@@ -1,0 +1,173 @@
+{
+  "title": "EnginEx 6.1.0 performance comparison: before/after compiler specialization, native PHP, and Twig",
+  "generatedAt": "2026-10-27T01:38:13.900Z",
+  "environment": {
+    "node": "v22.16.0",
+    "php": "8.4.24",
+    "platform": "linux",
+    "architecture": "x64",
+    "nodeEngineRequirement": ">=22.23.4"
+  },
+  "workload": {
+    "iterations": 50000,
+    "warmup": 5000,
+    "runs": 3,
+    "fixture": "132-byte HTML; escaped user name, 3 products, number formatting; CLI render-only benchmark; output hash computed inside the timed loop"
+  },
+  "baselineMethod": "The v6.0 baseline engine.js was extracted from the released 6.0.0 ZIP and benchmarked with the same fixtures/runtime/commands. Current and baseline runs are stored separately.",
+  "outputEquivalent": true,
+  "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+  "implementations": {
+    "baselineV6_0": [
+      {
+        "implementation": "EnginEx compiled sync renderer",
+        "available": true,
+        "medianRendersPerSecond": 76795,
+        "medianElapsedMs": 651.085,
+        "meanMicroseconds": 13.022,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0"
+      },
+      {
+        "implementation": "EnginEx compiled sync + prepared immutable data",
+        "available": true,
+        "medianRendersPerSecond": 95990,
+        "medianElapsedMs": 520.889,
+        "meanMicroseconds": 10.418,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0"
+      },
+      {
+        "implementation": "EnginEx async interpreted renderer",
+        "available": true,
+        "medianRendersPerSecond": 10050,
+        "medianElapsedMs": 4975.035,
+        "meanMicroseconds": 99.502,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0"
+      },
+      {
+        "implementation": "Native PHP template",
+        "available": true,
+        "medianRendersPerSecond": 584174,
+        "medianElapsedMs": 85.591,
+        "meanMicroseconds": 1.712,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "8.4.24"
+      },
+      {
+        "implementation": "Twig",
+        "available": false,
+        "reason": "vendor/autoload.php not found; install twig/twig to include this benchmark."
+      }
+    ],
+    "currentV6_1": [
+      {
+        "implementation": "EnginEx compiled sync renderer",
+        "available": true,
+        "medianRendersPerSecond": 118006,
+        "medianElapsedMs": 423.708,
+        "meanMicroseconds": 8.474,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0",
+        "v6_0BaselineRendersPerSecond": 76795,
+        "changeVsV6_0Percent": 53.66
+      },
+      {
+        "implementation": "EnginEx compiled sync + prepared immutable data",
+        "available": true,
+        "medianRendersPerSecond": 160521,
+        "medianElapsedMs": 311.486,
+        "meanMicroseconds": 6.23,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0",
+        "v6_0BaselineRendersPerSecond": 95990,
+        "changeVsV6_0Percent": 67.23
+      },
+      {
+        "implementation": "EnginEx async interpreted renderer",
+        "available": true,
+        "medianRendersPerSecond": 9682,
+        "medianElapsedMs": 5164.291,
+        "meanMicroseconds": 103.284,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "v22.16.0",
+        "v6_0BaselineRendersPerSecond": 10050,
+        "changeVsV6_0Percent": -3.66
+      },
+      {
+        "implementation": "Native PHP template",
+        "available": true,
+        "medianRendersPerSecond": 590354,
+        "medianElapsedMs": 84.695,
+        "meanMicroseconds": 1.694,
+        "outputBytes": 132,
+        "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+        "iterations": 50000,
+        "warmup": 5000,
+        "runs": 3,
+        "runtime": "8.4.24",
+        "v6_0BaselineRendersPerSecond": 584174,
+        "changeVsV6_0Percent": 1.06
+      },
+      {
+        "implementation": "Twig",
+        "available": false,
+        "reason": "vendor/autoload.php not found; install twig/twig to include this benchmark."
+      }
+    ]
+  },
+  "comparison": {
+    "compiledThroughputImprovementPercent": 53.66,
+    "preparedThroughputImprovementPercent": 67.23,
+    "nativePhpVsCompiledRatio": 5.003,
+    "nativePhpVsPreparedRatio": 3.678,
+    "compiledVsInterpretedRatio": 12.188
+  },
+  "cautions": [
+    "This is a small single-process CLI microbenchmark, not a complete web-page or PHP-FPM benchmark.",
+    "The local Node.js runtime is v22.16.0, below this package’s declared minimum of >=22.23.4. Re-run on supported patched Node.js versions before release decisions.",
+    "Native PHP used PHP 8.4.24 with opcache.enable_cli=1. Twig was not installed and could not be downloaded in this offline environment; no Twig performance result is claimed.",
+    "Numbers are medians of three runs and are specific to this environment. The same 132-byte output and SHA-256 were verified for available implementations."
+  ],
+  "rawRuns": {
+    "baseline": [
+      "cli-v6.0-baseline-run-1.json",
+      "cli-v6.0-baseline-run-2.json",
+      "cli-v6.0-baseline-run-3.json"
+    ],
+    "current": [
+      "cli-v6.1-run-1.json",
+      "cli-v6.1-run-2.json",
+      "cli-v6.1-run-3.json"
+    ]
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "note": "Local microbenchmark only. Includes full escaping output construction; does not imply general renderer speedup. Worker scan compares index scanning and includes worker/SAB overhead. WebGPU is omitted when unavailable.",
+  "runtime": "v22.16.0",
+  "inputBytes": 131072,
+  "iterations": 5,
+  "outputBytes": 202349,
+  "outputEquivalent": true,
+  "escaping": [
+    {
+      "implementation": "Native JavaScript escapeHtml",
+      "elapsedMs": 8.381,
+      "opsPerSecond": 597,
+      "meanMs": 1.676
+    },
+    {
+      "implementation": "Wasm SIMD ASCII escapeHtml",
+      "elapsedMs": 18.366,
+      "opsPerSecond": 272,
+      "meanMs": 3.673
+    }
+  ],
+  "workerScan": {
+    "nativeJavaScript": {
+      "implementation": "Native JS character scan",
+      "elapsedMs": 6.754,
+      "opsPerSecond": 740,
+      "meanMs": 1.351
+    },
+    "sharedArrayBufferWorker": {
+      "implementation": "SharedArrayBuffer worker scan",
+      "elapsedMs": 35.767,
+      "opsPerSecond": 140,
+      "meanMs": 7.153
+    },
+    "positionsEquivalent": true,
+    "stats": {
+      "scans": 5,
+      "scannedBytes": 655360,
+      "workerChunks": 10,
+      "workers": 2,
+      "closed": false
+    }
+  },
+  "webgpu": {
+    "available": false,
+    "reason": "WebGPU is not available in this Node.js environment."
+  }
+}

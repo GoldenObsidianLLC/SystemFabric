@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SystemFabric API",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/apps/api/src/server.js",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "HOST": "0.0.0.0",
+        "PORT": "8787",
+        "AI_PROVIDER": "mock",
+        "AI_ALLOWED_PROVIDERS": "mock",
+        "AI_ALLOW_EXTERNAL_CONTENT": "false"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Debug current Node test",
+      "type": "node",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "runtimeArgs": ["--test"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

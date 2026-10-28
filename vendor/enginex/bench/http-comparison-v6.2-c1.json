@@ -1,0 +1,99 @@
+{
+  "title": "EnginEx vs PHP vs Twig local HTTP benchmark",
+  "generatedAt": "2026-10-27T04:15:31.690Z",
+  "environment": {
+    "node": "v22.16.0",
+    "php": "8.4.24",
+    "platform": "linux",
+    "architecture": "x64"
+  },
+  "workload": {
+    "iterations": 500,
+    "warmup": 50,
+    "concurrency": 1,
+    "payload": "same 132-byte HTML fixture; no database, CDN, TLS, compression, or external network latency"
+  },
+  "topology": "EnginEx uses Node.js built-in HTTP server; PHP uses PHP built-in server, not PHP-FPM. Use a production-like run with PHP-FPM and the same reverse proxy before drawing deployment conclusions.",
+  "outputEquivalent": true,
+  "outputHashes": [
+    "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89"
+  ],
+  "aggregateOutputHashes": [
+    "4250c58af6c3e79bfa6acefe022619751649a18e17336ef73864b17bf6542501"
+  ],
+  "results": [
+    {
+      "implementation": "EnginEx compiled dynamic data",
+      "available": true,
+      "url": "/dynamic",
+      "requests": 500,
+      "elapsedMs": 846.384,
+      "requestsPerSecond": 591,
+      "latencyMs": {
+        "p50": 1.377,
+        "p95": 3.91,
+        "p99": 6.32
+      },
+      "status": 200,
+      "outputBytes": 132,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "aggregateOutputSha256": "4250c58af6c3e79bfa6acefe022619751649a18e17336ef73864b17bf6542501"
+    },
+    {
+      "implementation": "EnginEx prepared immutable data",
+      "available": true,
+      "url": "/prepared",
+      "requests": 500,
+      "elapsedMs": 656.628,
+      "requestsPerSecond": 761,
+      "latencyMs": {
+        "p50": 1.062,
+        "p95": 2.59,
+        "p99": 5.533
+      },
+      "status": 200,
+      "outputBytes": 132,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "aggregateOutputSha256": "4250c58af6c3e79bfa6acefe022619751649a18e17336ef73864b17bf6542501"
+    },
+    {
+      "implementation": "EnginEx full-page memory cache",
+      "available": true,
+      "url": "/page-cache",
+      "requests": 500,
+      "elapsedMs": 489.68,
+      "requestsPerSecond": 1021,
+      "latencyMs": {
+        "p50": 0.819,
+        "p95": 1.777,
+        "p99": 5.452
+      },
+      "status": 200,
+      "outputBytes": 132,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "aggregateOutputSha256": "4250c58af6c3e79bfa6acefe022619751649a18e17336ef73864b17bf6542501"
+    },
+    {
+      "implementation": "Native PHP page (PHP built-in server)",
+      "available": true,
+      "url": "/native",
+      "requests": 500,
+      "elapsedMs": 916.67,
+      "requestsPerSecond": 545,
+      "latencyMs": {
+        "p50": 1.657,
+        "p95": 2.749,
+        "p99": 4.336
+      },
+      "status": 200,
+      "outputBytes": 132,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "aggregateOutputSha256": "4250c58af6c3e79bfa6acefe022619751649a18e17336ef73864b17bf6542501"
+    },
+    {
+      "implementation": "Twig page (PHP built-in server)",
+      "available": false,
+      "reason": "{\"available\":false,\"reason\":\"Twig is not installed (vendor\\/autoload.php missing).\"}"
+    }
+  ]
+}

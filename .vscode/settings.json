@@ -1,0 +1,18 @@
+{
+  "editor.formatOnSave": true,
+  "editor.rulers": [100],
+  "files.eol": "\n",
+  "files.exclude": {
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/test-results": true,
+    "**/playwright-report": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/vendor/enginex/bench": true,
+    "**/artifacts/evidence/*.log": true
+  },
+  "testing.automaticallyOpenPeekView": "failureImmediately",
+  "javascript.updateImportsOnFileMove.enabled": "always"
+}

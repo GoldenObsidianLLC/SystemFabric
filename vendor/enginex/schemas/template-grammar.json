@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "id": "enginex-template-1",
+  "title": "EnginEx Template Grammar",
+  "version": "1.0.0",
+  "format": "EBNF-like machine-readable grammar",
+  "notes": [
+    "Expression semantics are defined by the restricted interpreter; unsupported JavaScript syntax is rejected.",
+    "Ordinary interpolation is HTML-escaped. Triple-brace interpolation requires engine-branded trusted HTML.",
+    "Legacy <?njs ?> blocks are rejected by safe-mode validation."
+  ],
+  "productions": {
+    "template": "(text | escapedInterpolation | rawInterpolation | comment | block | partial | legacyBlock)*",
+    "escapedInterpolation": "'{{' expression '}}'",
+    "rawInterpolation": "'{{{' expression '}}}'",
+    "comment": "'{{!' text '}}' | '{{!--' text '--}}'",
+    "block": "ifBlock | unlessBlock | eachBlock | withBlock | extendsBlock | namedBlock",
+    "ifBlock": "'{{#if' expression '}}' template ('{{else}}' template)? '{{/if}}'",
+    "unlessBlock": "'{{#unless' expression '}}' template ('{{else}}' template)? '{{/unless}}'",
+    "eachBlock": "'{{#each' expression ('as' identifier (',' identifier)?)? '}}' template ('{{else}}' template)? '{{/each}}'",
+    "withBlock": "'{{#with' expression 'as' identifier '}}' template '{{/with}}'",
+    "extendsBlock": "'{{#extends' stringLiteral '}}' namedBlock* '{{/extends}}'",
+    "namedBlock": "'{{#block' stringLiteral '}}' template '{{/block}}'",
+    "partial": "'{{>' (stringLiteral | relativeTemplateName) expression? '}}'",
+    "legacyBlock": "'<?njs' arbitraryText '?>' (rejected in safe mode)",
+    "expression": "restrictedExpression (('|' identifier arguments?)*)",
+    "restrictedExpression": "literal | identifier | propertyAccess | arrayLiteral | objectLiteral | unaryExpression | binaryExpression | conditionalExpression | helperCall | '(' restrictedExpression ')'",
+    "propertyAccess": "restrictedExpression ('.' identifier | '[' restrictedExpression ']' | '?.' identifier | '?.[' restrictedExpression ']')*",
+    "helperCall": "identifier '(' (restrictedExpression (',' restrictedExpression)*)? ')'",
+    "literal": "string | finiteNumber | true | false | null | undefined",
+    "unaryExpression": "('!' | '+' | '-') restrictedExpression",
+    "binaryOperators": ["**", "*", "/", "%", "+", "-", "<", "<=", ">", ">=", "===", "!==", "&&", "||", "??"],
+    "conditionalExpression": "restrictedExpression '?' restrictedExpression ':' restrictedExpression",
+    "identifier": "[A-Za-z_$][A-Za-z0-9_$]* | @root | @index | @key | @first | @last"
+  },
+  "securityConstraints": {
+    "functionCalls": "Only direct calls to registered helpers are permitted; methods on data objects cannot be invoked.",
+    "propertyAccess": "Own data properties only; prototype-sensitive names blocked.",
+    "rawInterpolation": "Requires safeHtml() or a trusted safe helper. htmlAttr(value) is intended only for quoted attribute values; safeUrl(value) is a URL scheme policy helper and should be used with normal escaped interpolation.",
+    "pathResolution": "Partial/layout paths must remain within the configured template root by default.",
+    "untrustedTemplateAuthors": "Do not treat arbitrary static HTML as safe; preview and publication permissions are separate."
+  }
+}

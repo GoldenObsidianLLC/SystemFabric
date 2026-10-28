@@ -1,0 +1,1 @@
+<main><h1>Hello, {{ user.name }}</h1><ul>{{#each products as product}}<li>{{ product.name }}: {{ product.price | formatNumber('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</li>{{/each}}</ul></main>

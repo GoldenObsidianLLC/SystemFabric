@@ -1,0 +1,129 @@
+{
+  "apiVersion": 1,
+  "widgets": [
+    {
+      "name": "section",
+      "label": "Section",
+      "category": "Layout",
+      "version": 1,
+      "children": true,
+      "renderKind": "container"
+    },
+    {
+      "name": "column",
+      "label": "Column",
+      "category": "Layout",
+      "version": 1,
+      "children": true,
+      "renderKind": "container"
+    },
+    {
+      "name": "container",
+      "label": "Container",
+      "category": "Layout",
+      "version": 1,
+      "children": true,
+      "renderKind": "container"
+    },
+    {
+      "name": "widget.heading",
+      "label": "Heading",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "heading"
+    },
+    {
+      "name": "widget.text",
+      "label": "Text",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "text"
+    },
+    {
+      "name": "widget.button",
+      "label": "Button",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "button"
+    },
+    {
+      "name": "widget.image",
+      "label": "Image",
+      "category": "Media",
+      "version": 1,
+      "children": false,
+      "renderKind": "image"
+    },
+    {
+      "name": "widget.list",
+      "label": "List",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "list"
+    },
+    {
+      "name": "widget.quote",
+      "label": "Quote",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "quote"
+    },
+    {
+      "name": "widget.divider",
+      "label": "Divider",
+      "category": "Basic",
+      "version": 1,
+      "children": false,
+      "renderKind": "divider"
+    },
+    {
+      "name": "widget.spacer",
+      "label": "Spacer",
+      "category": "Layout",
+      "version": 1,
+      "children": false,
+      "renderKind": "spacer"
+    },
+    {
+      "name": "widget.query-loop",
+      "label": "Query Loop",
+      "category": "Dynamic Content",
+      "version": 1,
+      "children": false,
+      "renderKind": "query-loop",
+      "description": "Displays a bounded list of published content items."
+    },
+    {
+      "name": "widget.video",
+      "label": "Video",
+      "category": "Media",
+      "version": 1,
+      "children": false,
+      "renderKind": "video",
+      "description": "Responsive video hosted in the SystemFabric media library."
+    },
+    {
+      "name": "widget.icon",
+      "label": "Icon",
+      "category": "Design",
+      "version": 1,
+      "children": false,
+      "renderKind": "icon",
+      "description": "Select an icon from the curated SystemFabric icon library."
+    },
+    {
+      "name": "widget.math",
+      "label": "Math Formula",
+      "category": "Content",
+      "version": 1,
+      "children": false,
+      "renderKind": "math",
+      "description": "Render a validated TeX formula with KaTeX when installed."
+    }
+  ]
+}

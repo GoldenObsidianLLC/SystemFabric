@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "release": "6.2.0",
+  "claims": [
+    {
+      "id": "ENG-CLAIM-001",
+      "claim": "The compiled renderer output is equivalent to the interpreter for tested fixtures.",
+      "status": "tested",
+      "evidence": ["npm test", "bench/enginex-php-twig-comparison.json"],
+      "scope": "local test suite and fixture only"
+    },
+    {
+      "id": "ENG-CLAIM-002",
+      "claim": "The reactive model can report changed paths and drive incremental fragment updates.",
+      "status": "tested",
+      "evidence": ["test/v6.2.test.js"],
+      "scope": "covered deterministic test cases; randomized property testing and high-contention tests remain required"
+    },
+    {
+      "id": "ENG-CLAIM-003",
+      "claim": "WebGPU/Wasm/worker acceleration improves rendering throughput.",
+      "status": "not-claimed",
+      "evidence": ["bench/accelerator-report.json"],
+      "scope": "prior measurements show results depend on workload; no general performance claim"
+    },
+    {
+      "id": "ENG-CLAIM-004",
+      "claim": "EnginEx is faster than PHP-FPM or Twig in production.",
+      "status": "not-measured",
+      "evidence": [],
+      "scope": "PHP-FPM deployment and Twig are not available in the local test environment"
+    },
+    {
+      "id": "ENG-CLAIM-005",
+      "claim": "EnginEx has undergone independent security auditing.",
+      "status": "not-audited",
+      "evidence": [],
+      "scope": "requires separate independent review"
+    }
+  ]
+}

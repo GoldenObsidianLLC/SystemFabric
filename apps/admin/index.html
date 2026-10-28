@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light"><title>SystemFabric Studio</title>
+  <link rel="stylesheet" href="/assets/studio.css">
+</head>
+<body>
+  <div id="login-shell" class="login-shell hidden">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">SF</div><p class="eyebrow">SYSTEMFABRIC</p><h1>Studio sign in</h1><p class="muted">Sign in to a site you have access to. The server manages a secure session.</p>
+      <label>Email<input id="login-email" type="email" autocomplete="username" required maxlength="254"></label>
+      <label>Password<input id="login-password" type="password" autocomplete="current-password" required maxlength="128"></label>
+      <button type="submit" class="primary wide">Sign in</button><a class="oidc-link" href="/api/v1/auth/oidc/start">Sign in with OIDC</a><a id="saml-link" class="oidc-link hidden" href="/api/v1/auth/saml/start">Sign in with SAML SSO</a>
+      <button id="forgot-password" type="button" class="text-button">Forgot password?</button>
+      <div id="mfa-challenge-panel" class="mfa-challenge hidden"><p class="hint">Enter the current code from your authenticator app. A recovery code can also be used.</p><label>Authentication code<input id="mfa-code" inputmode="text" autocomplete="one-time-code" maxlength="32"></label><button id="mfa-verify" type="button" class="primary wide">Verify and sign in</button><button id="mfa-cancel" type="button" class="text-button">Cancel</button></div>
+      <p id="login-status" role="status" class="status-text"></p>
+    </form>
+  </div>
+  <div id="app-shell" class="app-shell hidden">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark small">SF</div><div><strong>SystemFabric</strong><span>Visual CMS Studio</span></div></div>
+      <div class="top-actions"><label class="site-select-label">Site<select id="site-select" aria-label="Current site"></select></label><span id="user-label" class="user-label"></span><a class="quiet" href="/platform">Platform Hub</a><button id="security-button" class="quiet">Account security</button><button id="logout" class="quiet">Sign out</button></div>
+    </header>
+    <main class="workspace">
+      <aside class="left-rail">
+        <section class="rail-section pages-panel"><div class="section-heading"><div><p class="eyebrow">CONTENT</p><h2>Pages</h2></div><button id="new-page" class="icon-button" title="Create page" aria-label="Create page">＋</button></div>
+          <input id="page-search" class="search" type="search" placeholder="Find a page…" aria-label="Find pages"><div id="page-list" class="page-list"></div>
+        </section>
+        <section class="rail-section palette-panel"><p class="eyebrow">PAGE BUILDER</p><h2>Components</h2><p class="hint">Drag into the canvas, or click to add.</p>
+          <div id="component-palette" class="component-palette">
+            <button draggable="true" data-component="section" class="component-tile"><span class="tile-icon">▤</span><span><b>Section</b><small>Full-width group</small></span></button>
+            <button draggable="true" data-component="container" class="component-tile"><span class="tile-icon">▣</span><span><b>Container</b><small>Nested layout</small></span></button>
+            <button draggable="true" data-component="column" class="component-tile"><span class="tile-icon">▥</span><span><b>Column</b><small>Content column</small></span></button>
+            <button draggable="true" data-component="widget.heading" class="component-tile"><span class="tile-icon">H</span><span><b>Heading</b><small>Title or heading</small></span></button>
+            <button draggable="true" data-component="widget.text" class="component-tile"><span class="tile-icon">¶</span><span><b>Text</b><small>Paragraph copy</small></span></button>
+            <button draggable="true" data-component="widget.button" class="component-tile"><span class="tile-icon">↗</span><span><b>Button</b><small>Call to action</small></span></button>
+            <button draggable="true" data-component="widget.image" class="component-tile"><span class="tile-icon">▧</span><span><b>Image</b><small>Media asset</small></span></button>
+            <button draggable="true" data-component="widget.video" class="component-tile"><span class="tile-icon">▶</span><span><b>Video</b><small>Video media asset</small></span></button>
+            <button draggable="true" data-component="widget.icon" class="component-tile"><span class="tile-icon">✦</span><span><b>Icon</b><small>Curated SVG catalog</small></span></button>
+            <button draggable="true" data-component="widget.math" class="component-tile"><span class="tile-icon">∑</span><span><b>Math formula</b><small>TeX formula</small></span></button>
+            <button draggable="true" data-component="widget.list" class="component-tile"><span class="tile-icon">☷</span><span><b>List</b><small>Ordered or unordered</small></span></button>
+            <button draggable="true" data-component="widget.quote" class="component-tile"><span class="tile-icon">“</span><span><b>Quote</b><small>Quote and attribution</small></span></button>
+            <button draggable="true" data-component="widget.divider" class="component-tile"><span class="tile-icon">—</span><span><b>Divider</b><small>Visual separator</small></span></button>
+            <button draggable="true" data-component="widget.spacer" class="component-tile"><span class="tile-icon">↕</span><span><b>Spacer</b><small>Vertical spacing</small></span></button>
+            <button draggable="true" data-component="widget.query-loop" class="component-tile"><span class="tile-icon">▦</span><span><b>Query Loop</b><small>Published content cards</small></span></button>
+          </div>
+        </section>
+      </aside>
+      <section class="builder-area">
+        <div class="document-toolbar">
+          <div class="document-title-wrap"><input id="document-title" class="title-input" value="Untitled page" maxlength="180" aria-label="Page title"><div class="slug-row"><span>/</span><input id="page-slug" placeholder="page-slug" maxlength="180" aria-label="Page URL slug"><span id="version-label" class="version-label">New draft</span></div></div>
+          <div class="toolbar-actions"><button id="undo" class="quiet" disabled>↶ Undo</button><button id="redo" class="quiet" disabled>↷ Redo</button><button id="preview-button" class="secondary">Preview</button><button id="save-button" class="secondary">Save draft</button><button id="workflow-button" class="primary">Submit for review</button><button id="publish-button" class="primary hidden">Publish</button><button id="more-button" class="quiet">⋯</button></div>
+        </div>
+        <div id="more-menu" class="more-menu hidden"><button id="approve-button">Approve for publication</button><button id="schedule-button">Schedule publication</button><button id="unpublish-button">Unpublish</button><button id="archive-button" class="danger-text">Archive page</button><button id="revisions-button">Revision history</button><button id="json-button">Edit document JSON</button></div>
+        <div class="canvas-toolbar"><div><span class="live-dot"></span><span id="canvas-status">Draft editor</span><span id="dirty-status" class="dirty-status">Unsaved changes</span></div><div class="viewport-switch" role="group" aria-label="Canvas viewport"><button data-viewport="desktop" class="active">Desktop</button><button data-viewport="tablet">Tablet</button><button data-viewport="mobile">Mobile</button></div></div>
+        <div class="canvas-scroll"><div id="canvas-frame" class="canvas-frame desktop"><div id="canvas-root" class="canvas-root" aria-label="Page layout canvas"><div id="empty-canvas" class="empty-canvas"><div class="empty-symbol">＋</div><h3>Start building your page</h3><p>Drag a component from the left, or click any component to add it.</p></div></div></div></div>
+        <div class="bottom-status"><span id="save-status" role="status">Ready</span><span id="node-count">0 components</span><span>Autosave recovery enabled</span></div>
+      </section>
+      <aside class="inspector-rail">
+        <div class="inspector-tabs"><button class="active" data-tab="settings">Settings</button><button data-tab="styles">Styles</button><button data-tab="document">Document</button></div>
+        <div id="inspector-settings" class="inspector-content"><p class="eyebrow">SELECTED COMPONENT</p><h2 id="selected-name">No selection</h2><p id="selected-id" class="hint">Choose a component on the canvas.</p><div id="settings-fields" class="field-stack"></div><div id="node-actions" class="node-actions hidden"><button id="duplicate-node" class="secondary">Duplicate</button><button id="move-up" class="secondary">Move up</button><button id="move-down" class="secondary">Move down</button><button id="remove-node" class="danger">Remove</button></div></div>
+        <div id="inspector-styles" class="inspector-content hidden"><p class="eyebrow">VISUAL DESIGN</p><h2>Style controls</h2><p class="hint">Values are validated against a CSS property allowlist.</p><div id="style-fields" class="field-stack"></div><div class="field-group"><label for="responsive-breakpoint">Responsive breakpoint</label><select id="responsive-breakpoint"><option value="desktop">Desktop</option><option value="tablet">Tablet</option><option value="mobile">Mobile</option></select></div></div>
+        <div id="inspector-document" class="inspector-content hidden"><p class="eyebrow">DOCUMENT TOOLS</p><h2>Page document</h2><p class="hint">The versioned JSON document is the canonical page representation.</p><button id="download-json" class="secondary wide">Download JSON</button><button id="show-revisions" class="secondary wide">Revision history</button><button id="reload-document" class="secondary wide">Discard local changes</button></div>
+      </aside>
+    </main>
+  </div>
+  <dialog id="security-dialog" class="modal"><div class="modal-head"><h2>Account security</h2><button data-close="security-dialog" class="icon-button" aria-label="Close security">×</button></div><p class="hint">Manage your sessions and multi-factor authentication. Keep recovery codes somewhere secure.</p><div class="field-stack"><button id="security-sessions" class="secondary wide">Load active sessions</button><div id="security-session-list" class="revision-list"></div><button id="mfa-enroll" class="secondary wide">Set up authenticator MFA</button><div id="mfa-enroll-panel" class="hidden"><p>Enter this secret in your authenticator app, then verify a code.</p><code id="mfa-secret" class="mfa-secret"></code><p><a id="mfa-otpauth" href="#" rel="noreferrer">Open authenticator setup link</a></p><label>Authenticator code<input id="mfa-enroll-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></label><button id="mfa-confirm" class="primary wide">Enable MFA</button></div><div id="mfa-recovery-panel" class="hidden"><h3>Save your recovery codes</h3><p>Each code works once. They will not be shown again.</p><pre id="mfa-recovery-codes" class="json-editor"></pre></div><button id="mfa-disable" class="danger wide">Disable MFA</button><div id="mfa-disable-panel" class="hidden"><label>Current password<input id="mfa-disable-password" type="password" autocomplete="current-password"></label><label>Authenticator code<input id="mfa-disable-code" inputmode="numeric" maxlength="6"></label><button id="mfa-disable-confirm" class="danger wide">Confirm disable (ends all sessions)</button></div><p id="security-status" class="status-text" role="status"></p></div></dialog>
+  <dialog id="preview-dialog" class="modal preview-modal"><div class="modal-head"><h2>Live preview</h2><button data-close="preview-dialog" class="icon-button" aria-label="Close preview">×</button></div><iframe id="preview-frame" title="Rendered page preview" sandbox=""></iframe></dialog>
+  <dialog id="json-dialog" class="modal"><div class="modal-head"><h2>Document JSON</h2><button data-close="json-dialog" class="icon-button" aria-label="Close JSON">×</button></div><textarea id="json-editor" class="json-editor" spellcheck="false"></textarea><div class="modal-actions"><button data-close="json-dialog" class="secondary">Cancel</button><button id="apply-json" class="primary">Validate and apply</button></div></dialog>
+  <dialog id="revisions-dialog" class="modal"><div class="modal-head"><h2>Revision history</h2><button data-close="revisions-dialog" class="icon-button" aria-label="Close revisions">×</button></div><div id="revision-list" class="revision-list"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/studio.js" defer></script>
+</body>
+</html>

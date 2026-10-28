@@ -1,0 +1,25 @@
+.env
+.env.*.local
+node_modules/
+coverage/
+*.log
+.DS_Store
+.tmp/
+artifacts/private/
+.env.local
+.env.test
+playwright-report/
+test-results/
+blob-report/
+artifacts/evidence/*.log
+
+# Local uploads, media derivatives and test data
+var/
+/.env
+/.env.*
+!/.env.example
+!/.env.template
+!/.env.sample
+/playwright-report/
+/test-results/
+/coverage/

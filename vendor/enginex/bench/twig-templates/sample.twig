@@ -1,0 +1,1 @@
+<main><h1>Hello, {{ user.name }}</h1><ul>{% for product in products %}<li>{{ product.name }}: {{ product.price|number_format(2, '.', ',') }}</li>{% endfor %}</ul></main>

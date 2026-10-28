@@ -1,0 +1,121 @@
+{
+  "note": "Performance results are local measurements from this run only, not universal claims. The standard compiled path validates/snapshots data each render; prepared mode validates/freezes the same data once. Load/compile/preparation time is reported separately. Exact aggregate hashes verify byte-identical output across available implementations. Twig is reported unavailable when not installed.",
+  "workload": {
+    "iterations": 50000,
+    "warmup": 5000
+  },
+  "outputEquivalent": true,
+  "outputVerification": {
+    "aggregateOutputHashesMatch": true,
+    "singleOutputHashesMatch": true,
+    "outputByteLengthsMatch": true,
+    "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+    "outputBytesPerRender": 132
+  },
+  "comparisons": {
+    "fastestMeasured": "Native PHP template",
+    "speedupRatios": {
+      "compiledEnginExVsInterpreted": 7.641,
+      "preparedEnginExVsInterpreted": 9.551,
+      "preparedEnginExVsRegularCompiled": 1.25,
+      "nativePhpVsRegularCompiled": 7.607,
+      "nativePhpVsPreparedEnginEx": 6.086
+    },
+    "preparedThroughputPercentImprovement": 25,
+    "availableImplementations": [
+      "EnginEx compiled sync renderer",
+      "EnginEx compiled sync + prepared immutable data",
+      "EnginEx async interpreted renderer",
+      "Native PHP template"
+    ]
+  },
+  "results": [
+    {
+      "implementation": "EnginEx compiled sync renderer",
+      "version": "6.0.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-preloaded-template",
+      "iterations": 50000,
+      "warmup": 5000,
+      "templateLoadMs": 4.539,
+      "elapsedMs": 651.085,
+      "rendersPerSecond": 76795,
+      "meanMicroseconds": 13.022,
+      "outputBytes": 132,
+      "outputHash": "caa49062d99e2ddb5488961188f25efa2c7b3747d31e1eaf99ea583f897240a2",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "cache": {
+        "hits": 0,
+        "misses": 1,
+        "parses": 1,
+        "evictions": 0,
+        "rendererCompiles": 1,
+        "renderersCompiled": 1,
+        "syncRenders": 55000,
+        "incrementalPatches": 0,
+        "formatterCacheSize": 1,
+        "size": 1,
+        "inFlight": 0
+      }
+    },
+    {
+      "implementation": "EnginEx compiled sync + prepared immutable data",
+      "version": "6.0.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-precompiled-prepared-data",
+      "iterations": 50000,
+      "warmup": 5000,
+      "templateLoadAndPrepareMs": 5.291,
+      "elapsedMs": 520.889,
+      "rendersPerSecond": 95990,
+      "meanMicroseconds": 10.418,
+      "outputBytes": 132,
+      "outputHash": "caa49062d99e2ddb5488961188f25efa2c7b3747d31e1eaf99ea583f897240a2",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89"
+    },
+    {
+      "implementation": "EnginEx async interpreted renderer",
+      "version": "6.0.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-AST-cache",
+      "iterations": 50000,
+      "warmup": 5000,
+      "elapsedMs": 4975.035,
+      "rendersPerSecond": 10050,
+      "meanMicroseconds": 99.501,
+      "outputBytes": 132,
+      "outputHash": "caa49062d99e2ddb5488961188f25efa2c7b3747d31e1eaf99ea583f897240a2",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "cache": {
+        "hits": 54999,
+        "misses": 1,
+        "parses": 1,
+        "evictions": 0,
+        "rendererCompiles": 0,
+        "renderersCompiled": 0,
+        "syncRenders": 0,
+        "incrementalPatches": 0,
+        "formatterCacheSize": 1,
+        "size": 1,
+        "inFlight": 0
+      }
+    },
+    {
+      "implementation": "Native PHP template",
+      "runtime": "8.4.24",
+      "opcacheCliEnabled": true,
+      "iterations": 50000,
+      "warmup": 5000,
+      "elapsedMs": 85.591,
+      "rendersPerSecond": 584174,
+      "outputBytes": 132,
+      "outputHash": "caa49062d99e2ddb5488961188f25efa2c7b3747d31e1eaf99ea583f897240a2",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89"
+    },
+    {
+      "implementation": "Twig",
+      "available": false,
+      "reason": "vendor/autoload.php not found; install twig/twig to include this benchmark."
+    }
+  ]
+}

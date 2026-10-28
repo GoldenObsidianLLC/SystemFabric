@@ -1,0 +1,123 @@
+{
+  "note": "Performance results are local measurements from this run only, not universal claims. The standard compiled path validates/snapshots data each render; prepared mode validates/freezes the same data once. Load/compile/preparation time is reported separately. Exact aggregate hashes verify byte-identical output across available implementations. Twig is reported unavailable when not installed.",
+  "workload": {
+    "iterations": 10000,
+    "warmup": 1000,
+    "orderSeed": 4
+  },
+  "outputEquivalent": true,
+  "outputVerification": {
+    "aggregateOutputHashesMatch": true,
+    "singleOutputHashesMatch": true,
+    "outputByteLengthsMatch": true,
+    "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+    "outputBytesPerRender": 132
+  },
+  "comparisons": {
+    "fastestMeasured": "Native PHP template",
+    "speedupRatios": {
+      "compiledEnginExVsInterpreted": 10.905,
+      "preparedEnginExVsInterpreted": 39.304,
+      "preparedEnginExVsRegularCompiled": 3.604,
+      "nativePhpVsRegularCompiled": 5.975,
+      "nativePhpVsPreparedEnginEx": 1.658
+    },
+    "preparedThroughputPercentImprovement": 260.41,
+    "availableImplementations": [
+      "Native PHP template",
+      "EnginEx compiled sync renderer",
+      "EnginEx compiled sync + prepared immutable data",
+      "EnginEx async interpreted renderer"
+    ]
+  },
+  "results": [
+    {
+      "implementation": "Native PHP template",
+      "runtime": "8.4.24",
+      "opcacheCliEnabled": true,
+      "iterations": 10000,
+      "warmup": 1000,
+      "elapsedMs": 76.466,
+      "rendersPerSecond": 130777,
+      "outputBytes": 132,
+      "outputHash": "75da60bf8f23d6d61d0948c7d37a6be81422a2fb9c73cd061f0afbb82596e52f",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89"
+    },
+    {
+      "implementation": "Twig",
+      "available": false,
+      "reason": "vendor/autoload.php not found; install twig/twig to include this benchmark."
+    },
+    {
+      "implementation": "EnginEx compiled sync renderer",
+      "version": "6.2.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-preloaded-template",
+      "iterations": 10000,
+      "warmup": 1000,
+      "templateLoadMs": 104.711,
+      "elapsedMs": 456.891,
+      "rendersPerSecond": 21887,
+      "meanMicroseconds": 45.689,
+      "outputBytes": 132,
+      "outputHash": "75da60bf8f23d6d61d0948c7d37a6be81422a2fb9c73cd061f0afbb82596e52f",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "cache": {
+        "hits": 0,
+        "misses": 1,
+        "parses": 1,
+        "evictions": 0,
+        "rendererCompiles": 1,
+        "renderersCompiled": 1,
+        "syncRenders": 11000,
+        "incrementalPatches": 0,
+        "formatterCacheSize": 0,
+        "size": 1,
+        "inFlight": 0
+      }
+    },
+    {
+      "implementation": "EnginEx compiled sync + prepared immutable data",
+      "version": "6.2.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-precompiled-prepared-data",
+      "iterations": 10000,
+      "warmup": 1000,
+      "templateLoadAndPrepareMs": 79.769,
+      "elapsedMs": 126.77,
+      "rendersPerSecond": 78883,
+      "meanMicroseconds": 12.677,
+      "outputBytes": 132,
+      "outputHash": "75da60bf8f23d6d61d0948c7d37a6be81422a2fb9c73cd061f0afbb82596e52f",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89"
+    },
+    {
+      "implementation": "EnginEx async interpreted renderer",
+      "version": "6.2.0",
+      "runtime": "v22.16.0",
+      "mode": "warm-AST-cache",
+      "iterations": 10000,
+      "warmup": 1000,
+      "elapsedMs": 4981.768,
+      "rendersPerSecond": 2007,
+      "meanMicroseconds": 498.177,
+      "outputBytes": 132,
+      "outputHash": "75da60bf8f23d6d61d0948c7d37a6be81422a2fb9c73cd061f0afbb82596e52f",
+      "singleOutputHash": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "cache": {
+        "hits": 10999,
+        "misses": 1,
+        "parses": 1,
+        "evictions": 0,
+        "rendererCompiles": 0,
+        "renderersCompiled": 0,
+        "syncRenders": 0,
+        "incrementalPatches": 0,
+        "formatterCacheSize": 1,
+        "size": 1,
+        "inFlight": 0
+      }
+    }
+  ],
+  "runIndex": 4
+}

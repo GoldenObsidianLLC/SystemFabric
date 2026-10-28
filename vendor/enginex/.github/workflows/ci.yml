@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node.js ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22.23.4', '24.x', '26.x']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - run: npm run evals
+      - run: npm run check
+
+
+  php-output-equivalence:
+    name: PHP fixture output parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+      - run: ENGINEX_BENCH_ITERATIONS=100 ENGINEX_BENCH_WARMUP=10 npm run bench:compare
+      - run: ENGINEX_HTTP_ITERATIONS=100 ENGINEX_HTTP_WARMUP=10 npm run bench:http

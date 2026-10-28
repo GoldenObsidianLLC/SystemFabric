@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systemfabric.invalid/schemas/cpt-definition.schema.json",
+  "title": "SystemFabric Custom Content Type Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "name", "label", "source", "version", "fields", "capabilities", "publicationPolicy"],
+  "properties": {
+    "apiVersion": { "const": 1 },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,62}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 180 },
+    "source": { "enum": ["git", "admin"] },
+    "version": { "type": "integer", "minimum": 1 },
+    "fields": {
+      "type": "array", "maxItems": 200,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "type", "required"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z][A-Za-z0-9_]{0,62}$" },
+          "type": { "enum": ["string", "number", "boolean", "date", "enum", "assetRef", "relationRef", "richDocument"] },
+          "required": { "type": "boolean" },
+          "maxLength": { "type": "integer", "minimum": 1, "maximum": 100000 },
+          "enum": { "type": "array", "items": { "type": "string", "maxLength": 200 }, "maxItems": 100 },
+          "relationType": { "type": "string", "maxLength": 100 },
+          "default": {}
+        }
+      }
+    },
+    "capabilities": { "type": "array", "uniqueItems": true, "items": { "enum": ["read", "create", "edit", "submitForReview", "publish", "archive"] } },
+    "publicationPolicy": { "enum": ["author-can-publish", "review-required", "owner-only"] }
+  }
+}

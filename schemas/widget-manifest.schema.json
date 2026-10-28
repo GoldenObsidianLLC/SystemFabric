@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systemfabric.invalid/schemas/widget-manifest.schema.json",
+  "title": "SystemFabric Widget Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "name", "version", "label", "category", "children", "renderKind"],
+  "properties": {
+    "apiVersion": { "const": 1 },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{0,100}$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "category": { "type": "string", "maxLength": 100 },
+    "children": { "type": "boolean" },
+    "renderKind": { "enum": ["container", "heading", "text", "button", "image", "custom"] },
+    "propertiesSchema": { "type": "object" },
+    "defaults": { "type": "object" },
+    "requiredCapabilities": { "type": "array", "uniqueItems": true, "items": { "enum": ["content:read", "media:read", "network:fetch", "plugin:storage"] } },
+    "migrations": { "type": "array" }
+  }
+}

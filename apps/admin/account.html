@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark light"><title>SystemFabric Account</title>
+  <link rel="stylesheet" href="/assets/account.css"><script src="/assets/account.js" defer></script>
+</head>
+<body>
+  <main class="card" aria-labelledby="account-title">
+    <div class="brand-mark" aria-hidden="true">SF</div>
+    <p class="eyebrow">SYSTEMFABRIC</p>
+    <h1 id="account-title">Account action</h1>
+    <p id="account-intro" class="muted">Secure account management.</p>
+    <form id="password-reset-form" class="hidden">
+      <label>New password<input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+      <label>Confirm password<input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+      <button class="primary" type="submit">Reset password</button>
+    </form>
+    <form id="invitation-form" class="hidden">
+      <label>Display name<input id="display-name" autocomplete="name" maxlength="180" required></label>
+      <label>Choose a password<input id="invite-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+      <button class="primary" type="submit">Accept invitation</button>
+    </form>
+    <p id="account-status" class="status" role="status" aria-live="polite"></p>
+    <a id="studio-link" href="/admin">Return to SystemFabric Studio</a>
+  </main>
+</body>
+</html>

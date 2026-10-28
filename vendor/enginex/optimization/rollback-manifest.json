@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "release": "6.2.0",
+  "baselineRelease": "6.1.0",
+  "rollbackStrategy": {
+    "renderer": "Keep the previous package artifact and renderer configuration; disable the candidate feature or deploy the previous version.",
+    "incrementalRendering": "Disable incremental updates per session and perform a full render when dependencies or patch state are uncertain.",
+    "accelerators": "Set backend to javascript; do not require WebAssembly SIMD, SharedArrayBuffer or WebGPU for core rendering.",
+    "responseCache": "Disable or clear response cache and serve freshly rendered HTML if keys or invalidation are uncertain.",
+    "aiTooling": "Disable write/publish capabilities independently; retain the deterministic parser/validator and manual release path."
+  },
+  "releaseArtifactRequired": true,
+  "automaticProductionRollbackImplemented": false,
+  "note": "This manifest defines rollback procedures; deployment automation must implement and verify them in the target hosting environment."
+}

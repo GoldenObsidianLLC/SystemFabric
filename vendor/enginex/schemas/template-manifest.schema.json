@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enginex.invalid/schemas/template-manifest.schema.json",
+  "title": "EnginEx Template Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "template", "security"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "version": { "type": "integer", "minimum": 1 },
+    "template": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "dataSchema": { "type": "string", "maxLength": 512 },
+    "requiredHelpers": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$" } },
+    "partials": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 512 } },
+    "layouts": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 512 } },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rawHtmlAllowed"],
+      "properties": {
+        "rawHtmlAllowed": { "type": "boolean" },
+        "trustedHelperAllowlist": { "type": "array", "items": { "type": "string" } },
+        "contentPolicy": { "type": "string", "enum": ["application-owned", "sanitized-html", "text-only"] }
+      }
+    },
+    "tests": { "type": "array", "items": { "type": "string", "maxLength": 512 } }
+  }
+}

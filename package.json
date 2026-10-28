@@ -1,0 +1,56 @@
+{
+  "name": "systemfabric",
+  "version": "0.5.1",
+  "private": true,
+  "description": "AI-integrated headless CMS, visual page builder, media and document library, commerce, memberships, community, and rendering runtime for Node.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "start": "node apps/api/src/server.js",
+    "start:api": "node apps/api/src/server.js",
+    "start:mcp": "node apps/mcp/src/server.mjs",
+    "test": "node --test test/*.test.js",
+    "check": "node scripts/verify.js && npm test",
+    "dev": "node apps/api/src/server.js",
+    "seed:dev": "node scripts/seed-dev.js",
+    "start:worker": "node apps/worker/src/outbox-worker.js",
+    "migrate": "node scripts/migrate.js",
+    "bootstrap:owner": "node scripts/bootstrap-owner.js",
+    "plugin:provenance": "node scripts/plugin-provenance.js",
+    "start:scheduler": "node apps/worker/src/scheduler.js",
+    "start:plugin-runner": "node apps/plugin-runner/src/server.js",
+    "test:integration": "node --test test/integration/*.test.js",
+    "test:e2e": "playwright test",
+    "test:all": "npm run check && npm run test:integration:live && npm run test:e2e",
+    "sbom": "mkdir -p artifacts && npm sbom --sbom-format=cyclonedx --omit=dev > artifacts/systemfabric.sbom.cdx.json",
+    "postinstall": "node scripts/materialize-katex-assets.js",
+    "reconcile:library": "node scripts/reconcile-library-objects.js",
+    "release:readiness": "node scripts/release-readiness.js",
+    "release:assert-ready": "node scripts/release-readiness.js --strict",
+    "dev:setup": "node scripts/setup-dev.js",
+    "dev:bootstrap": "node scripts/bootstrap-dev.js",
+    "dev:doctor": "node scripts/dev-doctor.js",
+    "test:integration:live": "node scripts/test-integration-live.js",
+    "test:e2e:install": "playwright install chromium"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "enginex-ai-native": "file:vendor/enginex",
+    "neo4j-driver": "6.0.1",
+    "pg": "8.16.3",
+    "zod": "4.6.6",
+    "@aws-sdk/client-s3": "3.1156.0",
+    "@node-saml/node-saml": "5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  },
+  "optionalDependencies": {
+    "katex": "0.19.1",
+    "sharp": "0.35.5",
+    "@google-cloud/storage": "8.4.0",
+    "@azure/storage-blob": "12.34.0"
+  }
+}

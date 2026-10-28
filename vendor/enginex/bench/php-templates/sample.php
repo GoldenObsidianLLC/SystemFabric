@@ -1,0 +1,1 @@
+<main><h1>Hello, <?= htmlspecialchars((string)($user['name'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1><ul><?php foreach ($products as $product): ?><li><?= htmlspecialchars((string)$product['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>: <?= number_format((float)$product['price'], 2, '.', ',') ?></li><?php endforeach; ?></ul></main>

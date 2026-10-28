@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "product": "SystemFabric",
+  "version": "0.5.1",
+  "generatedAt": "2026-10-27T23:41:31.987Z",
+  "host": {
+    "node": "v22.16.0",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
+  "readyForProduction": false,
+  "checks": [
+    {
+      "id": "supported-runtime",
+      "title": "Supported Node.js runtime",
+      "status": "BLOCKED",
+      "details": "Required >=22.23.4; running v22.16.0.",
+      "evidencePath": null
+    },
+    {
+      "id": "reviewed-lockfile",
+      "title": "Reviewed and committed npm lockfile",
+      "status": "BLOCKED",
+      "details": "package-lock.json is absent; reproducible npm ci cannot be certified.",
+      "evidencePath": null
+    },
+    {
+      "id": "migration-artifacts",
+      "title": "Versioned migration files",
+      "status": "PASS",
+      "details": "8 migration files are present; live fresh/upgrade execution is a separate gate.",
+      "evidencePath": null
+    },
+    {
+      "id": "syntax-artifact-check",
+      "title": "Required artifacts and JavaScript syntax",
+      "status": "PASS",
+      "details": "Exit 0; 2346 ms.  | WARNING: current runtime is below the declared minimum; results are development checks only, not supported-runtime validation.",
+      "evidencePath": "artifacts/evidence/artifact-check.log"
+    },
+    {
+      "id": "unit-tests",
+      "title": "SystemFabric unit/security tests",
+      "status": "PASS",
+      "details": "Exit 0; {\"tests\":105,\"pass\":105,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1695 ms. Test execution is on v22.16.0.",
+      "evidencePath": "artifacts/evidence/unit-tests.tap.log"
+    },
+    {
+      "id": "enginex-tests",
+      "title": "Vendored EnginEx unit tests",
+      "status": "PASS",
+      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1043 ms.",
+      "evidencePath": "artifacts/evidence/enginex-tests.tap.log"
+    },
+    {
+      "id": "integration-tests",
+      "title": "PostgreSQL/Memgraph/product integration tests",
+      "status": "PARTIAL",
+      "details": "Exit 0; {\"tests\":5,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":5,\"todo\":0}; 219 ms. Skipped tests do not count as production validation.",
+      "evidencePath": "artifacts/evidence/integration-tests.tap.log"
+    },
+    {
+      "id": "playwright-installed",
+      "title": "Playwright dependency available",
+      "status": "BLOCKED",
+      "details": "@playwright/test is not installed/resolvable in this checkout.",
+      "evidencePath": null
+    }
+  ],
+  "evidenceGates": [
+    {
+      "id": "postgres-memgraph-live",
+      "title": "Fresh/upgrade migrations, PostgreSQL transactions and Memgraph outage/replay",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/postgres-memgraph-live.json",
+      "details": "No evidence file at artifacts/evidence/postgres-memgraph-live.json."
+    },
+    {
+      "id": "tenant-isolation-review",
+      "title": "Independent tenant-isolation and authorization review",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/tenant-isolation-review.json",
+      "details": "No evidence file at artifacts/evidence/tenant-isolation-review.json."
+    },
+    {
+      "id": "identity-provider-e2e",
+      "title": "OIDC/SAML/email delivery/MFA recovery end-to-end evidence",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/identity-provider-e2e.json",
+      "details": "No evidence file at artifacts/evidence/identity-provider-e2e.json."
+    },
+    {
+      "id": "clamav-corpus",
+      "title": "Live ClamAV, malicious-file corpus and legacy-asset quarantine",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/clamav-corpus.json",
+      "details": "No evidence file at artifacts/evidence/clamav-corpus.json."
+    },
+    {
+      "id": "cloud-live-providers",
+      "title": "Live S3/GCS/Azure/S3-compatible credentials and least-privilege operations",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/cloud-live-providers.json",
+      "details": "No evidence file at artifacts/evidence/cloud-live-providers.json."
+    },
+    {
+      "id": "stripe-live-lifecycle",
+      "title": "Stripe webhook replay, ambiguous-outcome recovery and inventory lifecycle",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/stripe-live-lifecycle.json",
+      "details": "No evidence file at artifacts/evidence/stripe-live-lifecycle.json."
+    },
+    {
+      "id": "browser-accessibility",
+      "title": "Playwright editor journeys and WCAG-focused accessibility acceptance",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/browser-accessibility.json",
+      "details": "No evidence file at artifacts/evidence/browser-accessibility.json."
+    },
+    {
+      "id": "commerce-parity-acceptance",
+      "title": "Tax/shipping/coupons/refunds/fulfilment/downloads/subscription acceptance",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/commerce-parity-acceptance.json",
+      "details": "No evidence file at artifacts/evidence/commerce-parity-acceptance.json."
+    },
+    {
+      "id": "community-parity-acceptance",
+      "title": "Group privacy, spam/abuse, search, export/deletion and forum acceptance",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/community-parity-acceptance.json",
+      "details": "No evidence file at artifacts/evidence/community-parity-acceptance.json."
+    },
+    {
+      "id": "plugin-container-isolation",
+      "title": "Signed plugin pipeline and adversarial container isolation",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/plugin-container-isolation.json",
+      "details": "No evidence file at artifacts/evidence/plugin-container-isolation.json."
+    },
+    {
+      "id": "dependency-sbom-codeql",
+      "title": "Reviewed dependency audit, SBOM/provenance and CodeQL evidence",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/dependency-sbom-codeql.json",
+      "details": "No evidence file at artifacts/evidence/dependency-sbom-codeql.json."
+    },
+    {
+      "id": "load-backup-restore",
+      "title": "Load/soak, fault injection, backup/restore and recovery drills",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/load-backup-restore.json",
+      "details": "No evidence file at artifacts/evidence/load-backup-restore.json."
+    },
+    {
+      "id": "independent-security-review",
+      "title": "Independent security assessment and severe-finding remediation",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/independent-security-review.json",
+      "details": "No evidence file at artifacts/evidence/independent-security-review.json."
+    },
+    {
+      "id": "operations-release-approval",
+      "title": "Deployment runbooks, secrets/rollback plan, monitoring and release approval",
+      "status": "MISSING_EVIDENCE",
+      "evidencePath": "artifacts/evidence/operations-release-approval.json",
+      "details": "No evidence file at artifacts/evidence/operations-release-approval.json."
+    }
+  ],
+  "summary": {
+    "pass": 4,
+    "partial": 1,
+    "blocked": 3,
+    "missingEvidence": 14,
+    "notRun": 0
+  }
+}

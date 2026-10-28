@@ -1,0 +1,143 @@
+{
+  "name": "SystemFabric",
+  "packageName": "systemfabric",
+  "version": "0.5.1",
+  "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
+  "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
+  "runtime": {
+    "nodeMinimum": ">=22.23.4",
+    "runtimeTested": "22.16.0",
+    "runtimeTestSupported": false,
+    "packageManager": "npm",
+    "packageLock": {
+      "included": false,
+      "reason": "The packaging environment had no usable registry access and no cached dependency metadata, so package-lock.json could not be generated or reviewed here. The VS Code bootstrap generates a lockfile on a network-enabled machine when absent; review it, commit it, and validate clean npm ci. CI requires a committed lockfile and does not create one."
+    }
+  },
+  "renderer": {
+    "name": "enginex-ai-native",
+    "version": "6.2.0",
+    "source": "vendor/enginex",
+    "license": "MIT"
+  },
+  "data": {
+    "authoritative": "PostgreSQL",
+    "relationshipProjection": "Memgraph",
+    "consistency": "PostgreSQL transactional outbox with idempotent versioned graph projections",
+    "assetStorage": "local or configured object storage adapter; SQL metadata and object bytes do not share a distributed transaction",
+    "publishedContent": "immutable published snapshots separate from mutable drafts",
+    "libraryScanning": "optional ClamAV clamdscan adapter; production upload path fails closed unless scanner is configured; existing assets default to not_scanned",
+    "objectReconciliation": "local-only, dry-run by default; delete requires explicit --apply and a minimum age"
+  },
+  "features": {
+    "cms": [
+      "versioned page documents",
+      "drafts and revisions",
+      "review, approval, publication, scheduling, unpublishing and archiving foundations",
+      "site-level identity and capability controls",
+      "browser drag-and-drop editor foundations"
+    ],
+    "libraries": [
+      "file/document/image/video/audio/font asset kinds",
+      "MIME signature checks and SHA-256 verification",
+      "metadata and optimistic asset versions",
+      "curated SVG icon catalogue",
+      "optional Sharp WebP and FFmpeg WebM derivatives",
+      "optional KaTeX rendering with escaped fallback",
+      "ClamAV scanning adapter and production fail-closed policy",
+      "non-production quarantine when scan is not configured",
+      "dry-run-first local object reconciler"
+    ],
+    "commerce": [
+      "product and order data model",
+      "bounded cart and integer minor-unit calculations",
+      "finite-stock reservation creation, transactional commit/release, and provider-aware Stripe session reconciliation for expired holds",
+      "Stripe Checkout expiration bound and persisted request snapshot for idempotent recovery",
+      "ambiguous provider transport/5xx outcome handling that preserves the pending order and stock hold; unknown or unavailable Stripe session state never triggers an automatic restock",
+      "signed Stripe webhook foundation and order-status idempotency",
+      "membership plan/recurring checkout foundations; full lifecycle remains incomplete",
+      "refund, coupon redemption and download entitlement schema foundations"
+    ],
+    "community": [
+      "site-scoped profile, groups, group membership, friend requests and activity foundations",
+      "site-scoped direct conversations/messages, read markers and message notifications",
+      "blocking, report queue/status workflows and moderator hide/restore actions",
+      "message/report rate limits serialized using transaction-scoped advisory locks",
+      "group conversations/privacy, forums, full abuse controls, search and privacy export/deletion remain incomplete"
+    ],
+    "security": [
+      "application firewall IP/CIDR/path/user-agent rules",
+      "plugin provenance and pinned-image runner interface",
+      "external AI opt-in and policy checks",
+      "fail-closed ClamAV scan policy for production library uploads"
+    ],
+    "cloud": [
+      "local storage",
+      "AWS S3 and S3-compatible adapter family (R2/MinIO patterns)",
+      "Google Cloud Storage adapter",
+      "Azure Blob adapter",
+      "read-only provider connectivity probe methods",
+      "secret-reference configuration; deployment-specific credential resolution still requires validation"
+    ],
+    "ai": [
+      "mock, OpenAI Responses, OpenAI-compatible, Anthropic and Gemini adapters",
+      "validated page/content proposals",
+      "SEO and translation assistance",
+      "constrained local MCP tools"
+    ],
+    "releaseEngineering": [
+      "supported-Node.js CI matrix definition",
+      "PostgreSQL and Memgraph integration job definition",
+      "Playwright browser/accessibility job definition",
+      "CodeQL static-analysis job definition",
+      "dependency audit and SBOM steps in CI workflow",
+      "CI workflow has not been executed in this packaging environment",
+      "release-readiness JSON/Markdown report and fail-closed readiness command",
+      "VS Code Dev Container, preflight checks, strict live integration test runner and blocker-to-test instructions are included in this candidate workspace"
+    ]
+  },
+  "validation": {
+    "systemfabricUnitTests": "105 passed, 0 failed on Node.js 22.16.0 (below declared minimum); see generated artifacts/release-readiness.json for the latest run",
+    "syntaxAndArtifactCheck": "passed: 112 required paths, 96 JavaScript files syntax-checked on Node.js 22.16.0; runtime is below declared minimum, so supported-runtime validation remains blocked",
+    "apiSmokeTests": "health, editor/platform assets, icon catalogue, escaped math fallback, AI proposal/preview routes, auth requirements and no-database behavior covered by unit/API tests",
+    "enginexVendoredTests": "88 passed, 0 failed on Node.js 22.16.0 (below declared minimum)",
+    "supportedNodeRuntimeTested": false,
+    "cleanNpmCi": false,
+    "postgresIntegrationTests": "Not run against live PostgreSQL here; new community and inventory lifecycle integration tests are gated on DATABASE_URL and SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION=true",
+    "memgraphIntegrationTests": "skipped: MEMGRAPH_URL and integration opt-in are not configured",
+    "integrationSuite": "Local integration cases skip without configured PostgreSQL/Memgraph; see artifacts/release-readiness.json",
+    "playwrightE2E": "not run: Playwright Test is not installed in the local packaging environment (playwright command did not recognize the test subcommand)",
+    "dependencyAuditAndSBOM": false,
+    "identityProviderIntegration": false,
+    "stripeLiveOrTestWebhookIntegration": false,
+    "cloudProviderIntegration": false,
+    "mediaOptimizationRepresentativeCorpus": false,
+    "clamavScannerIntegration": false,
+    "pluginContainerRuntimeTests": false,
+    "loadSoakTest": false,
+    "backupRestoreDrill": false,
+    "independentSecurityAudit": false
+  },
+  "aiPrivacy": {
+    "externalProviderOptInRequired": true,
+    "environmentFlag": "AI_ALLOW_EXTERNAL_CONTENT=true",
+    "promptLoggingDefault": false,
+    "retentionWarning": "Request-level provider storage opt-outs do not guarantee zero provider-side logging or retention. Review current provider terms and data classification before use."
+  },
+  "productionGates": [
+    "supported Node.js runtime, reviewed committed lockfile, clean npm ci and repeatable installation",
+    "apply and validate migrations 0001\u20130008 on fresh PostgreSQL and supported upgrade fixtures",
+    "live PostgreSQL concurrency, rollback, outbox replay/dead-letter, Memgraph outage and reconciliation tests",
+    "comprehensive tenant isolation and independent identity/authorization review",
+    "real OIDC/SAML/email provider integration and account recovery validation",
+    "malware-scanner integration, legacy asset rescanning/quarantine and malicious-file corpus testing",
+    "local object reconciler rehearsals and storage crash-recovery tests",
+    "live S3/GCS/Azure compatibility, credential resolution, permissions, encryption, retention and lifecycle tests",
+    "Stripe webhook replay, inventory, refund and full subscription lifecycle validation",
+    "complete WooCommerce/BuddyPress/Elementor scoped acceptance before parity claims",
+    "signed plugin build pipeline and adversarial container isolation tests",
+    "Playwright browser/accessibility, fuzz, load/soak and backup-restore tests",
+    "dependency/SBOM review, independent security audit, operational runbooks and release approval",
+    "Execute release:readiness and retain the generated report, test logs, and reviewed external evidence; release:assert-ready must pass before production claims"
+  ]
+}

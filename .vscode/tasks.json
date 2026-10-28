@@ -1,0 +1,54 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "SystemFabric: Bootstrap dev environment",
+      "type": "npm",
+      "script": "dev:bootstrap",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Preflight / blocker report",
+      "type": "npm",
+      "script": "dev:doctor",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Unit and security tests",
+      "type": "npm",
+      "script": "test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Full static and unit check",
+      "type": "npm",
+      "script": "check",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: LIVE PostgreSQL/Memgraph integration",
+      "type": "npm",
+      "script": "test:integration:live",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Browser and accessibility tests",
+      "type": "npm",
+      "script": "test:e2e",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Generate readiness evidence",
+      "type": "npm",
+      "script": "release:readiness",
+      "problemMatcher": []
+    },
+    {
+      "label": "SystemFabric: Assert production release gates",
+      "type": "npm",
+      "script": "release:assert-ready",
+      "problemMatcher": []
+    }
+  ]
+}

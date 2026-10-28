@@ -1,0 +1,15 @@
+{
+  "apiVersion": 1,
+  "name": "article",
+  "label": "Articles",
+  "source": "git",
+  "version": 1,
+  "fields": [
+    { "name": "title", "type": "string", "required": true, "maxLength": 180 },
+    { "name": "summary", "type": "string", "required": false, "maxLength": 500 },
+    { "name": "body", "type": "richDocument", "required": true },
+    { "name": "heroAssetId", "type": "assetRef", "required": false }
+  ],
+  "capabilities": ["read", "create", "edit", "submitForReview", "publish"],
+  "publicationPolicy": "review-required"
+}

@@ -1,0 +1,13 @@
+{{#extends "layouts/base.html"}}
+  {{#block "title"}}Products{{/block}}
+  {{#block "content"}}
+    <h1>Products</h1>
+    <ul>
+      {{#each products as product, index}}
+        <li data-index="{{ index }}"><strong>{{ product.name }}</strong> — {{ formatCurrency(product.price, 'USD') }}</li>
+      {{else}}
+        <li>No products available.</li>
+      {{/each}}
+    </ul>
+  {{/block}}
+{{/extends}}

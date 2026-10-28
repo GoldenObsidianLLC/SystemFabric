@@ -1,0 +1,1022 @@
+openapi: 3.1.0
+info:
+  title: SystemFabric API
+  version: 0.5.0
+  description: >-
+    Developer-preview API for the SystemFabric AI-integrated CMS, visual builder, libraries, commerce, memberships, community and cloud adapters.
+    Most routes require a database-backed session and site-scoped capabilities. The static
+    development bearer token is disabled in production. This API description does not claim
+    production certification or full WordPress/Elementor feature parity.
+servers:
+  - url: http://127.0.0.1:8787
+security:
+  - SessionCookie: []
+  - DevelopmentBearer: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Runtime health
+      responses:
+        '200': { description: Process health and non-sensitive provider information }
+  /ready:
+    get:
+      security: []
+      summary: Dependency readiness
+      responses:
+        '200': { description: Ready or local degraded mode }
+        '503': { description: PostgreSQL is not reachable }
+  /api/v1/auth/bootstrap:
+    post:
+      security: []
+      summary: Create the first owner account using the one-time bootstrap secret
+      parameters:
+        - in: header
+          name: x-systemfabric-bootstrap-secret
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12, maxLength: 256 }
+                displayName: { type: string, maxLength: 180 }
+                siteSlug: { type: string, maxLength: 63 }
+                siteName: { type: string, maxLength: 180 }
+      responses:
+        '201': { description: Initial owner and site created }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Bootstrap has already closed }
+  /api/v1/auth/login:
+    post:
+      security: []
+      summary: Authenticate and establish a server-side session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 1, maxLength: 256 }
+      responses:
+        '200': { description: Authenticated; session and CSRF cookies are set }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/auth/saml/metadata:
+    get:
+      security: []
+      summary: Return service-provider metadata when SAML is configured
+      responses:
+        '200': { description: SAML service-provider XML metadata }
+        '404': { description: SAML is disabled }
+  /api/v1/auth/saml/start:
+    get:
+      security: []
+      summary: Start an SP-initiated SAML sign-in flow
+      responses:
+        '302': { description: Redirect to the configured identity provider }
+        '503': { description: SAML or database-backed state is not configured }
+  /api/v1/auth/saml/acs:
+    post:
+      security: []
+      summary: Assertion consumer endpoint for a configured SAML identity provider
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [SAMLResponse, RelayState]
+              properties:
+                SAMLResponse: { type: string, maxLength: 2097152 }
+                RelayState: { type: string, minLength: 32, maxLength: 256 }
+      responses:
+        '303': { description: Set a SystemFabric session and redirect after validation }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { description: SAML, identity storage, or shared cache is unavailable }
+  /api/v1/auth/invitations/accept:
+    post:
+      security: []
+      summary: Accept a one-time site invitation and create an account/session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string, minLength: 32, maxLength: 200 }
+                password: { type: string, minLength: 12, maxLength: 256 }
+                displayName: { type: string, maxLength: 180 }
+      responses:
+        '200': { description: Invitation accepted }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /api/v1/auth/me:
+    get:
+      summary: Current identity and site memberships
+      responses:
+        '200': { description: Current authenticated identity }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/auth/logout:
+    post:
+      description: Cookie-authenticated requests require X-CSRF-Token matching the csrf cookie.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200': { description: Session revoked and cookies cleared }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/sites:
+    get:
+      summary: List sites accessible to current user
+      responses:
+        '200': { description: Authorized site memberships }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      description: Requires site management capability on an existing site.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name]
+              properties:
+                slug: { type: string, minLength: 1, maxLength: 63 }
+                name: { type: string, minLength: 1, maxLength: 180 }
+      responses:
+        '201': { description: Site created }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/sites/{siteId}/members:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - $ref: '#/components/parameters/CsrfHeader'
+    get:
+      summary: List site members
+      responses:
+        '200': { description: Member list }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Add an existing active user to a site
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [editor, author, viewer] }
+      responses:
+        '201': { description: Membership created }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/sites/{siteId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: '#/components/parameters/CsrfHeader'
+    delete:
+      summary: Remove a member from a site
+      responses:
+        '200': { description: Membership removed }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/sites/{siteId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - $ref: '#/components/parameters/CsrfHeader'
+    post:
+      summary: Create a one-time invitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email }
+                role: { type: string, enum: [editor, author, viewer] }
+      responses:
+        '201': { description: Invitation created; token is shown once for trusted-channel delivery }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/ai/status:
+    get:
+      summary: AI provider status without credentials
+      responses:
+        '200': { description: Provider and task capability metadata }
+  /api/v1/widgets:
+    get:
+      summary: List approved core widgets
+      responses:
+        '200': { description: Versioned widget registry }
+  /api/v1/ai/page-draft:
+    post:
+      summary: Generate a page-document proposal
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [prompt]
+              properties:
+                prompt: { type: string, minLength: 1, maxLength: 12000 }
+                siteContext: { type: string, maxLength: 3000 }
+      responses:
+        '200': { description: Validated, unsaved and unpublished page proposal }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { description: Model output failed domain validation }
+        '503': { description: AI provider unavailable or not configured }
+  /api/v1/ai/content-assist:
+    post:
+      summary: Suggest a content rewrite or edit
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 12000 }
+                operation: { type: string, enum: [rewrite, proofread, shorten, expand, make-clearer, change-tone] }
+                tone: { type: string, maxLength: 120 }
+      responses:
+        '200': { description: Suggestion only; not persisted }
+        '503': { description: AI provider unavailable or not configured }
+  /api/v1/ai/seo:
+    post:
+      summary: Generate SEO metadata suggestions
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title: { type: string, maxLength: 180 }
+                content: { type: string, maxLength: 12000 }
+      responses:
+        '200': { description: SEO suggestions }
+  /api/v1/ai/translate:
+    post:
+      summary: Suggest a translation
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, targetLanguage]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 12000 }
+                targetLanguage: { type: string, minLength: 2, maxLength: 80 }
+      responses:
+        '200': { description: Translation suggestion }
+  /api/v1/pages:
+    get:
+      summary: List authorized site-scoped content
+      parameters:
+        - $ref: '#/components/parameters/SiteQuery'
+      responses:
+        '200': { description: Content records permitted by role and ownership }
+  /api/v1/pages/drafts:
+    post:
+      summary: Save a validated draft after explicit review of AI-generated proposals
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document]
+              properties:
+                document: { $ref: './schemas/page-document.schema.json' }
+                id: { type: string, format: uuid }
+                siteId: { type: string, format: uuid }
+                slug: { type: string, maxLength: 180 }
+                locale: { type: string, maxLength: 20 }
+                expectedVersion: { type: integer, minimum: 1 }
+                reviewed: { type: boolean }
+      responses:
+        '201': { description: Draft saved; the previously published snapshot remains unchanged }
+        '409': { description: Optimistic version conflict or review acknowledgement missing }
+        '422': { description: Invalid page document }
+  /api/v1/pages/validate:
+    post:
+      summary: Validate a page document
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document]
+              properties:
+                document: { $ref: './schemas/page-document.schema.json' }
+      responses:
+        '200': { description: Validation result }
+        '422': { description: Invalid document }
+  /api/v1/preview:
+    post:
+      summary: Render a safe HTML preview without persistence
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document]
+              properties:
+                document: { $ref: './schemas/page-document.schema.json' }
+      responses:
+        '200':
+          description: No-store HTML with restrictive Content Security Policy
+          content:
+            text/html:
+              schema: { type: string }
+  /api/v1/pages/{pageId}:
+    parameters:
+      - name: pageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Retrieve a page visible to the current actor
+      responses:
+        '200': { description: Page record }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Page not found }
+  /api/v1/pages/{pageId}/revisions:
+    parameters:
+      - name: pageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: List revisions allowed to the current actor
+      responses:
+        '200': { description: Revision list }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/pages/{pageId}/restore/{version}:
+    parameters:
+      - name: pageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: version
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - $ref: '#/components/parameters/CsrfHeader'
+    post:
+      summary: Restore an earlier revision as a new draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: New draft created from revision }
+        '409': { description: Optimistic version conflict }
+  /api/v1/pages/{pageId}/{action}:
+    parameters:
+      - name: pageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [submit-review, approve, reject, publish, schedule, archive, unpublish] }
+      - $ref: '#/components/parameters/CsrfHeader'
+    post:
+      summary: Perform an explicit publication workflow transition
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                scheduledAt: { type: string, format: date-time }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200': { description: Workflow transition result }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Invalid current state or optimistic version conflict }
+  /api/v1/public/{siteSlug}/search:
+    get:
+      security: []
+      summary: Search the public published content index
+      parameters:
+        - name: siteSlug
+          in: path
+          required: true
+          schema: { type: string, maxLength: 63 }
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 500 }
+        - name: locale
+          in: query
+          schema: { type: string, maxLength: 20 }
+        - name: limit
+          in: query
+          schema: { oneOf: [{ type: integer, minimum: 1, maximum: 100 }, { type: string }] }
+      responses:
+        '200': { description: Search results limited to public published content }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /public/{siteSlug}/pages/{slug}:
+    get:
+      security: []
+      summary: Render a public published page
+      parameters:
+        - name: siteSlug
+          in: path
+          required: true
+          schema: { type: string, maxLength: 63 }
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: locale
+          in: query
+          schema: { type: string, maxLength: 20 }
+      responses:
+        '200': { description: HTML rendered from the published snapshot; drafts are not served }
+        '404': { description: Page not found }
+  /api/v1/content-types:
+    get:
+      summary: List effective Git-managed and site-managed content type definitions
+      parameters:
+        - $ref: '#/components/parameters/SiteQuery'
+      responses:
+        '200': { description: Validated content type definitions }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Register a versioned site-managed content type definition
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [definition]
+              properties:
+                definition: { $ref: './schemas/cpt-definition.schema.json' }
+      responses:
+        '201': { description: Definition registered and normalized }
+        '422': { description: Definition failed validation }
+  /api/v1/content-types/{slug}/records:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-z][a-z0-9_-]{0,62}$' }
+      - $ref: '#/components/parameters/SiteQuery'
+    post:
+      summary: Create a typed custom-content record
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Validated record created }
+        '422': { description: Field values failed schema validation }
+  /api/v1/content-types/{slug}/records/{recordId}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-z][a-z0-9_-]{0,62}$' }
+      - name: recordId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - $ref: '#/components/parameters/SiteQuery'
+    get:
+      summary: Read an authorized custom-content record
+      responses:
+        '200': { description: Record returned }
+        '404': { description: Record not found }
+  /api/v1/media:
+    get:
+      summary: List site-scoped media assets
+      parameters:
+        - $ref: '#/components/parameters/SiteQuery'
+      responses:
+        '200': { description: Media metadata list }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/media/uploads:
+    post:
+      summary: Upload a signature-checked raster image
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mimeType, dataBase64]
+              properties:
+                mimeType: { type: string, enum: [image/png, image/jpeg, image/webp, image/gif] }
+                dataBase64: { type: string, maxLength: 14000000 }
+                altText: { type: string, maxLength: 1000 }
+      responses:
+        '201': { description: Asset metadata returned }
+        '413': { description: Upload exceeds configured limit }
+        '415': { description: Unsupported file signature or format }
+  /media/{assetId}:
+    get:
+      security: []
+      summary: Retrieve a public media asset by ID
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Public raster media bytes }
+        '404': { description: Media not found }
+  /api/v1/plugins:
+    get:
+      summary: List site-scoped plugin registry entries
+      parameters:
+        - $ref: '#/components/parameters/SiteQuery'
+      responses:
+        '200': { description: Plugin registry }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/plugins/register:
+    post:
+      summary: Register a plugin manifest; registration does not execute package code
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifest, sourceType]
+              properties:
+                manifest: { $ref: './schemas/plugin-manifest.schema.json' }
+                sourceType: { type: string, enum: [npm-archive, oci-image] }
+                packageSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+                imageDigest: { type: string, pattern: '^.+@sha256:[a-f0-9]{64}$' }
+      responses:
+        '201': { description: Pending plugin registration }
+        '422': { description: Manifest validation failed }
+  /api/v1/plugins/{pluginId}/{action}:
+    parameters:
+      - name: pluginId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: action
+        in: path
+        required: true
+        schema: { type: string, enum: [approve, activate, disable, invoke] }
+      - $ref: '#/components/parameters/CsrfHeader'
+    post:
+      summary: Approve, activate, disable or invoke an explicitly registered plugin
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                capabilities: { type: array, items: { type: string } }
+                action: { type: string, maxLength: 100 }
+                input: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Lifecycle transition or isolated invocation result }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: Secure runner not configured or unavailable }
+  /platform:
+    get:
+      security: []
+      summary: Platform Hub interface
+      responses:
+        '200': { description: Static developer-preview platform interface }
+  /api/v1/icon-library:
+    get:
+      summary: List curated SVG icons
+      responses:
+        '200': { description: Curated icon catalogue }
+  /api/v1/math/render:
+    post:
+      summary: Validate and render a TeX formula or return escaped fallback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [formula]
+              properties:
+                formula: { type: string, minLength: 1, maxLength: 10000 }
+                displayMode: { type: boolean }
+      responses:
+        '200': { description: Rendered or escaped formula markup }
+        '422': { description: Formula rejected or rendering failed }
+  /api/v1/public/sites/{siteId}/products:
+    get:
+      security: []
+      summary: List published storefront products
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 100000, default: 0 }
+      responses:
+        '200': { description: Public published products }
+        '503': { description: PostgreSQL is unavailable }
+  /api/v1/public/sites/{siteId}/products/{slug}:
+    get:
+      security: []
+      summary: Retrieve a published product by slug
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, maxLength: 181 }
+      responses:
+        '200': { description: Public product details }
+        '404': { description: Product not found }
+  /api/v1/public/sites/{siteId}/membership-plans:
+    get:
+      security: []
+      summary: List active membership plans
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Public membership plan catalogue }
+        '503': { description: PostgreSQL is unavailable }
+  /api/v1/sites/{siteId}/library/items:
+    get:
+      summary: List site-scoped File/Document/Media Library assets
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: category
+          in: query
+          schema: { type: string, enum: [all, image, video, audio, document, file, font] }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: Matching assets and supported library kinds }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: Library storage/database unavailable }
+    post:
+      summary: Upload a validated asset into the site library
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, mimeType, fileName, dataBase64]
+              properties:
+                category: { type: string, enum: [image, video, audio, document, file, font] }
+                mimeType: { type: string, maxLength: 160 }
+                fileName: { type: string, maxLength: 240 }
+                displayName: { type: string, maxLength: 240 }
+                dataBase64: { type: string, maxLength: 69905068 }
+                isPublic: { type: boolean, default: false }
+                altText: { type: string, maxLength: 1000 }
+                caption: { type: string, maxLength: 4000 }
+                description: { type: string, maxLength: 12000 }
+                metadata: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Created asset and version 1 }
+        '413': { description: Upload size limit exceeded }
+        '422': { description: MIME signature or category rejected }
+  /api/v1/sites/{siteId}/library/items/{assetId}:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - name: assetId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Read an asset record and version history
+      responses:
+        '200': { description: Asset metadata and versions }
+        '404': { description: Asset not found }
+    patch:
+      summary: Update asset metadata using optimistic version control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, patch]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                patch: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Updated asset record }
+        '409': { description: Version conflict }
+    put:
+      summary: Replace asset bytes with a new version of the same library kind
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, mimeType, dataBase64]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                mimeType: { type: string }
+                fileName: { type: string }
+                dataBase64: { type: string }
+      responses:
+        '200': { description: Replacement and incremented version }
+        '409': { description: Version conflict }
+    delete:
+      summary: Soft-delete an asset with version checking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Soft-deleted asset }
+        '409': { description: Version conflict }
+  /api/v1/sites/{siteId}/library/items/{assetId}/versions:
+    get:
+      summary: List immutable metadata/content version snapshots
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Version history }
+  /api/v1/sites/{siteId}/library/items/{assetId}/download:
+    get:
+      summary: Download an asset privately with restrictive response headers
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Asset bytes with nosniff and attachment disposition }
+        '404': { description: Asset not found }
+  /api/v1/sites/{siteId}/library/items/{assetId}/optimize:
+    post:
+      summary: Request a bounded optional image/video derivative
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Optimization state and derivative metadata if created }
+        '404': { description: Asset not found }
+  /api/v1/sites/{siteId}/products:
+    get:
+      summary: List site products for administration
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Products with status and inventory metadata }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      summary: Create a validated draft/published product
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [slug, name, priceMinor], additionalProperties: true }
+      responses:
+        '201': { description: Product created }
+        '422': { description: Product validation failed }
+  /api/v1/sites/{siteId}/commerce/checkout:
+    post:
+      summary: Create an authenticated customer order and hosted Stripe Checkout session
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items: { type: array, minItems: 1, maxItems: 100, items: { type: object, required: [productId, quantity], additionalProperties: true } }
+                email: { type: string, format: email }
+                idempotencyKey: { type: string, minLength: 8, maxLength: 120 }
+      responses:
+        '201': { description: Order snapshot and hosted checkout URL }
+        '409': { description: Inventory conflict }
+        '503': { description: Database or billing provider unavailable }
+  /api/v1/sites/{siteId}/memberships/plans:
+    get:
+      summary: List membership plans for site administrators
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Site membership plans }
+    post:
+      summary: Create a one-time or recurring membership plan
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '201': { description: Membership plan created }
+        '422': { description: Plan validation failed }
+  /api/v1/sites/{siteId}/memberships/checkout:
+    post:
+      summary: Start hosted checkout for an active membership plan
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planId]
+              properties:
+                planId: { type: string, format: uuid }
+      responses:
+        '201': { description: Pending membership and hosted checkout URL }
+        '404': { description: Membership plan not found }
+  /api/v1/sites/{siteId}/mega-menus:
+    get:
+      summary: List mega-menu definitions
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Validated menu trees and presentation settings }
+    post:
+      summary: Create a validated mega menu
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name, items]
+              properties:
+                slug: { type: string, maxLength: 101 }
+                name: { type: string, maxLength: 180 }
+                items: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
+                presentation: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Mega menu created }
+        '422': { description: Menu or presentation invalid }
+  /api/v1/sites/{siteId}/security/firewall-rules:
+    get:
+      summary: List application-layer firewall rules
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Firewall rules; this is not a managed WAF }
+    post:
+      summary: Add an application-layer firewall rule
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '201': { description: Rule created and cache invalidated }
+        '422': { description: Rule validation failed }
+  /api/v1/sites/{siteId}/cloud/connections:
+    get:
+      summary: List configured object-storage connection metadata
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      responses:
+        '200': { description: Configured connection metadata, not proof of live health }
+    post:
+      summary: Register cloud-storage configuration using a secret reference
+      parameters:
+        - $ref: '#/components/parameters/SiteId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, name, credentialReference]
+              properties:
+                provider: { type: string, enum: [aws-s3, s3-compatible, google-cloud-storage, azure-blob, cloudflare-r2, minio] }
+                name: { type: string, maxLength: 180 }
+                credentialReference: { type: string, maxLength: 260 }
+                config: { type: object, additionalProperties: true }
+      responses:
+        '201': { description: Cloud connection metadata created }
+        '422': { description: Secret reference or provider configuration invalid }
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: sf_session
+      description: Database-backed session. For unsafe methods, also provide X-CSRF-Token matching the sf_csrf cookie.
+    DevelopmentBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: development-only token; disabled in production
+  parameters:
+    SiteId:
+      name: siteId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SiteQuery:
+      name: siteId
+      in: query
+      required: false
+      schema: { type: string, format: uuid }
+    CsrfHeader:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      schema: { type: string, minLength: 32, maxLength: 200 }
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+    Forbidden:
+      description: Site membership, role capability, CSRF, or origin check failed
+    BadRequest:
+      description: Request body or domain input is invalid
+    RateLimited:
+      description: Request rate limit exceeded; retry after the indicated delay

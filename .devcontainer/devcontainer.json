@@ -1,0 +1,39 @@
+{
+  "name": "SystemFabric Dev/Test",
+  "dockerComposeFile": ["../compose.yaml", "docker-compose.devcontainer.yml"],
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+  "runServices": ["postgres", "memgraph", "workspace"],
+  "shutdownAction": "stopCompose",
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "postCreateCommand": "npm run dev:bootstrap",
+  "forwardPorts": [8787, 5432, 7687, 7444, 9000, 9001, 3310],
+  "portsAttributes": {
+    "8787": { "label": "SystemFabric API/Admin", "onAutoForward": "notify" },
+    "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+    "7687": { "label": "Memgraph Bolt", "onAutoForward": "silent" },
+    "9000": { "label": "MinIO API (optional profile)", "onAutoForward": "silent" },
+    "9001": { "label": "MinIO Console (optional profile)", "onAutoForward": "notify" },
+    "3310": { "label": "ClamAV (optional profile)", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.js-debug-nightly",
+        "ms-playwright.playwright",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "yzhang.markdown-all-in-one"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.rulers": [100],
+        "files.eol": "\n",
+        "testing.automaticallyOpenPeekView": "failureImmediately",
+        "javascript.updateImportsOnFileMove.enabled": "always",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}

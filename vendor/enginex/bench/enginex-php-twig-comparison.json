@@ -1,0 +1,173 @@
+{
+  "title": "EnginEx 6.2 paired CLI rendering benchmark",
+  "generatedAt": "2026-10-27T04:17:26.420Z",
+  "evidenceClass": "LOCAL_MEASUREMENT_EXPLORATORY",
+  "status": "NOT_PRODUCTION_CERTIFIED",
+  "methodology": {
+    "runs": 5,
+    "iterationsPerRun": 10000,
+    "warmupPerRun": 1000,
+    "order": "Implementation order is rotated between runs to reduce fixed order effects.",
+    "timing": "Each child process performs warm-up then measures steady-state rendering; each implementation is a separate process.",
+    "equivalence": "Single-render SHA-256 and output byte length are compared across implementations and runs.",
+    "caveats": [
+      "This is a small local CLI microbenchmark, not a full HTTP or user-perceived page-load benchmark.",
+      "Prepared-data EnginEx rendering reuses the same prevalidated immutable snapshot and is not semantically identical to per-render validation of changing data.",
+      "PHP CLI OPcache is enabled when the PHP benchmark runs; this is not equivalent to PHP-FPM under a production web server.",
+      "Twig is only measured if twig/twig is installed in this project; unavailable means not measured, not zero performance.",
+      "The available Node.js runtime may be below the package engine range and must be recorded as an environment limitation if so."
+    ]
+  },
+  "environment": {
+    "node": "v22.16.0",
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "6.18.55",
+    "cpuModel": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "logicalCpuCount": 3,
+    "totalMemoryBytes": 6248996864,
+    "packageVersion": "6.2.0",
+    "phpVersion": "8.4.24",
+    "twigInstalled": false
+  },
+  "outputEquivalent": true,
+  "rows": [
+    {
+      "implementation": "EnginEx compiled sync renderer",
+      "available": true,
+      "successfulRuns": 5,
+      "medianRendersPerSecond": 33764,
+      "minRendersPerSecond": 21887,
+      "maxRendersPerSecond": 49721,
+      "medianMicrosecondsPerRender": 29.617,
+      "medianElapsedMs": 296.173,
+      "iterationsPerRun": 10000,
+      "warmupPerRun": 1000,
+      "outputBytes": 132,
+      "outputEquivalentAcrossRuns": true,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "sourceRuntimeVersions": [
+        "v22.16.0"
+      ]
+    },
+    {
+      "implementation": "EnginEx compiled sync + prepared immutable data",
+      "available": true,
+      "successfulRuns": 5,
+      "medianRendersPerSecond": 54426,
+      "minRendersPerSecond": 47543,
+      "maxRendersPerSecond": 93227,
+      "medianMicrosecondsPerRender": 18.373,
+      "medianElapsedMs": 183.735,
+      "iterationsPerRun": 10000,
+      "warmupPerRun": 1000,
+      "outputBytes": 132,
+      "outputEquivalentAcrossRuns": true,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "sourceRuntimeVersions": [
+        "v22.16.0"
+      ]
+    },
+    {
+      "implementation": "EnginEx async interpreted renderer",
+      "available": true,
+      "successfulRuns": 5,
+      "medianRendersPerSecond": 2007,
+      "minRendersPerSecond": 1743,
+      "maxRendersPerSecond": 2640,
+      "medianMicrosecondsPerRender": 498.177,
+      "medianElapsedMs": 4981.768,
+      "iterationsPerRun": 10000,
+      "warmupPerRun": 1000,
+      "outputBytes": 132,
+      "outputEquivalentAcrossRuns": true,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "sourceRuntimeVersions": [
+        "v22.16.0"
+      ]
+    },
+    {
+      "implementation": "Native PHP template",
+      "available": true,
+      "successfulRuns": 5,
+      "medianRendersPerSecond": 202406,
+      "minRendersPerSecond": 130777,
+      "maxRendersPerSecond": 445429,
+      "medianMicrosecondsPerRender": 4.941,
+      "medianElapsedMs": 49.406,
+      "iterationsPerRun": 10000,
+      "warmupPerRun": 1000,
+      "outputBytes": 132,
+      "outputEquivalentAcrossRuns": true,
+      "singleOutputSha256": "119053e635c5bd70def068e4977842776459366b1ea453e037793e6e72f49f89",
+      "sourceRuntimeVersions": [
+        "8.4.24"
+      ]
+    },
+    {
+      "implementation": "Twig",
+      "available": false,
+      "reason": "vendor/autoload.php not found; install twig/twig to include this benchmark."
+    }
+  ],
+  "comparisons": {
+    "compiledEnginExVsInterpreted": 16.823,
+    "preparedEnginExVsInterpreted": 27.118,
+    "nativePhpVsCompiledEnginEx": 5.995,
+    "nativePhpVsPreparedEnginEx": 3.719,
+    "twigVsCompiledEnginEx": null,
+    "preparedThroughputImprovementPercent": 61.2
+  },
+  "rawRuns": [
+    {
+      "runIndex": 1,
+      "outputEquivalent": true,
+      "rawReport": "bench/paired-runs/run-01.json",
+      "workload": {
+        "iterations": 10000,
+        "warmup": 1000,
+        "orderSeed": 1
+      }
+    },
+    {
+      "runIndex": 2,
+      "outputEquivalent": true,
+      "rawReport": "bench/paired-runs/run-02.json",
+      "workload": {
+        "iterations": 10000,
+        "warmup": 1000,
+        "orderSeed": 2
+      }
+    },
+    {
+      "runIndex": 3,
+      "outputEquivalent": true,
+      "rawReport": "bench/paired-runs/run-03.json",
+      "workload": {
+        "iterations": 10000,
+        "warmup": 1000,
+        "orderSeed": 3
+      }
+    },
+    {
+      "runIndex": 4,
+      "outputEquivalent": true,
+      "rawReport": "bench/paired-runs/run-04.json",
+      "workload": {
+        "iterations": 10000,
+        "warmup": 1000,
+        "orderSeed": 4
+      }
+    },
+    {
+      "runIndex": 5,
+      "outputEquivalent": true,
+      "rawReport": "bench/paired-runs/run-05.json",
+      "workload": {
+        "iterations": 10000,
+        "warmup": 1000,
+        "orderSeed": 5
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systemfabric.dev/schemas/design-system.schema.json",
+  "title": "SystemFabric Design Tokens",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "colors": { "type": "object", "maxProperties": 100, "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,32}$" }, "additionalProperties": { "type": "string", "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$" } },
+    "spacing": { "$ref": "#/$defs/lengthMap" },
+    "radii": { "$ref": "#/$defs/lengthMap" },
+    "fontSizes": { "$ref": "#/$defs/lengthMap" },
+    "fontFamilies": { "type": "object", "maxProperties": 100, "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,32}$" }, "additionalProperties": { "type": "string", "maxLength": 160, "pattern": "^[a-zA-Z0-9 ,\"'_-]+$" } },
+    "fontWeights": { "type": "object", "maxProperties": 100, "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,32}$" }, "additionalProperties": { "enum": ["100", "200", "300", "400", "500", "600", "700", "800", "900", "normal", "bold"] } },
+    "breakpoints": { "type": "object", "maxProperties": 100, "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,32}$" }, "additionalProperties": { "type": "integer", "minimum": 240, "maximum": 2560 } }
+  },
+  "$defs": {
+    "lengthMap": { "type": "object", "maxProperties": 100, "propertyNames": { "pattern": "^[a-z][a-z0-9_-]{0,32}$" }, "additionalProperties": { "type": "string", "pattern": "^(?:0|(?:[0-9]+(?:\\.[0-9]+)?)(?:px|rem|em|%|vw|vh))$" } }
+  }
+}

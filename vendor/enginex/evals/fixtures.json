@@ -1,0 +1,58 @@
+[
+  {
+    "id": "escaped-interpolation",
+    "source": "<p>{{ name }}</p>",
+    "sampleData": { "name": "Ada & Bob" },
+    "valid": true,
+    "expectedHtml": "<p>Ada &amp; Bob</p>"
+  },
+  {
+    "id": "nested-conditional",
+    "source": "{{#if user.admin}}admin{{else}}{{#if user.member}}member{{else}}guest{{/if}}{{/if}}",
+    "sampleData": { "user": { "admin": false, "member": true } },
+    "valid": true,
+    "expectedHtml": "member"
+  },
+  {
+    "id": "array-loop",
+    "source": "{{#each items as item, index}}[{{index}}:{{item}}]{{else}}empty{{/each}}",
+    "sampleData": { "items": ["a", "b"] },
+    "valid": true,
+    "expectedHtml": "[0:a][1:b]"
+  },
+  {
+    "id": "unknown-helper",
+    "source": "{{ makeSecret(value) }}",
+    "sampleData": { "value": "x" },
+    "valid": false,
+    "diagnostic": "ERR_ENGINEX_UNKNOWN_HELPER"
+  },
+  {
+    "id": "legacy-code-block",
+    "source": "<?njs process.exit(1); ?>",
+    "sampleData": {},
+    "valid": false,
+    "diagnostic": "ERR_ENGINEX_UNSAFE_CODE_DISABLED"
+  },
+  {
+    "id": "unsupported-method-call",
+    "source": "{{ user.toUpperCase() }}",
+    "sampleData": { "user": "text" },
+    "valid": false,
+    "diagnostic": "ERR_ENGINEX_CALL_NOT_HELPER"
+  },
+  {
+    "id": "active-html-review",
+    "source": "<script>alert(1)</script>",
+    "sampleData": {},
+    "valid": true,
+    "diagnostic": "ENGINEX_ACTIVE_HTML_REVIEW"
+  },
+  {
+    "id": "script-context-review",
+    "source": "<script>const x = '{{ value }}';</script>",
+    "sampleData": { "value": "x" },
+    "valid": true,
+    "diagnostic": "ENGINEX_CONTEXTUAL_OUTPUT_REVIEW"
+  }
+]

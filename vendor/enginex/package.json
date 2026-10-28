@@ -1,0 +1,62 @@
+{
+  "name": "enginex-ai-native",
+  "version": "6.2.0",
+  "description": "Dependency-free secure Node.js templating with optimized compiled renderers, change-aware incremental updates, profiles, telemetry, AI tooling, and optional acceleration backends.",
+  "main": "index.js",
+  "bin": {
+    "enginex": "./bin/enginex.js"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./engine": "./engine.js",
+    "./ai": "./ai/index.js",
+    "./providers/openai-responses": "./providers/openai-responses.js",
+    "./mcp": "./adapters/mcp-server.mjs",
+    "./schema": "./lib/schema.js",
+    "./backend-capabilities": "./lib/backend-capabilities.js",
+    "./grammar": "./schemas/template-grammar.json",
+    "./manifest-schema": "./schemas/template-manifest.schema.json",
+    "./render-request-schema": "./schemas/render-request.schema.json",
+    "./dirty-bitset": "./lib/dirty-bitset.js",
+    "./response-cache": "./lib/response-cache.js",
+    "./shared-worker-pool": "./lib/shared-worker-pool.js",
+    "./accelerators/wasm-simd": "./accelerators/wasm-simd.js",
+    "./accelerators/webgpu": "./accelerators/webgpu-scanner.js",
+    "./transports/websocket": "./transports/websocket-live-preview.js",
+    "./transports/webtransport": "./transports/webtransport-client.mjs",
+    "./transports/webrtc": "./transports/webrtc-data-channel.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check index.js && node --check lib/performance-profiles.js && node --check lib/backend-capabilities.js && node --check lib/render-request.js && node --check engine.js && node --check bench/http-compare.js && node --check bench/http-client.js && node --check bench/paired-benchmark.js && node --check bench/http/node-server.js && node --check bin/enginex.js && node --check ai/index.js && node --check providers/openai-responses.js && node --check adapters/mcp-server.mjs && node --check mcp/serve-stdio.mjs && node --check lib/dirty-bitset.js && node --check lib/response-cache.js && node --check lib/shared-worker-pool.js && node --check accelerators/wasm-simd.js && node --check accelerators/webgpu-scanner.js && node --check transports/websocket-live-preview.js && node --check transports/webrtc-data-channel.js && node --check transports/webtransport-client.mjs && node --test test/*.test.js && node scripts/verify-package.js",
+    "bench:node": "node bench/render.js",
+    "bench:prepared": "node bench/render-prepared.js",
+    "bench:compare": "node bench/compare.js",
+    "bench:http": "node bench/http-compare.js",
+    "bench:http:small": "ENGINEX_HTTP_ITERATIONS=250 ENGINEX_HTTP_WARMUP=25 node bench/http-compare.js",
+    "bench:profile": "node --cpu-prof bench/render.js",
+    "bench:accelerators": "node bench/accelerators.js",
+    "evals": "node evals/run.js",
+    "mcp": "node mcp/serve-stdio.mjs",
+    "bench:http:external": "node bench/http-client.js",
+    "bench:paired": "node bench/paired-benchmark.js",
+    "bench:paired:quick": "ENGINEX_BENCH_ITERATIONS=10000 ENGINEX_BENCH_WARMUP=1000 node bench/paired-benchmark.js"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/server": ">=2.4.0 <3",
+    "zod": ">=4.0.0 <5"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/server": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "license": "MIT"
+}

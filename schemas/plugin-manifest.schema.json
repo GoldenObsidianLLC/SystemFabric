@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systemfabric.invalid/schemas/plugin-manifest.schema.json",
+  "title": "SystemFabric Plugin Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "name", "version", "title", "description", "capabilities"],
+  "properties": {
+    "apiVersion": { "const": 1 },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,99}$" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["render:widget", "editor:widget", "content:read", "content:write", "media:read", "search:query", "http:approved-endpoints"] }
+    },
+    "widgets": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["name", "title"],
+        "properties": {
+          "name": { "type": "string", "maxLength": 120 },
+          "title": { "type": "string", "maxLength": 120 }
+        },
+        "additionalProperties": true
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{1,99}$" } },
+        "additionalProperties": true
+      }
+    },
+    "homepage": { "type": "string", "maxLength": 2048 },
+    "license": { "type": "string", "maxLength": 100 },
+    "publisher": { "type": "string", "maxLength": 180 }
+  }
+}
