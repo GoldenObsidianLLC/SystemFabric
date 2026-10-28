@@ -16,29 +16,51 @@ test('WebSocket preview adapter authorizes clients, renders safely, and bounds r
   class WSS extends EventEmitter { constructor() { super(); this.clients = new Set(); } }
   class Socket extends EventEmitter {
     constructor() { super(); this.readyState = 1; this.sent = []; this.closed = null; }
-    send(message) { this.sent.push(JSON.parse(message)); }
+    send(message) {
+      const payload = JSON.parse(message);
+      this.sent.push(payload);
+      this.emit('sent', payload);
+    }
     close(code, reason) { this.closed = { code, reason }; this.readyState = 3; }
   }
+  const waitForSent = (socket, index, timeoutMs = 2_000) => {
+    if (socket.sent.length > index) return Promise.resolve(socket.sent[index]);
+    return new Promise((resolve, reject) => {
+      const onSent = () => {
+        if (socket.sent.length <= index) return;
+        clearTimeout(timer);
+        socket.off('sent', onSent);
+        resolve(socket.sent[index]);
+      };
+      const timer = setTimeout(() => {
+        socket.off('sent', onSent);
+        reject(new Error(`Timed out waiting for WebSocket message ${index + 1}.`));
+      }, timeoutMs);
+      socket.on('sent', onSent);
+      // Close the race between the initial length check and listener setup.
+      onSent();
+    });
+  };
   const wss = new WSS();
   engine.attachWebSocketLivePreview({ wss, engine, templateOptions: { views }, authorize: async () => ({ user: 'tester' }), maxMessageBytes: 1024 });
   const socket = new Socket();
   wss.emit('connection', socket, {});
   await new Promise(resolve => setTimeout(resolve, 0));
   socket.emit('message', JSON.stringify({ type: 'preview', template: 'page.html', revision: 3, data: { name: '<Admin>' } }));
-  await new Promise(resolve => setTimeout(resolve, 20));
-  assert.equal(socket.sent[0].type, 'preview.result');
-  assert.equal(socket.sent[0].html, '<h1>&lt;Admin&gt;</h1>');
+  const preview = await waitForSent(socket, 0);
+  assert.equal(preview.type, 'preview.result');
+  assert.equal(preview.html, '<h1>&lt;Admin&gt;</h1>');
   socket.emit('message', JSON.stringify({ type: 'preview', template: '../outside.html', data: {} }));
-  await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(socket.sent[1].type, 'error');
+  const invalidPreview = await waitForSent(socket, 1);
+  assert.equal(invalidPreview.type, 'error');
   socket.emit('message', JSON.stringify({ type: 'incremental.start', sessionId: 'dashboard', template: 'counter.html', data: { notifications: { count: 1 } } }));
-  await new Promise(resolve => setTimeout(resolve, 20));
-  assert.equal(socket.sent[2].type, 'incremental.result');
-  assert.equal(socket.sent[2].result.type, 'full');
+  const incrementalStart = await waitForSent(socket, 2);
+  assert.equal(incrementalStart.type, 'incremental.result');
+  assert.equal(incrementalStart.result.type, 'full');
   socket.emit('message', JSON.stringify({ type: 'incremental.update', sessionId: 'dashboard', data: { notifications: { count: 2 } } }));
-  await new Promise(resolve => setTimeout(resolve, 10));
-  assert.equal(socket.sent[3].result.type, 'patches');
-  assert.deepEqual(socket.sent[3].result.patches.map(patch => patch.id), ['count']);
+  const incrementalUpdate = await waitForSent(socket, 3);
+  assert.equal(incrementalUpdate.result.type, 'patches');
+  assert.deepEqual(incrementalUpdate.result.patches.map(patch => patch.id), ['count']);
 });
 
 test('WebRTC wrapper sends typed JSON messages over an already negotiated channel', async () => {

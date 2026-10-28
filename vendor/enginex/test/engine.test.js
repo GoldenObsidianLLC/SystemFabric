@@ -222,6 +222,10 @@ test('supports LRU caching, stats, and explicit invalidation', async t => {
   await engine('index.html', { views: root, locals: { name: 'Y' }, cache: true });
   assert.ok(engine.cacheStats().hits > 0);
   await fs.writeFile(file, 'B {{ name }}');
+  // Force the mtime beyond coarse-resolution filesystems so this test always
+  // exercises cache revalidation instead of depending on write timing.
+  const updatedAt = new Date(Date.now() + 2_000);
+  await fs.utimes(file, updatedAt, updatedAt);
   assert.equal(await engine('index.html', { views: root, locals: { name: 'Z' }, cache: 'mtime' }), 'B Z');
   engine.clearCache(file);
 });

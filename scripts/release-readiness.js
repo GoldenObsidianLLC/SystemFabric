@@ -124,7 +124,7 @@ const requiredMigrations = [
   '0001_initial.sql', '0002_identity_workflows_plugins.sql', '0003_identity_editor_ai.sql',
   '0004_governance_taxonomy_release.sql', '0005_saml_shared_cache.sql',
   '0006_platform_libraries_commerce_social_billing.sql', '0007_release_hardening.sql',
-  '0008_checkout_stock_reservation_lifecycle.sql'
+  '0008_checkout_stock_reservation_lifecycle.sql', '0009_fix_content_item_slug_constraint.sql'
 ];
 const missingMigrations = requiredMigrations.filter(file => !fs.existsSync(path.join(root, 'database/migrations', file)));
 addCheck('migration-artifacts', 'Versioned migration files', missingMigrations.length ? 'BLOCKED' : 'PASS',

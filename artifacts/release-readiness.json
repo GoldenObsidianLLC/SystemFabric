@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "product": "SystemFabric",
   "version": "0.5.1",
-  "generatedAt": "2026-10-27T23:41:31.987Z",
+  "generatedAt": "2026-10-28T22:55:32.659Z",
   "host": {
-    "node": "v22.16.0",
-    "platform": "linux",
+    "node": "v26.12.1",
+    "platform": "win32",
     "arch": "x64"
   },
   "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
@@ -14,57 +14,57 @@
     {
       "id": "supported-runtime",
       "title": "Supported Node.js runtime",
-      "status": "BLOCKED",
-      "details": "Required >=22.23.4; running v22.16.0.",
+      "status": "PASS",
+      "details": "Required >=22.23.4; running v26.12.1.",
       "evidencePath": null
     },
     {
       "id": "reviewed-lockfile",
       "title": "Reviewed and committed npm lockfile",
-      "status": "BLOCKED",
-      "details": "package-lock.json is absent; reproducible npm ci cannot be certified.",
+      "status": "PASS",
+      "details": "package-lock.json is present and tracked; a human dependency review is still required.",
       "evidencePath": null
     },
     {
       "id": "migration-artifacts",
       "title": "Versioned migration files",
       "status": "PASS",
-      "details": "8 migration files are present; live fresh/upgrade execution is a separate gate.",
+      "details": "9 migration files are present; live fresh/upgrade execution is a separate gate.",
       "evidencePath": null
     },
     {
       "id": "syntax-artifact-check",
       "title": "Required artifacts and JavaScript syntax",
       "status": "PASS",
-      "details": "Exit 0; 2346 ms.  | WARNING: current runtime is below the declared minimum; results are development checks only, not supported-runtime validation.",
-      "evidencePath": "artifacts/evidence/artifact-check.log"
+      "details": "Exit 0; 7183 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
+      "evidencePath": "artifacts\\evidence\\artifact-check.log"
     },
     {
       "id": "unit-tests",
       "title": "SystemFabric unit/security tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":105,\"pass\":105,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1695 ms. Test execution is on v22.16.0.",
-      "evidencePath": "artifacts/evidence/unit-tests.tap.log"
+      "details": "Exit 0; {\"tests\":109,\"pass\":109,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1379 ms. Test execution is on v26.12.1.",
+      "evidencePath": "artifacts\\evidence\\unit-tests.tap.log"
     },
     {
       "id": "enginex-tests",
       "title": "Vendored EnginEx unit tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1043 ms.",
-      "evidencePath": "artifacts/evidence/enginex-tests.tap.log"
+      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 841 ms.",
+      "evidencePath": "artifacts\\evidence\\enginex-tests.tap.log"
     },
     {
       "id": "integration-tests",
       "title": "PostgreSQL/Memgraph/product integration tests",
       "status": "PARTIAL",
-      "details": "Exit 0; {\"tests\":5,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":5,\"todo\":0}; 219 ms. Skipped tests do not count as production validation.",
-      "evidencePath": "artifacts/evidence/integration-tests.tap.log"
+      "details": "Exit 0; {\"tests\":5,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":5,\"todo\":0}; 242 ms. Skipped tests do not count as production validation.",
+      "evidencePath": "artifacts\\evidence\\integration-tests.tap.log"
     },
     {
       "id": "playwright-installed",
       "title": "Playwright dependency available",
-      "status": "BLOCKED",
-      "details": "@playwright/test is not installed/resolvable in this checkout.",
+      "status": "PASS",
+      "details": "@playwright/test resolves in this checkout; browser execution and results are separate gates.",
       "evidencePath": null
     }
   ],
@@ -169,9 +169,9 @@
     }
   ],
   "summary": {
-    "pass": 4,
+    "pass": 7,
     "partial": 1,
-    "blocked": 3,
+    "blocked": 0,
     "missingEvidence": 14,
     "notRun": 0
   }

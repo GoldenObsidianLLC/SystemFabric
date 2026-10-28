@@ -83,6 +83,10 @@ jobs:
           node-version: '22.23.4'
       - name: Install exact reviewed dependency graph (requires committed package-lock.json)
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Create isolated integration database
+        env:
+          PGPASSWORD: systemfabric_test
+        run: psql -h 127.0.0.1 -U systemfabric -d systemfabric -v ON_ERROR_STOP=1 -c "CREATE DATABASE systemfabric_test;"
       - name: Wait for Memgraph Bolt listener
         run: |
           for attempt in $(seq 1 60); do

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "SystemFabric",
   "gate": "local-live-integration-subset",
-  "generatedAt": "2026-10-28T20:11:06.830Z",
+  "generatedAt": "2026-10-28T22:54:34.924Z",
   "status": "PASS",
   "node": "v26.12.1",
   "databaseName": "systemfabric_test",
