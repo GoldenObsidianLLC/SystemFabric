@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "SystemFabric",
   "version": "0.5.1",
-  "generatedAt": "2026-10-28T22:55:32.659Z",
+  "generatedAt": "2026-10-29T20:35:48.430Z",
   "host": {
     "node": "v26.12.1",
     "platform": "win32",
@@ -36,28 +36,28 @@
       "id": "syntax-artifact-check",
       "title": "Required artifacts and JavaScript syntax",
       "status": "PASS",
-      "details": "Exit 0; 7183 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
+      "details": "Exit 0; 6656 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
       "evidencePath": "artifacts\\evidence\\artifact-check.log"
     },
     {
       "id": "unit-tests",
       "title": "SystemFabric unit/security tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":109,\"pass\":109,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1379 ms. Test execution is on v26.12.1.",
+      "details": "Exit 0; {\"tests\":109,\"pass\":109,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1406 ms. Test execution is on v26.12.1.",
       "evidencePath": "artifacts\\evidence\\unit-tests.tap.log"
     },
     {
       "id": "enginex-tests",
       "title": "Vendored EnginEx unit tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 841 ms.",
+      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1019 ms.",
       "evidencePath": "artifacts\\evidence\\enginex-tests.tap.log"
     },
     {
       "id": "integration-tests",
       "title": "PostgreSQL/Memgraph/product integration tests",
       "status": "PARTIAL",
-      "details": "Exit 0; {\"tests\":5,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":5,\"todo\":0}; 242 ms. Skipped tests do not count as production validation.",
+      "details": "Exit 0; {\"tests\":8,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":8,\"todo\":0}; 356 ms. Skipped tests do not count as production validation.",
       "evidencePath": "artifacts\\evidence\\integration-tests.tap.log"
     },
     {
@@ -72,9 +72,9 @@
     {
       "id": "postgres-memgraph-live",
       "title": "Fresh/upgrade migrations, PostgreSQL transactions and Memgraph outage/replay",
-      "status": "MISSING_EVIDENCE",
+      "status": "PASS",
       "evidencePath": "artifacts/evidence/postgres-memgraph-live.json",
-      "details": "No evidence file at artifacts/evidence/postgres-memgraph-live.json."
+      "details": "Evidence validated; 1 referenced artifact(s)."
     },
     {
       "id": "tenant-isolation-review",
@@ -169,10 +169,10 @@
     }
   ],
   "summary": {
-    "pass": 7,
+    "pass": 8,
     "partial": 1,
     "blocked": 0,
-    "missingEvidence": 14,
+    "missingEvidence": 13,
     "notRun": 0
   }
 }
