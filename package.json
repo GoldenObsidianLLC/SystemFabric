@@ -34,7 +34,8 @@
     "dev:doctor": "node scripts/dev-doctor.js",
     "test:integration:live": "node scripts/test-integration-live.js",
     "test:integration:memgraph-outage": "node scripts/test-memgraph-outage.js",
-    "test:e2e:install": "playwright install chromium"
+    "test:e2e:install": "playwright install chromium",
+    "test:graph:rebuild": "node scripts/test-graph-rebuild.js"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",

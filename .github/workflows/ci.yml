@@ -126,6 +126,12 @@ jobs:
           set -o pipefail
           mkdir -p artifacts/evidence
           npm run test:integration:memgraph-outage 2>&1 | tee artifacts/evidence/memgraph-outage-live.log
+      - name: Validate canonical graph rebuild in an isolated Memgraph container
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/evidence
+          npm run test:graph:rebuild 2>&1 | tee artifacts/evidence/graph-rebuild-live.log
       - name: Upload live integration test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -136,6 +142,7 @@ jobs:
             artifacts/evidence/integration-migrations.log
             artifacts/evidence/integration-live.json
             artifacts/evidence/memgraph-outage-live.log
+            artifacts/evidence/graph-rebuild-live.log
           if-no-files-found: warn
 
   browser-and-accessibility:
