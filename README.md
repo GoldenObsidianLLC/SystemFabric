@@ -101,3 +101,22 @@ scripts/reconcile-library-objects.js  dry-run-first local object reconciliation 
 scripts/test-integration-live.js      strict live database/graph integration runner
 test/                       unit, API/security-boundary, DB integration and Playwright E2E tests
 ```
+
+## License, copyright, and attribution
+
+Original SystemFabric source code and project materials are licensed under the
+**GNU General Public License, version 2 or (at your option) any later version**
+(**GPL-2.0-or-later**), except where individual files, directories, or
+components identify different terms. The full GPL version 2 text is in
+[`LICENSE`](LICENSE). Copyright © 2026 Golden Obsidian LLC. SystemFabric's
+original developer and founder is **Justin Harlan**.
+
+Third-party and vendored components keep their own copyright notices and
+license terms. In particular, see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)
+and the license file in `vendor/enginex/`. The project-wide license does not
+replace a component's separate license.
+
+The GPL license for the software does not grant permission to use SystemFabric
+or Golden Obsidian LLC names, logos, crest, or other branding to imply official
+affiliation or endorsement. See [`TRADEMARKS.md`](TRADEMARKS.md). Contribution
+terms are described in [`CONTRIBUTING.md`](CONTRIBUTING.md).
