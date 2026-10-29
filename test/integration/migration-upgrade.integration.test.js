@@ -178,6 +178,14 @@ test(
         );
 
         contentId = content.rows[0].id;
+        // Restore the legacy v0008 constraint after seeding existing content.
+        // NOT VALID preserves the historical row while retaining the old
+        // constraint definition for migration 0009 to replace.
+        await client.query(
+          `ALTER TABLE content_items
+          ADD CONSTRAINT content_items_slug_check
+          CHECK (slug ~ '^[a-z0-9][a-z0-9-_/]{0,240}$') NOT VALID`
+        );
       } finally {
         client.release();
       }
@@ -232,7 +240,7 @@ test(
 
       try {
         // Existing content must survive the forward migration.
-        const existing = await client.query(
+        const existing = await verificationClient.query(
           `SELECT slug
              FROM content_items
             WHERE id = $1`,
@@ -243,7 +251,7 @@ test(
         assert.equal(existing.rows[0].slug, 'docs/upgrade_path');
 
         // The updated constraint must permit supported route separators.
-        const accepted = await client.query(
+        const accepted = await verificationClient.query(
           `INSERT INTO content_items(site_id, slug, title, body)
            VALUES($1, $2, $3, $4::jsonb)
            RETURNING id`,
@@ -259,7 +267,7 @@ test(
 
         // Uppercase letters are not valid in the updated route expression.
         await assert.rejects(
-          client.query(
+          verificationClient.query(
             `INSERT INTO content_items(site_id, slug, title, body)
              VALUES($1, $2, $3, $4::jsonb)`,
             [
@@ -272,7 +280,7 @@ test(
           error => error.code === '23514'
         );
 
-        const registered = await client.query(
+        const registered = await verificationClient.query(
           `SELECT sha256
              FROM systemfabric_schema_migrations
             WHERE version = $1`,
