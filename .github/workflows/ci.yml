@@ -95,8 +95,37 @@ jobs:
           done
           echo 'Memgraph did not become ready on Bolt port 7687.' >&2
           exit 1
+      - name: Identify the exact Memgraph test container
+        shell: bash
+        run: |
+          mapfile -t ids < <(
+            docker ps \
+              --filter 'ancestor=memgraph/memgraph:3.13.1' \
+              --format '{{.ID}}'
+          )
+
+          if [ "${#ids[@]}" -ne 1 ]; then
+            echo "Expected exactly one Memgraph service container; found ${#ids[@]}." >&2
+            docker ps --format '{{.ID}} {{.Image}} {{.Names}}'
+            exit 1
+          fi
+
+          image="$(docker inspect --format '{{.Config.Image}}' "${ids[0]}")"
+
+          if [ "$image" != 'memgraph/memgraph:3.13.1' ]; then
+            echo "Unexpected Memgraph test image: $image" >&2
+            exit 1
+          fi
+
+          echo "MEMGRAPH_TEST_CONTAINER_ID=${ids[0]}" >> "$GITHUB_ENV"
       - name: Test PostgreSQL/Memgraph/community/commerce integration workflows (zero skips required)
         run: npm run test:integration:live
+      - name: Exercise real Memgraph outage and outbox recovery
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/evidence
+          npm run test:integration:memgraph-outage 2>&1 | tee artifacts/evidence/memgraph-outage-live.log
       - name: Upload live integration test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -106,6 +135,7 @@ jobs:
             artifacts/evidence/integration-tests.tap.log
             artifacts/evidence/integration-migrations.log
             artifacts/evidence/integration-live.json
+            artifacts/evidence/memgraph-outage-live.log
           if-no-files-found: warn
 
   browser-and-accessibility:

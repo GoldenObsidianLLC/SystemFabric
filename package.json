@@ -33,6 +33,7 @@
     "dev:bootstrap": "node scripts/bootstrap-dev.js",
     "dev:doctor": "node scripts/dev-doctor.js",
     "test:integration:live": "node scripts/test-integration-live.js",
+    "test:integration:memgraph-outage": "node scripts/test-memgraph-outage.js",
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
