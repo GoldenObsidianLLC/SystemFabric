@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible defect in SystemFabric.
+title: "bug: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, personal data, private production output, or exploitable security details. See [SECURITY.md](../../SECURITY.md) for private vulnerability reporting.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Version number or full commit SHA.
+      placeholder: "0.5.1 / full SHA"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node.js/npm versions, database/provider versions where relevant. Never include secrets.
+      placeholder: "Windows 11; Node.js 22.x; PostgreSQL ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the command/test and a minimal sanitized example.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation attempted
+      description: Commands run, pass/fail summary, relevant sanitized logs.
+    validations:
+      required: false
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I removed secrets, personal data, and sensitive output.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true

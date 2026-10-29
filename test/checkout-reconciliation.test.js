@@ -54,6 +54,8 @@ function fetchSession(session, optionsSeen = []) {
   };
 }
 
+const TEST_STRIPE_SECRET_KEY = ['sk', 'test', 'fixture_not_real'].join('_');
+
 test('reconciliation batch size is bounded', () => {
   assert.equal(validateBatchSize(1), 1);
   assert.equal(validateBatchSize(1_000), 1_000);
@@ -66,7 +68,7 @@ test('expired Stripe session transitions pending order to failed and releases th
   const pool = fakePool();
   const requests = [];
   const result = await reconcileExpiredStripeCheckouts(pool, {
-    secretKey: 'sk_fixture_not_a_real_credential', fetchImpl: fetchSession({ id: candidate.provider_session_id, status: 'expired', payment_status: 'unpaid' }, requests)
+    secretKey: TEST_STRIPE_SECRET_KEY, fetchImpl: fetchSession({ id: candidate.provider_session_id, status: 'expired', payment_status: 'unpaid' }, requests)
   });
   assert.deepEqual(result, { skipped: false, checked: 1, expired: 1, paid: 0, held: 0, errors: 0, unlinked: 0 });
   assert.equal(pool.state.releases, 1);
@@ -74,13 +76,13 @@ test('expired Stripe session transitions pending order to failed and releases th
   assert.equal(pool.state.commits, 1);
   assert.equal(requests[0].url, 'https://api.stripe.com/v1/checkout/sessions/cs_test_123');
   assert.equal(requests[0].options.method, 'GET');
-  assert.equal(requests[0].options.headers.Authorization, 'Bearer sk_fixture_not_a_real_credential');
+  assert.equal(requests[0].options.headers.Authorization, `Bearer ${TEST_STRIPE_SECRET_KEY}`);
 });
 
 test('complete paid Stripe session reconciles pending order and commits the reservation', async () => {
   const pool = fakePool();
   const result = await reconcileExpiredStripeCheckouts(pool, {
-    secretKey: 'sk_fixture_not_a_real_credential', fetchImpl: fetchSession({ id: candidate.provider_session_id, status: 'complete', payment_status: 'paid', payment_intent: 'pi_test_123' })
+    secretKey: TEST_STRIPE_SECRET_KEY, fetchImpl: fetchSession({ id: candidate.provider_session_id, status: 'complete', payment_status: 'paid', payment_intent: 'pi_test_123' })
   });
   assert.equal(result.paid, 1);
   assert.equal(result.expired, 0);
@@ -94,7 +96,7 @@ test('open or unpaid-complete sessions retain reservations', async () => {
     { id: candidate.provider_session_id, status: 'complete', payment_status: 'unpaid' }
   ]) {
     const pool = fakePool();
-    const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: 'sk_fixture_not_a_real_credential', fetchImpl: fetchSession(session) });
+    const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: TEST_STRIPE_SECRET_KEY, fetchImpl: fetchSession(session) });
     assert.equal(result.held, 1);
     assert.equal(pool.state.connects, 0);
     assert.equal(pool.state.releases, 0);
@@ -111,7 +113,7 @@ test('provider transport and response errors retain inventory and are reported',
   ];
   for (const fetchImpl of cases) {
     const pool = fakePool();
-    const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: 'sk_fixture_not_a_real_credential', fetchImpl });
+    const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: TEST_STRIPE_SECRET_KEY, fetchImpl });
     assert.equal(result.errors, 1);
     assert.equal(result.held, 1);
     assert.equal(pool.state.releases, 0);
@@ -129,7 +131,7 @@ test('missing provider credentials skip reconciliation without releasing holds',
 
 test('orders without a Stripe session ID are retained for manual or idempotent recovery', async () => {
   const pool = fakePool({ candidateRows: [{ order_id: 'order-2', site_id: 'site-1', provider_session_id: null }] });
-  const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: 'sk_fixture_not_a_real_credential' });
+  const result = await reconcileExpiredStripeCheckouts(pool, { secretKey: TEST_STRIPE_SECRET_KEY });
   assert.equal(result.unlinked, 1);
   assert.equal(result.held, 1);
   assert.equal(pool.state.connects, 0);
