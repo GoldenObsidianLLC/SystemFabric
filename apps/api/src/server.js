@@ -206,7 +206,23 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   function safeCsrfCookie(a, b) { return typeof a === 'string' && typeof b === 'string' && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
 
   async function siteIdFor({ req, url, body, actor, required = true }) {
-    const fromRequest = req.headers['x-systemfabric-site-id'] || url.searchParams.get('siteId') || body?.siteId;
+    const querySiteIds = url.searchParams.getAll('siteId');
+    if (querySiteIds.length > 1) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH', 'Provide a siteId query parameter only once.');
+    }
+    const selectorEntries = [
+      ['header', req.headers['x-systemfabric-site-id']],
+      ['query', querySiteIds[0]],
+      ['body', body?.siteId],
+    ].filter(([, value]) => value !== undefined && value !== null && value !== '');
+    if (selectorEntries.some(([, value]) => typeof value !== 'string')) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+    }
+    const distinctSiteIds = new Set(selectorEntries.map(([, value]) => value.toLowerCase()));
+    if (distinctSiteIds.size > 1) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH', 'All site selectors in the request must identify the same site.');
+    }
+    const fromRequest = selectorEntries[0]?.[1];
     let siteId = typeof fromRequest === 'string' ? fromRequest : '';
     if (!siteId && actor.isDeveloper) siteId = env.SYSTEMFABRIC_DEFAULT_SITE_ID || '';
     if (!siteId && actor.memberships.length === 1) siteId = actor.memberships[0].siteId;
@@ -214,6 +230,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     if (!siteId && actor.memberships.length > 1) throw fail(400, 'ERR_SYSTEMFABRIC_SITE_REQUIRED', 'Select a site using x-systemfabric-site-id or siteId.');
     if (!siteId) throw fail(400, 'ERR_SYSTEMFABRIC_SITE_REQUIRED', 'A siteId is required for this operation.');
     if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+
     if (!actor.isDeveloper && !(await identity.authorizeSite(actor.user.id, siteId, 'content:read'))) {
       // Read membership directly; the requested capability is checked by route-specific authorization below.
       const hasMembership = actor.memberships.some(item => item.siteId === siteId);
