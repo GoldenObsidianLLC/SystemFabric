@@ -64,3 +64,48 @@ test('PostgreSQL integration: concurrent outbox workers claim events once and qu
   assert.equal(dead.rows[0]?.attempts, 1);
   assert.equal(dead.rows[0]?.last_error_code, 'ERR_TEST_POISON');
 });
+test('PostgreSQL integration: failed transaction rolls back earlier writes', { skip: !enabled }, async t => {
+  const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '2' });
+  const slug = `rollback-it-${randomUUID().slice(0, 10)}`;
+
+  t.after(async () => {
+    await pool.query('DELETE FROM sites WHERE slug=$1', [slug]).catch(() => {});
+    await pool.end();
+  });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      'INSERT INTO sites(slug,name) VALUES($1,$2)',
+      [slug, 'Rollback Integration Site']
+    );
+
+    await assert.rejects(
+      client.query(
+        'INSERT INTO sites(slug,name) VALUES($1,$2)',
+        [slug, 'Duplicate Rollback Integration Site']
+      ),
+      error => error.code === '23505'
+    );
+
+    await client.query('ROLLBACK');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  const persisted = await pool.query(
+    'SELECT id FROM sites WHERE slug=$1',
+    [slug]
+  );
+
+  assert.equal(
+    persisted.rows.length,
+    0,
+    'A failed transaction must not persist earlier writes'
+  );
+});
