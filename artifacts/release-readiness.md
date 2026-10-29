@@ -1,6 +1,6 @@
 # SystemFabric 0.5.1 — Release Readiness Report
 
-- Generated: 2026-10-29T20:35:48.430Z
+- Generated: 2026-10-29T21:37:18.208Z
 - Node.js: v26.12.1 (win32/x64)
 - Production-ready: **NO**
 - Release classification: `NOT_PRODUCTION_CERTIFIED`
@@ -13,10 +13,10 @@
 | Supported Node.js runtime | **PASS** | Required >=22.23.4; running v26.12.1. |
 | Reviewed and committed npm lockfile | **PASS** | package-lock.json is present and tracked; a human dependency review is still required. |
 | Versioned migration files | **PASS** | 9 migration files are present; live fresh/upgrade execution is a separate gate. |
-| Required artifacts and JavaScript syntax | **PASS** | Exit 0; 6656 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. \| Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script. |
-| SystemFabric unit/security tests | **PASS** | Exit 0; {"tests":109,"pass":109,"fail":0,"cancelled":0,"skipped":0,"todo":0}; 1406 ms. Test execution is on v26.12.1. |
-| Vendored EnginEx unit tests | **PASS** | Exit 0; {"tests":88,"pass":88,"fail":0,"cancelled":0,"skipped":0,"todo":0}; 1019 ms. |
-| PostgreSQL/Memgraph/product integration tests | **PARTIAL** | Exit 0; {"tests":8,"pass":0,"fail":0,"cancelled":0,"skipped":8,"todo":0}; 356 ms. Skipped tests do not count as production validation. |
+| Required artifacts and JavaScript syntax | **PASS** | Exit 0; 7090 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. \| Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script. |
+| SystemFabric unit/security tests | **PASS** | Exit 0; {"tests":109,"pass":109,"fail":0,"cancelled":0,"skipped":0,"todo":0}; 1148 ms. Test execution is on v26.12.1. |
+| Vendored EnginEx unit tests | **PASS** | Exit 0; {"tests":88,"pass":88,"fail":0,"cancelled":0,"skipped":0,"todo":0}; 922 ms. |
+| PostgreSQL/Memgraph/product integration tests | **PARTIAL** | Exit 0; {"tests":9,"pass":0,"fail":0,"cancelled":0,"skipped":9,"todo":0}; 374 ms. Skipped tests do not count as production validation. |
 | Playwright dependency available | **PASS** | @playwright/test resolves in this checkout; browser execution and results are separate gates. |
 | Fresh/upgrade migrations, PostgreSQL transactions and Memgraph outage/replay | **PASS** | Evidence validated; 1 referenced artifact(s). |
 | Independent tenant-isolation and authorization review | **MISSING_EVIDENCE** | No evidence file at artifacts/evidence/tenant-isolation-review.json. |

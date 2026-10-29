@@ -139,6 +139,14 @@ test(
     assert.equal(queryMismatch.status, 400, 'a site B query selector must not authorize a site A route');
     assert.equal((await queryMismatch.json()).code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
 
+    const bodyMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({ siteId: siteB, body: writeMarker, visibility: 'members' }),
+    });
+    assert.equal(bodyMismatch.status, 400, 'a site B body selector must not authorize writes to a site A route');
+    assert.equal((await bodyMismatch.json()).code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+
     const writeMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
       method: 'POST',
       headers: { ...authHeaders, 'content-type': 'application/json', 'x-systemfabric-site-id': siteB },

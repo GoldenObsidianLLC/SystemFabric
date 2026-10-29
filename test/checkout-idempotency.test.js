@@ -30,7 +30,7 @@ function context({ actorId = ownerId, existingStatus = 'pending_payment', metada
       },
       async connect() { throw new Error('connect should not be called for existing-order branches'); }
     },
-    async siteIdFor({ body }) { assert.equal(body.siteId, siteId); return siteId; },
+    async siteIdFor({ body, routeSiteId }) { assert.equal(routeSiteId, siteId); assert.equal(Object.hasOwn(body, 'siteId'), false); return siteId; },
     async requireCapability() {},
     async readJson() { return { items: [{ productId: 'a34c0d1a-0b9d-4f56-a3ec-0b2b97224632', quantity: 1 }], email: 'owner@example.test', idempotencyKey: key }; },
     sendJson(_res, statusCode, payload) { ctx.res.statusCode = statusCode; ctx.res.payload = payload; return true; },
