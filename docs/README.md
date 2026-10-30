@@ -13,6 +13,7 @@ This directory contains task-oriented documentation. The root [README](../README
 | Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
 | Community behavior, reporting, and enforcement. | [Code of Conduct](../CODE_OF_CONDUCT.md) |
 | How project contributions and collaborators are credited. | [Contributor Recognition](../CONTRIBUTOR_RECOGNITION.md) |
+| Explore research topics or collaborate on technical investigations | [Research & Collaboration](../RESEARCH_COLLABORATION.md) |
 | Decide whether a release can ship | [Release readiness](RELEASE_READINESS.md) |
 | Plan work without making unsupported promises | [Roadmap](ROADMAP.md) |
 | Update docs consistently | [Documentation standards](DOCUMENTATION_STANDARDS.md) |
