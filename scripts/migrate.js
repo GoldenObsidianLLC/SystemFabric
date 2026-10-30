@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadEnvFile } = require('./load-env');
 const { createPostgresPool } = require('../packages/db/src/postgres-store');
+const { normalizeMigrationSql, migrationChecksum } = require('./migration-checksum');
 
 const MIGRATION_DIR = path.resolve(__dirname, '../database/migrations');
 const LOCK_KEY_A = 57_493_100;
@@ -25,8 +26,9 @@ async function main() {
       applied_at timestamptz NOT NULL DEFAULT now()
     )`);
     for (const file of files) {
-      const sql = fs.readFileSync(path.join(MIGRATION_DIR, file), 'utf8');
-      const sha256 = crypto.createHash('sha256').update(sql).digest('hex');
+      const rawSql = fs.readFileSync(path.join(MIGRATION_DIR, file), 'utf8');
+      const sql = normalizeMigrationSql(rawSql);
+      const sha256 = migrationChecksum(rawSql);
       const existing = await client.query('SELECT sha256 FROM systemfabric_schema_migrations WHERE version=$1', [file]);
       if (existing.rows[0]) {
         if (existing.rows[0].sha256 !== sha256) throw new Error(`Applied migration ${file} has changed. Create a new forward migration instead of editing an applied migration.`);
@@ -58,4 +60,4 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { MIGRATION_DIR, main };
+module.exports = { MIGRATION_DIR, main, normalizeMigrationSql, migrationChecksum };

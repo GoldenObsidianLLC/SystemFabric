@@ -86,3 +86,42 @@
 **Decision:** Global provider allowlists and external-content opt-in are combined with site-level provider/usage policy. AI output remains a validated proposal and cannot directly publish or change permissions.
 
 **Reason:** Provider flexibility must not bypass tenant policy, human review, or document validation.
+
+## ADR-015: Durable outbox events use a versioned site-scoped envelope
+
+**Decision:** Keep `outbox_events.id` as the stable event identity and add explicit schema version, site scope, actor, correlation/causation metadata, and classification to outbox rows. Consumers receive a validated v1 envelope alongside the legacy event `type` and `payload` fields. The existing aggregate/type/version unique constraint remains the producer idempotency key.
+
+**Reason:** Durable events need stable identity and explicit site, actor, classification and compatibility semantics before additional consumers or a broker are introduced. The v1 envelope uses `siteId` as the current tenancy/isolation boundary; the database does not yet model a separate `tenantId`.
+
+**Consequences:** Delivery is at-least-once. Consumers deduplicate by event identity and use aggregate version to avoid stale projections. Unregistered event types remain internal until classified. Shared fan-out, authenticated network delivery, and broker selection remain separate milestones. The Memgraph projection consumer's durable group and sequence semantics are specified by ADR-016 and ADR-017.
+
+
+## ADR-016: PostgreSQL is the initial durable consumer-group delivery ledger
+
+**Decision:** Keep the canonical outbox event in `outbox_events` and add one independently leased delivery row per consumer group in `outbox_deliveries`. Use PostgreSQL row locking with `SKIP LOCKED` for concurrent workers, expiring claim leases for crash recovery, per-aggregate ordering barriers, retry/dead-letter state and bounded replay by explicit event IDs. Do not select an external broker in this slice.
+
+**Reason:** The existing PostgreSQL outbox is already the transactional source of truth. A broker-independent delivery ledger creates independent subscriber state and replay semantics without coupling the product to an unmeasured transport or operational dependency. Deployment topology, throughput and ordering needs must be benchmarked before introducing Redis, Kafka, NATS or a managed broker.
+
+**Consequences:** Delivery is at-least-once; handlers must be idempotent. A dead event blocks later events for its aggregate and consumer group until replayed or resolved. Consumer groups have independent delivery/retry state. The Memgraph projection handler has since migrated to a named group and is governed by ADR-017. This ADR does not claim multi-instance SSE/WebSocket delivery, distributed presence, telemetry, or production readiness.
+
+
+## ADR-017: Memgraph projection consumes a filtered durable consumer group
+
+**Decision:** Run the graph projector through the PostgreSQL-backed `graph.projection.v1` consumer group. Persist an explicit event-type allow-list on each consumer group; reject worker startup when the persisted subscription differs from the code configuration. Project content upsert/delete, workflow status changes, taxonomy changes and relationship changes only. Keep the original source event immutable and store processing/retry state in `outbox_deliveries`.
+
+**Aggregate sequence:** Use `content_items.lock_version` as the monotonic content aggregate sequence in `outbox_events.aggregate_version` and `envelope.resource.version`. Keep payload `version` as the editorial content revision. Migration `0013_consumer_group_event_filters.sql` re-sequences historical content events by original `created_at,id` order and advances each canonical content row's lock-version floor before the worker is deployed. Graph projection nodes store both editorial `version` and `projectionVersion`; workflow status transitions use the latter, so stale replays cannot undo a newer publish/unpublish state.
+
+**Reason:** The former worker claimed every outbox event through one shared status column, while the graph projector supports only graph-relevant event types. It also lacked a monotonic sequence for workflow changes that do not create a new editorial revision. Durable per-group state isolates graph retries from other consumers, event filters prevent unrelated domain events from being misrouted, and the lock-version sequence preserves ordering across workflow transitions.
+
+**Consequences:** The graph projection worker no longer writes `outbox_events.status`; other consumers remain independent. Delivery is at-least-once and the projector remains version-guarded. Event-type subscriptions are routing configuration, not an authorization boundary. A controlled graph rebuild, live Memgraph outage/replay test, operational lag/dead-letter telemetry and production topology validation remain required before production certification.
+
+
+## ADR-018: Redis-compatible TTL storage backs shared ephemeral presence
+
+**Decision:** Keep presence leases separate from the durable PostgreSQL outbox and store them in a Redis-protocol-compatible service through the `redis` Node client. Use a site-scoped sorted-set expiry index plus one TTL-backed JSON lease per principal/session. Lua scripts make heartbeat renewal, per-site capacity, removal and snapshot cleanup atomic. Session identifiers are hashed in key names; all keys for a site share a Redis Cluster hash tag. Preserve the memory adapter for deterministic tests and single-process preview.
+
+**Expiry behavior:** Expired members are pruned on the next heartbeat or site snapshot. A short metadata-retention window allows the adapter's `onExpired` callback to observe the expired session during that cleanup. This is lazy notification, not a background sweeper or a cross-node broadcast.
+
+**Reason:** Presence is ephemeral and high-churn. A shared TTL store provides multi-process visibility without coupling presence lifecycle to durable content/event tables. Redis protocol compatibility permits local Memurai and managed Redis-compatible deployments to use the same adapter contract.
+
+**Consequences:** Redis errors fail closed with HTTP 503; the application does not silently fall back to process-local memory when Redis is selected. Shared snapshots and lease expiry are implemented and verified with two independent clients. The event hub/SSE fan-out remains process-local, so this ADR does not claim immediate cross-instance notifications, distributed connection quotas, production readiness or an authenticated multi-replica gateway. Production hosts must inject both a distributed event hub and shared presence service.

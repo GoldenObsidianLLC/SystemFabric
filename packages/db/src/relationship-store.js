@@ -6,7 +6,7 @@ const ALLOWED_KINDS = new Set(['HAS_TERM', 'PARENT_OF', 'RELATED_TO', 'LOCALIZED
 function createRelationshipStore({ pool }) {
   if (!pool) throw new TypeError('PostgreSQL pool is required.');
   return Object.freeze({
-    async upsert({ siteId, sourceId, targetId, kind, metadata = {} }) {
+    async upsert({ siteId, sourceId, targetId, kind, metadata = {}, actorId = null, correlationId = null }) {
       if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_SYSTEMFABRIC_RELATION_KIND' });
       if (sourceId === targetId) throw Object.assign(new Error('Self relationships are not allowed.'), { code: 'ERR_SYSTEMFABRIC_RELATION_SELF' });
       const client = await pool.connect();
@@ -23,13 +23,13 @@ function createRelationshipStore({ pool }) {
         );
         const row = result.rows[0];
         const event = { relationshipId: row.id, siteId, sourceId, targetId, kind, version: row.version, metadata: row.metadata };
-        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb) ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, row.version, JSON.stringify(event)]);
+        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, row.version, JSON.stringify(event), siteId, actorId || null, correlationId || null]);
         await client.query('COMMIT');
         return row;
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
       finally { client.release(); }
     },
-    async delete({ siteId, sourceId, targetId, kind }) {
+    async delete({ siteId, sourceId, targetId, kind, actorId = null, correlationId = null }) {
       if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_SYSTEMFABRIC_RELATION_KIND' });
       const client = await pool.connect();
       try {
@@ -40,7 +40,7 @@ function createRelationshipStore({ pool }) {
         const version = row.version + 1;
         await client.query('UPDATE content_relationships SET deleted_at=now(),version=$2 WHERE id=$1', [row.id, version]);
         const event = { relationshipId: row.id, siteId, sourceId, targetId, kind, version };
-        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb) ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, version, JSON.stringify(event)]);
+        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, version, JSON.stringify(event), siteId, actorId || null, correlationId || null]);
         await client.query('COMMIT');
         return { deleted: true, id: row.id, version };
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }

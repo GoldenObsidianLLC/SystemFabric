@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "SystemFabric",
   "version": "0.5.1",
-  "generatedAt": "2026-10-29T21:37:18.208Z",
+  "generatedAt": "2026-10-30T23:06:48.244Z",
   "host": {
     "node": "v26.12.1",
     "platform": "win32",
@@ -11,6 +11,13 @@
   "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
   "readyForProduction": false,
   "checks": [
+    {
+      "id": "clean-source-tree",
+      "title": "Clean, revision-identified release source tree",
+      "status": "BLOCKED",
+      "details": "HEAD 637e1b15059892550192597e237c54ada51e87b9; 55 tracked/untracked path(s) are modified. Release evidence must be regenerated for a clean, committed target revision.",
+      "evidencePath": null
+    },
     {
       "id": "supported-runtime",
       "title": "Supported Node.js runtime",
@@ -21,43 +28,43 @@
     {
       "id": "reviewed-lockfile",
       "title": "Reviewed and committed npm lockfile",
-      "status": "PASS",
-      "details": "package-lock.json is present and tracked; a human dependency review is still required.",
+      "status": "PARTIAL",
+      "details": "package-lock.json is present and tracked; fresh isolated npm ci passed, but human dependency review remains required.",
       "evidencePath": null
     },
     {
       "id": "migration-artifacts",
       "title": "Versioned migration files",
       "status": "PASS",
-      "details": "9 migration files are present; live fresh/upgrade execution is a separate gate.",
+      "details": "13 migration files are present; live fresh/upgrade execution is a separate gate.",
       "evidencePath": null
     },
     {
       "id": "syntax-artifact-check",
       "title": "Required artifacts and JavaScript syntax",
       "status": "PASS",
-      "details": "Exit 0; 7090 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
+      "details": "Exit 0; 9920 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
       "evidencePath": "artifacts\\evidence\\artifact-check.log"
     },
     {
       "id": "unit-tests",
       "title": "SystemFabric unit/security tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":109,\"pass\":109,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 1148 ms. Test execution is on v26.12.1.",
+      "details": "Exit 0; {\"tests\":147,\"pass\":147,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 9230 ms. Test execution is on v26.12.1.",
       "evidencePath": "artifacts\\evidence\\unit-tests.tap.log"
     },
     {
       "id": "enginex-tests",
       "title": "Vendored EnginEx unit tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 922 ms.",
+      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 2570 ms.",
       "evidencePath": "artifacts\\evidence\\enginex-tests.tap.log"
     },
     {
       "id": "integration-tests",
       "title": "PostgreSQL/Memgraph/product integration tests",
-      "status": "PARTIAL",
-      "details": "Exit 0; {\"tests\":9,\"pass\":0,\"fail\":0,\"cancelled\":0,\"skipped\":9,\"todo\":0}; 374 ms. Skipped tests do not count as production validation.",
+      "status": "PASS",
+      "details": "Exit 0; {\"tests\":16,\"pass\":16,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 11419 ms. Skipped tests do not count as production validation.",
       "evidencePath": "artifacts\\evidence\\integration-tests.tap.log"
     },
     {
@@ -72,9 +79,9 @@
     {
       "id": "postgres-memgraph-live",
       "title": "Fresh/upgrade migrations, PostgreSQL transactions and Memgraph outage/replay",
-      "status": "PASS",
+      "status": "BLOCKED",
       "evidencePath": "artifacts/evidence/postgres-memgraph-live.json",
-      "details": "Evidence validated; 1 referenced artifact(s)."
+      "details": "Evidence targets 4653c84f21e9652affeebbb36f5803cd7354d397, but current HEAD is 637e1b15059892550192597e237c54ada51e87b9; rerun against the exact release revision."
     },
     {
       "id": "tenant-isolation-review",
@@ -169,10 +176,75 @@
     }
   ],
   "summary": {
-    "pass": 8,
+    "pass": 7,
     "partial": 1,
-    "blocked": 0,
+    "blocked": 2,
     "missingEvidence": 13,
     "notRun": 0
-  }
+  },
+  "supplementalEvidence": [
+    {
+      "id": "clean-npm-ci",
+      "title": "Fresh clean npm ci installation",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/clean-npm-ci.json",
+      "details": "Fresh isolated npm ci completed on Windows x64 / Node.js 26.12.1, installed 167 packages and ran the KaTeX postinstall; maintainer review and CI matrix evidence remain open."
+    },
+    {
+      "id": "fresh-migrations",
+      "title": "Fresh PostgreSQL migrations and idempotency",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/fresh-migrations.json",
+      "details": "All 13 migrations applied to a disposable fresh local PostgreSQL database, all 13 skipped on a second pass, then only that disposable database was dropped."
+    },
+    {
+      "id": "playwright-smoke",
+      "title": "Playwright Chromium smoke tests (not full accessibility acceptance)",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/browser-smoke.log",
+      "details": "4 Chromium smoke tests passed with one worker; broader browser acceptance and manual WCAG review remain open."
+    },
+    {
+      "id": "npm-audit",
+      "title": "Local npm dependency audit (high severity threshold)",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/npm-audit.log",
+      "details": "npm audit --audit-level=high reported 0 vulnerabilities; manual dependency review and CodeQL remain open."
+    },
+    {
+      "id": "cyclonedx-sbom-generation",
+      "title": "CycloneDX SBOM generation",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/sbom-generation.log",
+      "details": "SBOM generation command completed; the retained CycloneDX file is checked separately by maintainers."
+    },
+    {
+      "id": "memgraph-outage-recovery",
+      "title": "Memgraph outage and durable projection recovery",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/memgraph-outage-local.log",
+      "details": "The event remained pending with its lease released during outage, replayed after restart and was not delivered again."
+    },
+    {
+      "id": "graph-projection-rebuild",
+      "title": "Canonical graph projection rebuild",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/graph-rebuild-local.log",
+      "details": "Rebuild preserved tombstones, removed stale nodes, honored safety limit and was deterministic on a second run."
+    },
+    {
+      "id": "library-reconciliation-dry-run",
+      "title": "Local library-object reconciliation dry run",
+      "status": "PASS",
+      "evidencePath": "artifacts/evidence/library-reconcile-dryrun.log",
+      "details": "Dry-run used TEST_DATABASE_URL and an isolated temporary directory; no candidates or deletions."
+    },
+    {
+      "id": "cyclonedx-sbom-artifact",
+      "title": "CycloneDX SBOM artifact schema",
+      "status": "PASS",
+      "evidencePath": "artifacts/systemfabric.sbom.cdx.json",
+      "details": "Format CycloneDX 1.5; 162 components and 163 dependency records. Human review/provenance remain open."
+    }
+  ]
 }

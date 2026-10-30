@@ -6,12 +6,15 @@
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
     "nodeMinimum": ">=22.23.4",
-    "runtimeTested": "22.16.0",
-    "runtimeTestSupported": false,
+    "runtimeTested": "26.12.1",
+    "runtimeTestSupported": true,
     "packageManager": "npm",
     "packageLock": {
-      "included": false,
-      "reason": "The packaging environment had no usable registry access and no cached dependency metadata, so package-lock.json could not be generated or reviewed here. The VS Code bootstrap generates a lockfile on a network-enabled machine when absent; review it, commit it, and validate clean npm ci. CI requires a committed lockfile and does not create one."
+      "included": true,
+      "trackedInGit": true,
+      "cleanNpmCiValidated": true,
+      "reviewedByMaintainer": false,
+      "reason": "A fresh isolated Windows x64 Node.js 26.12.1 npm ci passed on 2026-10-30 after synchronizing redis@6.3.1 and its five @redis/* package entries. Human maintainer dependency review and supported CI matrix evidence remain open."
     }
   },
   "renderer": {
@@ -97,16 +100,21 @@
     ]
   },
   "validation": {
-    "systemfabricUnitTests": "105 passed, 0 failed on Node.js 22.16.0 (below declared minimum); see generated artifacts/release-readiness.json for the latest run",
-    "syntaxAndArtifactCheck": "passed: 112 required paths, 96 JavaScript files syntax-checked on Node.js 22.16.0; runtime is below declared minimum, so supported-runtime validation remains blocked",
+    "systemfabricUnitTests": "149 passed, 0 failed, 0 skipped on Node.js 26.12.1 (2026-10-30), including LF/CRLF migration checksum regression coverage.",
+    "syntaxAndArtifactCheck": "passed: 141 required paths, 123 JavaScript files syntax-checked on Node.js 26.12.1 (2026-10-30)",
     "apiSmokeTests": "health, editor/platform assets, icon catalogue, escaped math fallback, AI proposal/preview routes, auth requirements and no-database behavior covered by unit/API tests",
-    "enginexVendoredTests": "88 passed, 0 failed on Node.js 22.16.0 (below declared minimum)",
-    "supportedNodeRuntimeTested": false,
-    "cleanNpmCi": false,
-    "postgresIntegrationTests": "Not run against live PostgreSQL here; new community and inventory lifecycle integration tests are gated on DATABASE_URL and SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION=true",
-    "memgraphIntegrationTests": "skipped: MEMGRAPH_URL and integration opt-in are not configured",
-    "integrationSuite": "Local integration cases skip without configured PostgreSQL/Memgraph; see artifacts/release-readiness.json",
-    "playwrightE2E": "not run: Playwright Test is not installed in the local packaging environment (playwright command did not recognize the test subcommand)",
+    "enginexVendoredTests": "88 passed, 0 failed, 0 skipped on Node.js 26.12.1 (2026-10-30)",
+    "supportedNodeRuntimeTested": true,
+    "cleanNpmCi": true,
+    "postgresIntegrationTests": "16 live integration tests passed with zero skips against the dedicated local TEST_DATABASE_URL systemfabric_test database; primary DATABASE_URL was not used",
+    "memgraphIntegrationTests": "16-test live integration sweep passed with zero skips against local Memgraph on 2026-10-30",
+    "integrationSuite": "16 passed, 0 failed, 0 skipped; includes migration-upgrade fixture, PostgreSQL transactions/outbox, Memgraph projections/replay, local Redis shared presence and cross-instance SSE fan-out",
+    "memgraphOutageRecovery": "passed on 2026-10-30: durable event remained pending and lease released during outage, replayed after Memgraph restart, projection verified, duplicate replay prevented",
+    "graphProjectionRebuild": "passed on 2026-10-30: canonical content/taxonomy/relationships rebuilt, tombstones retained, stale nodes removed, safety bound preserved existing state, second rebuild deterministic",
+    "libraryReconciliationDryRun": "passed on 2026-10-30 against disposable TEST_DATABASE_URL and temporary directory; zero files/candidates, apply=false, no deletion",
+    "playwrightE2E": "4 Playwright Chromium smoke tests passed on 2026-10-30 using one worker; broader browser acceptance and manual accessibility review remain outstanding",
+    "npmAudit": "npm audit --audit-level=high passed: 0 vulnerabilities reported on 2026-10-30",
+    "cycloneDxSbom": "npm run sbom generated CycloneDX 1.5 SBOM with 162 components and 163 dependency records on 2026-10-30; manual review, provenance and CodeQL evidence remain open",
     "dependencyAuditAndSBOM": false,
     "identityProviderIntegration": false,
     "stripeLiveOrTestWebhookIntegration": false,
@@ -116,7 +124,12 @@
     "pluginContainerRuntimeTests": false,
     "loadSoakTest": false,
     "backupRestoreDrill": false,
-    "independentSecurityAudit": false
+    "independentSecurityAudit": false,
+    "freshMigrationInstall": "PASS — all 13 migrations applied to a disposable fresh PostgreSQL test database, then all 13 skipped on a second pass; disposable database dropped; TEST_DATABASE_URL only (2026-10-30).",
+    "migrationChecksumEolNormalization": "passed: migration checksums normalize CRLF and CR line endings to LF, preserving applied-migration identity across platforms",
+    "postRebaseLiveIntegration": "16 passed, 0 failed, 0 skipped against TEST_DATABASE_URL systemfabric_test, local Memgraph and local Memurai after rebasing on origin/main (2026-10-30)",
+    "postRebaseFreshMigrations": "13/13 applied and 13/13 skipped on the second pass in a disposable local TEST_DATABASE_URL database; disposable DB dropped (2026-10-30)",
+    "postRebasePlaywright": "4 Playwright Chromium tests passed after rebase (2026-10-30)"
   },
   "aiPrivacy": {
     "externalProviderOptInRequired": true,
@@ -126,7 +139,7 @@
   },
   "productionGates": [
     "supported Node.js runtime, reviewed committed lockfile, clean npm ci and repeatable installation",
-    "apply and validate migrations 0001\u20130008 on fresh PostgreSQL and supported upgrade fixtures",
+    "apply and validate migrations 0001–0008 on fresh PostgreSQL and supported upgrade fixtures",
     "live PostgreSQL concurrency, rollback, outbox replay/dead-letter, Memgraph outage and reconciliation tests",
     "comprehensive tenant isolation and independent identity/authorization review",
     "real OIDC/SAML/email provider integration and account recovery validation",

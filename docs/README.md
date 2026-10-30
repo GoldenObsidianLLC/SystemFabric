@@ -7,6 +7,13 @@ This directory contains task-oriented documentation. The root [README](../README
 | If you need to… | Read |
 |---|---|
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
+| Understand the project mission and human-AI symbiosis vision | [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) |
+| Apply the manifesto to product and engineering decisions | [Engineering Principles](SYSTEMFABRIC-PRINCIPLES.md) |
+| Understand the proposed real-time, collaboration and AI architecture | [Real-Time and AI Architecture](REALTIME-AI-ARCHITECTURE.md) |
+| Review the implemented developer-preview presence foundation and its limits | [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) |
+| Review existing AI provider adapters and integration boundaries | [AI Integration](AI-INTEGRATION.md) |
+| Review recorded architecture trade-offs | [Architecture Decisions](ARCHITECTURE-DECISIONS.md) |
+| Compare current feature coverage with planned capabilities | [Feature Coverage Matrix](FEATURE-PARITY.md) |
 | Set up a local checkout | [Development](DEVELOPMENT.md) |
 | Run tests or interpret validation | [Testing](TESTING.md) |
 | Report a security issue or understand risk boundaries | [Security](SECURITY.md) and root [SECURITY.md](../SECURITY.md) |
@@ -26,6 +33,8 @@ This directory contains task-oriented documentation. The root [README](../README
 - Prefer copy/paste commands that work from the repository root.
 - Never include live secrets, unredacted logs, customer data, or production identifiers.
 - Keep feature tables, badges, architecture diagrams, screenshots, and examples synchronized with the current code.
+- Keep proposed architecture and planned features visibly separate from implemented and validated capabilities.
+- Apply the Human-AI agency principles to AI-enabled features, real-time collaboration, data use, attribution and approval design.
 
 ## Evidence and freshness
 

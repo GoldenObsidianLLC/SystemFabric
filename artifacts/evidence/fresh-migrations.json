@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "product": "SystemFabric",
+  "version": "0.5.1",
+  "gate": "fresh-migrations",
+  "generatedAt": "2026-10-30T23:32:13.315Z",
+  "status": "PASS",
+  "environment": {
+    "node": "v26.12.1",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "databaseName": "systemfabric_fresh_8456bb43807f_test",
+  "migrationCount": 13,
+  "firstPass": "13/13 migrations applied",
+  "secondPass": "13/13 migrations skipped as already applied",
+  "cleanup": "disposable database dropped",
+  "error": null
+}

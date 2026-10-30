@@ -42,15 +42,19 @@ function createPostgresStore({ pool }) {
     );
   }
 
-  async function writeOutbox(client, { id, siteId, version, eventType, payload }) {
+  async function writeOutbox(client, { id, siteId, version, aggregateVersion = version, eventType, payload, actorId = null, correlationId = null, causationId = null }) {
     await client.query(
-      `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload)
-       VALUES('content',$1,$2,$3,$4::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`,
-      [id, version, eventType, JSON.stringify({ id, siteId, version, ...payload })]
+      `INSERT INTO outbox_events(
+         aggregate_type,aggregate_id,aggregate_version,event_type,payload,
+         site_id,actor_id,correlation_id,causation_id,classification
+       )
+       VALUES('content',$1,$2,$3,$4::jsonb,$5,$6,$7,$8,'site-private')
+       ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`,
+      [id, aggregateVersion, eventType, JSON.stringify({ id, siteId, version, ...payload }), siteId, actorId || null, correlationId || null, causationId || null]
     );
   }
 
-  async function transition({ siteId, id, actorId, action, fromStatuses, toStatus, expectedVersion, note, scheduledAt, publish = false, clearPublished = false }) {
+  async function transition({ siteId, id, actorId, correlationId = null, action, fromStatuses, toStatus, expectedVersion, note, scheduledAt, publish = false, clearPublished = false }) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -76,11 +80,11 @@ function createPostgresStore({ pool }) {
            reviewed_at=CASE WHEN $10 THEN now() ELSE reviewed_at END,
            lock_version=lock_version+1,updated_at=now()
          WHERE id=$1 AND site_id=$2
-         RETURNING id,site_id,title,slug,locale,content_type,status,version,scheduled_at,published_at,published_version,updated_at`,
+         RETURNING id,site_id,title,slug,locale,content_type,status,version,lock_version,scheduled_at,published_at,published_version,updated_at`,
         [id, siteId, toStatus, scheduledAt || null, clearPublished, publish, JSON.stringify(snapshot), row.title, extractPageText(row.body), action === 'approved', actorId || null]
       );
       await writeWorkflow(client, { siteId, id, version: row.version, action, fromStatus: row.status, toStatus, actorId, scheduledAt, note });
-      await writeOutbox(client, { id, siteId, version: row.version, eventType: publish ? 'content.publish' : clearPublished ? 'content.unpublish' : `content.${action}`, payload: { slug: row.slug, locale: row.locale, status: toStatus, action } });
+      await writeOutbox(client, { id, siteId, version: row.version, aggregateVersion: updated.rows[0].lock_version, eventType: publish ? 'content.publish' : clearPublished ? 'content.unpublish' : `content.${action}`, payload: { slug: row.slug, locale: row.locale, status: toStatus, action }, actorId, correlationId });
       await client.query('COMMIT');
       return updated.rows[0];
     } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('A page with that published route already exists.', 'ERR_SYSTEMFABRIC_ROUTE_CONFLICT'); throw error; }
@@ -88,7 +92,7 @@ function createPostgresStore({ pool }) {
   }
 
   const store = {
-    async saveDraft({ siteId, id, title, slug, locale = 'en', contentType = 'page', document, authorId = null, expectedVersion, note = null }) {
+    async saveDraft({ siteId, id, title, slug, locale = 'en', contentType = 'page', document, authorId = null, expectedVersion, note = null, correlationId = null }) {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -104,7 +108,7 @@ function createPostgresStore({ pool }) {
             `UPDATE content_items SET title=$3,slug=$4,locale=$5,content_type=$6,status='draft',body=$7::jsonb,schema_version=$8,version=$9,
                updated_by=$10,updated_at=now(),scheduled_at=NULL,reviewed_by=NULL,reviewed_at=NULL,
                search_vector=to_tsvector('simple',$3 || ' ' || $11),lock_version=lock_version+1
-             WHERE id=$1 AND site_id=$2 RETURNING id,site_id,title,slug,locale,content_type,status,version,body,published_version,updated_at`,
+             WHERE id=$1 AND site_id=$2 RETURNING id,site_id,title,slug,locale,content_type,status,version,lock_version,body,published_version,updated_at`,
             [contentId, siteId, title, slug, locale, contentType, JSON.stringify(document), document.schemaVersion || 1, version, authorId, extractPageText(document)]
           );
           committedRow = result.rows[0];
@@ -112,7 +116,7 @@ function createPostgresStore({ pool }) {
           const result = await client.query(
             `INSERT INTO content_items(id,site_id,content_type,slug,locale,title,status,body,schema_version,version,created_by,updated_by,search_vector)
              VALUES($1,$2,$3,$4,$5,$6,'draft',$7::jsonb,$8,$9,$10,$10,to_tsvector('simple',$6 || ' ' || $11))
-             RETURNING id,site_id,title,slug,locale,content_type,status,version,body,published_version,updated_at`,
+             RETURNING id,site_id,title,slug,locale,content_type,status,version,lock_version,body,published_version,updated_at`,
             [contentId, siteId, contentType, slug, locale, title, JSON.stringify(document), document.schemaVersion || 1, version, authorId, extractPageText(document)]
           );
           committedRow = result.rows[0];
@@ -122,7 +126,7 @@ function createPostgresStore({ pool }) {
           [committedRow.id, version, JSON.stringify({ title, slug, locale, contentType, status: 'draft', document }), authorId, typeof note === 'string' && note ? note.slice(0, 2000) : (old ? 'Draft updated' : 'Draft created')]
         );
         await writeWorkflow(client, { siteId, id: committedRow.id, version, action: 'draft_saved', fromStatus: old?.status || null, toStatus: 'draft', actorId: authorId, note });
-        await writeOutbox(client, { id: committedRow.id, siteId, version, eventType: 'content.upsert', payload: { contentType, slug, locale, status: 'draft', title } });
+        await writeOutbox(client, { id: committedRow.id, siteId, version, aggregateVersion: committedRow.lock_version, eventType: 'content.upsert', payload: { contentType, slug, locale, status: 'draft', title }, actorId: authorId, correlationId });
         await client.query('COMMIT'); return committedRow;
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('That content route is already in use.', 'ERR_SYSTEMFABRIC_ROUTE_CONFLICT'); throw error; }
       finally { client.release(); }
@@ -241,7 +245,7 @@ function createPostgresStore({ pool }) {
       try {
         await client.query('BEGIN');
         const due = await client.query(
-          `SELECT id,site_id,title,slug,locale,content_type,body,version FROM content_items
+          `SELECT id,site_id,title,slug,locale,content_type,body,version,lock_version FROM content_items
            WHERE status='scheduled' AND scheduled_at<=now() AND deleted_at IS NULL
            ORDER BY scheduled_at LIMIT $1 FOR UPDATE SKIP LOCKED`, [Math.min(100, Math.max(1, Number(limit) || 20))]
         );
@@ -250,10 +254,10 @@ function createPostgresStore({ pool }) {
           const result = await client.query(
             `UPDATE content_items SET status='published',published_snapshot=$2::jsonb,published_version=version,published_at=now(),scheduled_at=NULL,
              published_search_vector=to_tsvector('simple',$3 || ' ' || $4),lock_version=lock_version+1,updated_at=now()
-             WHERE id=$1 RETURNING id,site_id,slug,locale,version`, [row.id, JSON.stringify(snapshot), row.title, extractPageText(row.body)]
+             WHERE id=$1 RETURNING id,site_id,slug,locale,version,lock_version`, [row.id, JSON.stringify(snapshot), row.title, extractPageText(row.body)]
           );
           await writeWorkflow(client, { siteId: row.site_id, id: row.id, version: row.version, action: 'published', fromStatus: 'scheduled', toStatus: 'published', actorId: null, note: 'Published by scheduler' });
-          await writeOutbox(client, { id: row.id, siteId: row.site_id, version: row.version, eventType: 'content.publish', payload: { slug: row.slug, locale: row.locale, status: 'published', source: 'scheduler' } });
+          await writeOutbox(client, { id: row.id, siteId: row.site_id, version: row.version, aggregateVersion: result.rows[0].lock_version, eventType: 'content.publish', payload: { slug: row.slug, locale: row.locale, status: 'published', source: 'scheduler' } });
           published.push(result.rows[0]);
         }
         await client.query('COMMIT'); return published;

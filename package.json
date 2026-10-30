@@ -24,7 +24,7 @@
     "test:integration": "node --test test/integration/*.test.js",
     "test:e2e": "playwright test",
     "test:all": "npm run check && npm run test:integration:live && npm run test:e2e",
-    "sbom": "mkdir -p artifacts && npm sbom --sbom-format=cyclonedx --omit=dev > artifacts/systemfabric.sbom.cdx.json",
+    "sbom": "node -e \"require('node:fs').mkdirSync('artifacts',{recursive:true})\" && npm sbom --sbom-format=cyclonedx --omit=dev > artifacts/systemfabric.sbom.cdx.json",
     "postinstall": "node scripts/materialize-katex-assets.js",
     "reconcile:library": "node scripts/reconcile-library-objects.js",
     "release:readiness": "node scripts/release-readiness.js",
@@ -35,24 +35,26 @@
     "test:integration:live": "node scripts/test-integration-live.js",
     "test:integration:memgraph-outage": "node scripts/test-memgraph-outage.js",
     "test:e2e:install": "playwright install chromium",
-    "test:graph:rebuild": "node scripts/test-graph-rebuild.js"
+    "test:graph:rebuild": "node scripts/test-graph-rebuild.js",
+    "test:migrations:fresh": "node scripts/test-fresh-migrations.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1156.0",
     "@modelcontextprotocol/server": "2.4.0",
+    "@node-saml/node-saml": "5.1.0",
     "enginex-ai-native": "file:vendor/enginex",
     "neo4j-driver": "6.0.1",
     "pg": "8.16.3",
-    "zod": "4.6.6",
-    "@aws-sdk/client-s3": "3.1156.0",
-    "@node-saml/node-saml": "5.1.0"
+    "redis": "6.3.1",
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"
   },
   "optionalDependencies": {
-    "katex": "0.19.1",
-    "sharp": "0.35.5",
+    "@azure/storage-blob": "12.34.0",
     "@google-cloud/storage": "8.4.0",
-    "@azure/storage-blob": "12.34.0"
+    "katex": "0.19.1",
+    "sharp": "0.35.5"
   }
 }
