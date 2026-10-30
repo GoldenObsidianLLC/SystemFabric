@@ -15,6 +15,27 @@ Run commands from the repository root in a Windows PowerShell terminal unless a 
 | Working-tree secret scan | `gitleaks dir --redact --verbose .` | Gitleaks | Scans current files; historical data needs a separate scan. |
 | Git history secret scan | `gitleaks git --redact --verbose --log-opts="--all"` | Gitleaks and Git history | Scans refs reachable locally; also verify the actual remote refs before publication. |
 
+## Choosing tests for a contribution
+
+Use the [contributor map](ARCHITECTURE.md#contributor-map-where-to-change-code) to identify the source area and related tests.
+
+| Change type | Example command | Test boundary |
+|---|---|---|
+| API or package logic | `node --test test/api.test.js` | Focused unit/API tests; dependencies may be mocked. |
+| Complete configured unit suite | `npm run check` | Artifact, syntax, and unit checks. |
+| Admin/browser behavior | `npm run test:e2e -- --workers=1` | Playwright browser tests; API responses may be mocked. |
+| PostgreSQL or Memgraph integration | `npm run test:integration:live` | Real, isolated database services required. |
+
+Run commands from the repository root.
+
+The live integration runner requires `TEST_DATABASE_URL` pointing to a dedicated test database whose name ends in `test`, plus `MEMGRAPH_TEST_URL` or `MEMGRAPH_URL`. It applies migrations and runs database-backed tests, so never use production resources.
+
+The Playwright configuration currently selects the Chrome browser channel. Install the configured browser before running the suite. `npm run test:e2e:install` installs Chromium, which is not the same as the selected Chrome channel.
+
+AI and other external-provider unit tests use mocked responses where configured. A passing mocked test does not prove connectivity to a live provider. Live provider validation requires separate credentials, infrastructure, and evidence.
+
+See [Development setup](DEVELOPMENT.md) and [Contributing](../CONTRIBUTING.md) for prerequisites and the contribution workflow.
+
 ## Test design guidance
 
 - Unit tests should be deterministic and mock external boundaries unless they are explicitly tagged/configured for live use.
