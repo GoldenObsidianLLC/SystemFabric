@@ -7,8 +7,8 @@ This directory contains task-oriented documentation. The root [README](../README
 | If you need to… | Read |
 |---|---|
 | Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
-| Community behavior, reporting, and enforcement. | [Code of Conduct](CODE_OF_CONDUCT.md) |
-| How project contributions and collaborators are credited. | [Contributor Recognition](CONTRIBUTOR_RECOGNITION.md) |
+| Community behavior, reporting, and enforcement. | [Code of Conduct](../CODE_OF_CONDUCT.md) |
+| How project contributions and collaborators are credited. | [Contributor Recognition](../CONTRIBUTOR_RECOGNITION.md) |
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
 | Set up a local checkout | [Development](DEVELOPMENT.md) |
 | Run tests or interpret validation | [Testing](TESTING.md) |
