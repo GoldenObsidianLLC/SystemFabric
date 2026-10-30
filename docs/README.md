@@ -1,6 +1,7 @@
 # SystemFabric Documentation
 
 This directory contains task-oriented documentation. The root [README](../README.md) is the project overview and quickest entry point; the pages below contain detail so that the README can stay scannable.
+
 | Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
 
 ## Start here
