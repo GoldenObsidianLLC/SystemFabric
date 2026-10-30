@@ -10,7 +10,7 @@
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/License-GPL--2.0--or--later-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.23.4-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-[Overview](#overview) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Architecture](#architecture) · [Documentation](docs/README.md) · [Governance](GOVERNANCE.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Contributors](CONTRIBUTOR_RECOGNITION.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Overview](#overview) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Architecture](#architecture) · [Documentation](docs/README.md) · [Governance](GOVERNANCE.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Contributors](CONTRIBUTOR_RECOGNITION.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Research & Collaboration](RESEARCH_COLLABORATION.md)
 
 </div>
 
@@ -164,6 +164,7 @@ Start at **[the documentation index](docs/README.md)**.
 | [Governance](GOVERNANCE.md) | Project stewardship, decision-making, and funding transparency. |
 | [Code of Conduct](CODE_OF_CONDUCT.md) | Community behavior, reporting, and enforcement. |
 | [Contributor Recognition](CONTRIBUTOR_RECOGNITION.md) | How project contributions and collaborators are credited. |
+| [Research & Collaboration](RESEARCH_COLLABORATION.md) | Research priorities, technical collaboration, and open engineering questions. |
 | [Release readiness](docs/RELEASE_READINESS.md) | Evidence-based release gates and current certification caveat. |
 | [Roadmap](docs/ROADMAP.md) | Staged work grouped by engineering, operations, and release evidence. |
 | [Documentation standards](docs/DOCUMENTATION_STANDARDS.md) | How to keep docs concise, accurate, accessible, and maintainable. |
