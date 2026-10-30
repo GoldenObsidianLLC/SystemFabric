@@ -28,6 +28,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.
 - Add npm run test:migrations:fresh to apply all 13 migrations to a disposable database derived only from TEST_DATABASE_URL, verify a second pass is idempotent, and drop only the generated test database.
 - Add a Redis service to PostgreSQL/Memgraph CI and make the live integration runner explicitly opt into Redis tests only for a local Redis/Memurai endpoint; retain zero-skip integration evidence.
+- Pin the CI Memgraph loopback port for the outage/restart test so the service remains reachable after Docker restarts its fixed-port container.
 - Refresh release-readiness evidence and regenerate the CycloneDX SBOM after dependency and test-harness changes.
 - Normalize SQL migration line endings before hashing/execution so Windows CRLF checkouts do not trigger false migration-drift failures; add LF/CRLF/CR regression tests.
 
