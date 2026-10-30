@@ -45,7 +45,7 @@ We agree to restrict the following behaviors in our community. Instances, threat
 
 Tensions can occur between community members even when they are trying their best to collaborate. Not every conflict represents a code of conduct violation, and this Code of Conduct reinforces encouraged behaviors and norms that can help avoid conflicts and minimize harm.
 
-When an incident does occur, it is important to report it promptly. To report a possible violation, When an incident occurs, please report it promptly. Contact the SystemFabric project maintainer privately at [goldenobsidianllc.business@gmail.com](mailto:goldenobsidianllc.business@gmail.com), using the subject line "SystemFabric Code of Conduct Report."
+When an incident occurs, please report it promptly. Contact the SystemFabric project maintainer privately at [goldenobsidianllc.business@gmail.com](mailto:goldenobsidianllc.business@gmail.com), using the subject line "SystemFabric Code of Conduct Report."
 
 Please include links to the relevant discussion, issue, pull request, or other community interaction and a concise description of your concern.
 
