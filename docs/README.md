@@ -6,13 +6,13 @@ This directory contains task-oriented documentation. The root [README](../README
 
 | If you need to… | Read |
 |---|---|
-| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
-| Community behavior, reporting, and enforcement. | [Code of Conduct](../CODE_OF_CONDUCT.md) |
-| How project contributions and collaborators are credited. | [Contributor Recognition](../CONTRIBUTOR_RECOGNITION.md) |
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
 | Set up a local checkout | [Development](DEVELOPMENT.md) |
 | Run tests or interpret validation | [Testing](TESTING.md) |
 | Report a security issue or understand risk boundaries | [Security](SECURITY.md) and root [SECURITY.md](../SECURITY.md) |
+| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
+| Community behavior, reporting, and enforcement. | [Code of Conduct](../CODE_OF_CONDUCT.md) |
+| How project contributions and collaborators are credited. | [Contributor Recognition](../CONTRIBUTOR_RECOGNITION.md) |
 | Decide whether a release can ship | [Release readiness](RELEASE_READINESS.md) |
 | Plan work without making unsupported promises | [Roadmap](ROADMAP.md) |
 | Update docs consistently | [Documentation standards](DOCUMENTATION_STANDARDS.md) |
