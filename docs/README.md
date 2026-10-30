@@ -6,6 +6,7 @@ This directory contains task-oriented documentation. The root [README](../README
 
 | If you need to… | Read |
 |---|---|
+| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
 | Set up a local checkout | [Development](DEVELOPMENT.md) |
 | Run tests or interpret validation | [Testing](TESTING.md) |
@@ -13,7 +14,6 @@ This directory contains task-oriented documentation. The root [README](../README
 | Decide whether a release can ship | [Release readiness](RELEASE_READINESS.md) |
 | Plan work without making unsupported promises | [Roadmap](ROADMAP.md) |
 | Update docs consistently | [Documentation standards](DOCUMENTATION_STANDARDS.md) |
-| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
 
 ## Documentation principles
 
