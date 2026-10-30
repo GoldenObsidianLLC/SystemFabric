@@ -161,6 +161,9 @@ Start at **[the documentation index](docs/README.md)**.
 | [Development](docs/DEVELOPMENT.md) | Local setup, configuration, and contributor workflow. |
 | [Testing](docs/TESTING.md) | Test commands, prerequisites, scope, and validation caveats. |
 | [Security](docs/SECURITY.md) | Threat assumptions, secret handling, and security-sensitive controls. |
+| [Governance](GOVERNANCE.md) | Project stewardship, decision-making, and funding transparency. |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Community behavior, reporting, and enforcement. |
+| [Contributor Recognition](CONTRIBUTOR_RECOGNITION.md) | How project contributions and collaborators are credited. |
 | [Release readiness](docs/RELEASE_READINESS.md) | Evidence-based release gates and current certification caveat. |
 | [Roadmap](docs/ROADMAP.md) | Staged work grouped by engineering, operations, and release evidence. |
 | [Documentation standards](docs/DOCUMENTATION_STANDARDS.md) | How to keep docs concise, accurate, accessible, and maintainable. |
