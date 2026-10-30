@@ -11,7 +11,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.23.4-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 [Overview](#overview) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Architecture](#architecture) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
-
+| [Governance](GOVERNANCE.md) | Current project stewardship, decision-making, contributions, and funding transparency. |
 </div>
 
 > **Project status:** SystemFabric 0.5.1 is an actively developed software baseline. It is **not production-certified**. Passing tests and static checks do not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md).
