@@ -2,8 +2,6 @@
 
 This directory contains task-oriented documentation. The root [README](../README.md) is the project overview and quickest entry point; the pages below contain detail so that the README can stay scannable.
 
-| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
-
 ## Start here
 
 | If you need to… | Read |
@@ -15,6 +13,7 @@ This directory contains task-oriented documentation. The root [README](../README
 | Decide whether a release can ship | [Release readiness](RELEASE_READINESS.md) |
 | Plan work without making unsupported promises | [Roadmap](ROADMAP.md) |
 | Update docs consistently | [Documentation standards](DOCUMENTATION_STANDARDS.md) |
+| Understand project decisions, contribution stewardship, and funding transparency | [Governance](../GOVERNANCE.md) |
 
 ## Documentation principles
 
