@@ -4,6 +4,11 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ## Unreleased
 
+### CI and request security
+
+- Serialize live integration test files that share the dedicated PostgreSQL database and graph fixture, preventing cross-suite outbox/event cleanup races from making the Memgraph consumer-group test flaky.
+- Separate explicitly authenticated bearer sessions from cookie sessions; cookie-authenticated writes always undergo same-origin and CSRF validation even when an invalid bearer header is also supplied.
+
 ### Documentation and maintainability
 
 - Restructure the project overview around capabilities, architecture, setup, testing, security, contribution, and release-readiness navigation.

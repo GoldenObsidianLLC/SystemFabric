@@ -217,19 +217,28 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   async function authenticate(req) {
     const cookies = parseCookies(req.headers.cookie || '');
     const bearer = parseBearer(req);
-    const sessionToken = bearer || cookies.sf_session;
-    if (sessionToken && identity) {
-      const session = await identity.authenticate(sessionToken);
-      if (session) {
-        const usingCookie = !bearer && Boolean(cookies.sf_session);
-        if (usingCookie && UNSAFE_METHODS.has(req.method)) {
-          const origin = req.headers.origin;
-          const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
-          if (typeof origin !== 'string' || origin !== expectedOrigin) throw fail(403, 'ERR_SYSTEMFABRIC_CSRF', 'A matching same-origin Origin header is required for cookie-authenticated writes.');
-          const header = req.headers['x-csrf-token'];
-          if (!header || !safeCsrfCookie(cookies.sf_csrf, header) || !(await identity.validateCsrf(sessionToken, header))) throw fail(403, 'ERR_SYSTEMFABRIC_CSRF', 'A valid CSRF token is required.');
+    if (identity) {
+      // A valid explicit bearer credential is non-ambient authentication; browser
+      // cookies are handled separately and always receive CSRF checks on writes.
+      if (bearer) {
+        const bearerSession = await identity.authenticate(bearer);
+        if (bearerSession) {
+          return { mode: 'session', sessionToken: bearer, sessionId: bearerSession.sessionId, user: bearerSession.user, memberships: bearerSession.memberships };
         }
-        return { mode: 'session', sessionToken, sessionId: session.sessionId, user: session.user, memberships: session.memberships };
+      }
+      const cookieSessionToken = cookies.sf_session;
+      if (cookieSessionToken) {
+        const cookieSession = await identity.authenticate(cookieSessionToken);
+        if (cookieSession) {
+          if (UNSAFE_METHODS.has(req.method)) {
+            const origin = req.headers.origin;
+            const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
+            if (typeof origin !== 'string' || origin !== expectedOrigin) throw fail(403, 'ERR_SYSTEMFABRIC_CSRF', 'A matching same-origin Origin header is required for cookie-authenticated writes.');
+            const header = req.headers['x-csrf-token'];
+            if (!header || !safeCsrfCookie(cookies.sf_csrf, header) || !(await identity.validateCsrf(cookieSessionToken, header))) throw fail(403, 'ERR_SYSTEMFABRIC_CSRF', 'A valid CSRF token is required.');
+          }
+          return { mode: 'session', sessionToken: cookieSessionToken, sessionId: cookieSession.sessionId, user: cookieSession.user, memberships: cookieSession.memberships };
+        }
       }
     }
     if (env.NODE_ENV !== 'production' && devToken && sameSecret(bearer, devToken)) {

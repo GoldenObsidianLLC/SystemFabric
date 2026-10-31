@@ -139,11 +139,16 @@ test('session cookie writes require CSRF validation, same-origin context, and Ht
     const missingOrigin = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(missingOrigin.status, 403);
     assert.equal((await missingOrigin.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
+    const invalidBearerWithCookie = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, authorization: 'Bearer invalid-token', 'x-csrf-token': 'c'.repeat(43) } });
+    assert.equal(invalidBearerWithCookie.status, 403, 'an invalid bearer header must not bypass cookie CSRF validation');
+    assert.equal((await invalidBearerWithCookie.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
     const rejected = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, origin: base } });
     assert.equal(rejected.status, 403);
     assert.equal((await rejected.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
     const accepted = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, origin: base, 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(accepted.status, 200);
+    const bearerAccepted = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${'s'.repeat(43)}` } });
+    assert.equal(bearerAccepted.status, 200, 'valid explicit bearer credentials remain usable without cookie CSRF headers');
   } finally {
     await new Promise(resolve => server.close(resolve));
     await server.systemfabric.close();

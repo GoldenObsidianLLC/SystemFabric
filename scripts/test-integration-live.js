@@ -146,7 +146,10 @@ async function main() {
   const integrationDir = path.join(root, 'test', 'integration');
   const files = fs.readdirSync(integrationDir).filter(file => file.endsWith('.test.js')).sort().map(file => path.join('test', 'integration', file));
   if (!files.length) throw new Error('No integration test files were found.');
-  const output = run('Run live PostgreSQL/Memgraph/product integration tests', ['--test', ...files], env, 'integration-tests.tap.log');
+  // These suites share the dedicated PostgreSQL test database and graph fixture.
+  // Serial file execution prevents cross-suite inserts/cleanup from racing with
+  // the outbox consumer-group baseline captured by the Memgraph integration test.
+  const output = run('Run live PostgreSQL/Memgraph/product integration tests', ['--test', '--test-concurrency=1', ...files], env, 'integration-tests.tap.log');
   const summary = parseNodeTestSummary(output);
   if (!summary) {
     throw new Error('Could not parse the Node.js test summary. Expected TAP (# tests 5) or Node information (ℹ tests 5) summary lines; inspect artifacts/evidence/integration-tests.tap.log.');
