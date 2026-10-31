@@ -14,12 +14,40 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
         return;
       }
       if (operation?.type === 'node.set_prop') {
+        const value = structuredClone(payload.value);
+        const applyApprovedProperty = props => {
+          if (!props || typeof props !== 'object' || Array.isArray(props)) return false;
+          switch (payload.key) {
+            case 'text': props.text = value; return true;
+            case 'level': props.level = value; return true;
+            case 'url': props.url = value; return true;
+            case 'assetId': props.assetId = value; return true;
+            case 'posterAssetId': props.posterAssetId = value; return true;
+            case 'alt': props.alt = value; return true;
+            case 'title': props.title = value; return true;
+            case 'iconName': props.iconName = value; return true;
+            case 'size': props.size = value; return true;
+            case 'formula': props.formula = value; return true;
+            case 'displayMode': props.displayMode = value; return true;
+            case 'controls': props.controls = value; return true;
+            case 'className': props.className = value; return true;
+            case 'styles': props.styles = value; return true;
+            case 'responsiveStyles': props.responsiveStyles = value; return true;
+            case 'items': props.items = value; return true;
+            case 'ordered': props.ordered = value; return true;
+            case 'cite': props.cite = value; return true;
+            case 'height': props.height = value; return true;
+            case 'source': props.source = value; return true;
+            case 'contentType': props.contentType = value; return true;
+            case 'limit': props.limit = value; return true;
+            case 'columns': props.columns = value; return true;
+            case 'emptyText': props.emptyText = value; return true;
+            default: return false;
+          }
+        };
         const visit = nodes => {
           for (const node of nodes || []) {
-            if (node.id === payload.nodeId) {
-              node.props[payload.key] = structuredClone(payload.value);
-              return true;
-            }
+            if (node.id === payload.nodeId) return applyApprovedProperty(node.props);
             if (visit(node.children)) return true;
           }
           return false;

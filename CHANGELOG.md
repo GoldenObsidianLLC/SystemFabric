@@ -96,6 +96,7 @@ All notable project-level changes should be recorded here. This changelog does n
 ### Security hygiene
 
 - Replace fabricated Stripe-shaped test fixtures with clearly non-live test placeholders.
+- Replace the collaboration browser fixture's computed property assignment with an explicit allow-list of supported page-document properties after CodeQL identified a high-severity remote property-injection path.
 - Clean the affected local Git history and require a clean current-tree and history scan before public publication.
 
 ## 0.5.1
