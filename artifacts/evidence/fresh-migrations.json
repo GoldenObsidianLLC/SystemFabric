@@ -3,17 +3,17 @@
   "product": "SystemFabric",
   "version": "0.5.1",
   "gate": "fresh-migrations",
-  "generatedAt": "2026-10-30T23:32:13.315Z",
+  "generatedAt": "2026-10-31T19:31:14.639Z",
   "status": "PASS",
   "environment": {
     "node": "v26.12.1",
     "platform": "win32",
     "arch": "x64"
   },
-  "databaseName": "systemfabric_fresh_8456bb43807f_test",
-  "migrationCount": 13,
-  "firstPass": "13/13 migrations applied",
-  "secondPass": "13/13 migrations skipped as already applied",
+  "databaseName": "systemfabric_fresh_0b58b856619f_test",
+  "migrationCount": 14,
+  "firstPass": "14/14 migrations applied",
+  "secondPass": "14/14 migrations skipped as already applied",
   "cleanup": "disposable database dropped",
   "error": null
 }

@@ -1,0 +1,6 @@
+PASS: safety-limit rejection preserved existing graph state.
+PASS: canonical content, taxonomy and relationships rebuilt.
+PASS: deleted content and relationship tombstones preserved.
+PASS: stale graph nodes removed.
+PASS: second rebuild produced the same summary.
+GRAPH REBUILD LIVE RESULT: PASS

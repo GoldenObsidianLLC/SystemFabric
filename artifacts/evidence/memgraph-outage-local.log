@@ -1,0 +1,4 @@
+PASS: real Memgraph outage left the durable event pending and released its worker lease.
+PASS: persisted event replayed after isolated Memgraph 3.13.1 restart.
+PASS: expected projection exists and processed event was not replayed twice.
+REAL MEMGRAPH OUTAGE RESULT: PASS

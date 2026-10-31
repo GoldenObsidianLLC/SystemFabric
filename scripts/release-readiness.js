@@ -14,6 +14,8 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { loadEnvFile } = require('./load-env');
+const { configureReleaseRedisIntegrationEnv } = require('./release-integration-env');
+const { hasSuccessfulPlaywrightSummary, isFreshMigrationEvidence } = require('./release-readiness-validation');
 
 const root = path.resolve(__dirname, '..');
 loadEnvFile(path.join(root, '.env'));
@@ -147,7 +149,8 @@ const requiredMigrations = [
   '0006_platform_libraries_commerce_social_billing.sql', '0007_release_hardening.sql',
   '0008_checkout_stock_reservation_lifecycle.sql', '0009_fix_content_item_slug_constraint.sql',
   '0010_outbox_event_contract.sql', '0011_outbox_legacy_classification_backfill.sql',
-  '0012_durable_consumer_group_deliveries.sql', '0013_consumer_group_event_filters.sql'
+  '0012_durable_consumer_group_deliveries.sql', '0013_consumer_group_event_filters.sql',
+  '0014_collaborative_document_operations.sql'
 ];
 const missingMigrations = requiredMigrations.filter(file => !fs.existsSync(path.join(root, 'database/migrations', file)));
 addCheck('migration-artifacts', 'Versioned migration files', missingMigrations.length ? 'BLOCKED' : 'PASS',
@@ -174,7 +177,7 @@ if (!skipTests) {
     `Exit ${vendor.exitCode}; ${JSON.stringify(vendorCounts)}; ${vendor.elapsedMs} ms.`, vendorLog);
 
   const integrationFiles = fs.readdirSync(path.join(root, 'test/integration')).filter(file => file.endsWith('.test.js')).sort().map(file => `test/integration/${file}`);
-  const integrationEnv = { ...process.env };
+  const integrationEnv = configureReleaseRedisIntegrationEnv(process.env);
   // Never point the release-readiness integration sweep at DATABASE_URL implicitly.
   // Opt into database tests only when a dedicated local TEST_DATABASE_URL is configured.
   delete integrationEnv.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION;
@@ -196,15 +199,6 @@ if (!skipTests) {
   } else {
     delete integrationEnv.DATABASE_URL;
     delete integrationEnv.MEMGRAPH_URL;
-  }
-  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
-  if (redisUrl) {
-    try {
-      const parsedRedis = new URL(redisUrl);
-      if (['redis:', 'rediss:'].includes(parsedRedis.protocol) && parsedRedis.hostname) {
-        integrationEnv.SYSTEMFABRIC_RUN_REDIS_INTEGRATION = 'true';
-      }
-    } catch {}
   }
   const integration = runNode(['--test', '--test-reporter=tap', '--test-concurrency=1', ...integrationFiles], { env: integrationEnv });
   const integrationLog = saveLog('integration-tests.tap.log', integration.output);
@@ -266,10 +260,10 @@ function supplementalFile(id, title, filename, validator, successDetails) {
 supplementalFile('clean-npm-ci', 'Fresh clean npm ci installation', 'clean-npm-ci.json',
   raw => { const value = JSON.parse(raw); return value.status === 'passed' && value.result?.exitCode === 0 && value.result?.packagesAdded === 167 && value.environment?.node === 'v26.12.1'; },
   'Fresh isolated npm ci completed on Windows x64 / Node.js 26.12.1, installed 167 packages and ran the KaTeX postinstall; maintainer review and CI matrix evidence remain open.');
-supplementalFile('fresh-migrations', 'Fresh PostgreSQL migrations and idempotency', 'fresh-migrations.json', raw => { const value = JSON.parse(raw); return value.status === 'PASS' && value.migrationCount === 13 && value.firstPass === '13/13 migrations applied' && value.secondPass === '13/13 migrations skipped as already applied' && value.cleanup === 'disposable database dropped'; }, 'All 13 migrations applied to a disposable fresh local PostgreSQL database, all 13 skipped on a second pass, then only that disposable database was dropped.');
+supplementalFile('fresh-migrations', 'Fresh PostgreSQL migrations and idempotency', 'fresh-migrations.json', raw => isFreshMigrationEvidence(JSON.parse(raw), requiredMigrations.length), `All ${requiredMigrations.length} migrations applied to a disposable fresh local PostgreSQL database, all ${requiredMigrations.length} skipped on a second pass, then only that disposable database was dropped.`);
 supplementalFile('playwright-smoke', 'Playwright Chromium smoke tests (not full accessibility acceptance)', 'browser-smoke.log',
-  raw => /4 passed/.test(raw) && !/\n\s*\d+ failed/.test(raw),
-  '4 Chromium smoke tests passed with one worker; broader browser acceptance and manual WCAG review remain open.');
+  raw => hasSuccessfulPlaywrightSummary(raw),
+  'The configured Chromium Playwright suite passed with zero failed tests; manual screen-reader and broader WCAG review remain open.');
 supplementalFile('npm-audit', 'Local npm dependency audit (high severity threshold)', 'npm-audit.log',
   raw => /found 0 vulnerabilities/i.test(raw),
   'npm audit --audit-level=high reported 0 vulnerabilities; manual dependency review and CodeQL remain open.');

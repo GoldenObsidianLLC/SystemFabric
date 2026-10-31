@@ -1,33 +1,51 @@
 # PostgreSQL and Memgraph Live Integration Evidence
 
-**Technical gate result: PASSED**  
-**SystemFabric commit:** `4653c84f21e9652affeebbb36f5803cd7354d397`  
-**GitHub Actions run:** [SystemFabric CI #14 — successful](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/40949007893)  
-**Integration job ID:** `123711815754`  
-**Evidence generated from CI:** `2026-10-29T20:27:54Z`
+**Technical integration gate: PASSED**
+
+**Application source commit:** `fc95ea3628c88c9bc1eb29e5d07e36edb07fb31a`
+
+**Current-main hosted CI run:** [SystemFabric CI — all five jobs successful](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41232584439)
+
+**CI commit:** `fc95ea3628c88c9bc1eb29e5d07e36edb07fb31a`
+
+**Local evidence generated:** 2026-10-31 (Windows x64, Node.js 26.12.1)
 
 ## Environment
 
-- GitHub-hosted Ubuntu runner.
-- Node.js `22.23.4`.
-- PostgreSQL `18-alpine`, with isolated `systemfabric_test` integration database.
-- Memgraph `memgraph/memgraph:3.13.1` service for the live integration and outage/replay test.
-- A separate temporary Memgraph container for the graph rebuild test.
-- The CI run used isolated test resources and fixture credentials; it did not validate a production deployment or external identity, cloud-storage, or payment-provider account.
+- Local Windows x64 development environment, Node.js `26.12.1`.
+- Dedicated PostgreSQL test database: `systemfabric_test`, reached through `TEST_DATABASE_URL`.
+- Local Memgraph `memgraph/memgraph:3.13.1` and loopback Memurai/Redis service.
+- Fresh migration verification used a generated disposable database named `systemfabric_fresh_0b58b856619f_test`; only that disposable database was dropped.
+- The live graph-outage rehearsal used a separate disposable Memgraph `3.13.1` container and restored/removed it after the test.
+- No production database, production graph, or external provider credentials were used.
 
 ## Verified results
 
-1. **Fresh migration run:** The live integration job applied migrations `0001` through `0009` to its isolated test database; the migration runner reported success for `0009_fix_content_item_slug_constraint.sql`.
-2. **Supported upgrade fixture:** The integration suite upgraded a disposable database at schema version `0008` to migration `0009`, preserving existing content and checking accepted/rejected slug constraints.
-3. **Live PostgreSQL/Memgraph/product tests:** `npm run test:integration:live` completed **8 tests, 8 passed, 0 failed, 0 skipped**.
-4. **PostgreSQL correctness:** Integration coverage exercised site-scoped content reads, transaction rollback, concurrent outbox workers, poison-event dead-lettering, and transient projection failure/retry.
-5. **Real Memgraph outage/recovery:** The test stopped and restarted the identified Memgraph test container, verified the persisted outbox event remained recoverable, replayed successfully after restart, and verified an already-processed event was not replayed again.
-6. **Canonical graph projection rebuild:** The test verified that a safety-limit rejection preserves existing graph state, canonical content/taxonomy/relationship projections are rebuilt, deleted content and relationship tombstones are preserved, stale graph nodes are removed, and a second rebuild produces the same summary.
+1. **Fresh migrations and idempotency:** all 14 migrations applied to an empty disposable PostgreSQL database; a second migration pass skipped all 14; the disposable database was dropped.
+2. **Live PostgreSQL/Memgraph/Redis integration:** `npm run test:integration:live` completed **22 tests, 22 passed, 0 failed, 0 skipped** against the dedicated `systemfabric_test` database and local services.
+3. **PostgreSQL correctness:** the integration suite covered the v0008 upgrade fixture through the current schema, transaction rollback, concurrent outbox workers, poison-event dead-lettering, projection retries, and tenant/site selector isolation.
+4. **Redis collaboration:** the integration suite exercised real Redis document relay recovery, bounded 2,000-message fan-out to 10 subscribers (20,000 expected and observed deliveries), site/document routing, cross-instance presence and SSE behavior, and authorization invalidation.
+5. **Real Memgraph outage/recovery:** stopping the isolated graph container left the durable event pending and released its lease; after graph restart, the event replayed, projected the expected content, and was not delivered a second time.
+6. **Canonical graph rebuild:** the live rebuild preserved existing graph state when a safety limit was exceeded, rebuilt canonical content/taxonomy/relationships, retained tombstones, removed stale nodes, and produced an identical second-run summary.
+
+## Hosted CI confirmation
+
+The current-main workflow run completed all five jobs successfully:
+
+- Unit, security, dependency audit, and SBOM jobs on Node.js `22.23.4`.
+- Unit, security, dependency audit, and SBOM jobs on Node.js `24.22.1`.
+- PostgreSQL and Memgraph integration, including fresh migration verification, live integration, outage/recovery, and isolated graph rebuild.
+- Browser editor and accessibility smoke tests.
+- CodeQL security analysis.
+
+The hosted CI job is test evidence, not a production deployment or a substitute for independent security review.
 
 ## Retained machine evidence
 
-The workflow uploaded artifact **`systemfabric-live-integration-node-22.23.4`** (artifact ID `12930188574`). GitHub recorded SHA-256 digest `sha256:038f2c71d55e45ad2bcf11519a38b71ce8c9f1d427aba689307b3c82f43f1071`; retention expiry was `2027-01-27T20:26:14Z` at the time this record was produced. The artifact contains the CI-generated migration, TAP, integration summary, outage, and graph-rebuild logs. Open the successful [workflow run](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/40949007893) to access the retained artifact.
+- `artifacts/evidence/fresh-migrations.json` — 14/14 migrations applied and 14/14 idempotently skipped.
+- `artifacts/evidence/integration-live.json` — 22/22 local live integration tests, zero skips.
+- This evidence summary and the linked hosted workflow run provide the retained execution record. Raw local logs are kept as ignored local artifacts and are not published because they are not part of the repository's retained evidence contract.
 
 ## Scope and caveats
 
-This record supports only the live PostgreSQL/Memgraph integration gate for the commit above. It is not an independent review and does not close tenant-isolation review, identity-provider, ClamAV corpus, live cloud-provider, live Stripe lifecycle, full browser/accessibility acceptance, plugin sandbox, load/backup/restore, independent security review, or operations approval gates. Keep the overall release state `NOT_PRODUCTION_CERTIFIED` until the remaining required evidence is collected and reviewed.
+This record supports the PostgreSQL/Memgraph live integration gate for the application source above. It does **not** close independent tenant-isolation review, real identity-provider, ClamAV corpus, cloud-provider, Stripe lifecycle, full manual browser/accessibility acceptance, plugin container isolation, representative load/soak, backup/restore, independent security review, or operations approval. Overall release classification remains `NOT_PRODUCTION_CERTIFIED`.

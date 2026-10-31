@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "SystemFabric",
   "version": "0.5.1",
-  "generatedAt": "2026-10-30T23:06:48.244Z",
+  "generatedAt": "2026-10-31T21:09:35.326Z",
   "host": {
     "node": "v26.12.1",
     "platform": "win32",
@@ -14,8 +14,8 @@
     {
       "id": "clean-source-tree",
       "title": "Clean, revision-identified release source tree",
-      "status": "BLOCKED",
-      "details": "HEAD 637e1b15059892550192597e237c54ada51e87b9; 55 tracked/untracked path(s) are modified. Release evidence must be regenerated for a clean, committed target revision.",
+      "status": "PASS",
+      "details": "Clean source tree at f4d78c6037a658006e72785d9bcc403b3508ec6d.",
       "evidencePath": null
     },
     {
@@ -36,35 +36,35 @@
       "id": "migration-artifacts",
       "title": "Versioned migration files",
       "status": "PASS",
-      "details": "13 migration files are present; live fresh/upgrade execution is a separate gate.",
+      "details": "14 migration files are present; live fresh/upgrade execution is a separate gate.",
       "evidencePath": null
     },
     {
       "id": "syntax-artifact-check",
       "title": "Required artifacts and JavaScript syntax",
       "status": "PASS",
-      "details": "Exit 0; 9920 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
+      "details": "Exit 0; 11888 ms. Vendored EnginEx version: 6.2.0; required Node.js: >=22.23.4; current Node.js: 26.12.1. | Database migrations, Memgraph Cypher, live provider calls, and production security are not validated by this script.",
       "evidencePath": "artifacts\\evidence\\artifact-check.log"
     },
     {
       "id": "unit-tests",
       "title": "SystemFabric unit/security tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":147,\"pass\":147,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 9230 ms. Test execution is on v26.12.1.",
+      "details": "Exit 0; {\"tests\":212,\"pass\":212,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 22954 ms. Test execution is on v26.12.1.",
       "evidencePath": "artifacts\\evidence\\unit-tests.tap.log"
     },
     {
       "id": "enginex-tests",
       "title": "Vendored EnginEx unit tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 2570 ms.",
+      "details": "Exit 0; {\"tests\":88,\"pass\":88,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 2710 ms.",
       "evidencePath": "artifacts\\evidence\\enginex-tests.tap.log"
     },
     {
       "id": "integration-tests",
       "title": "PostgreSQL/Memgraph/product integration tests",
       "status": "PASS",
-      "details": "Exit 0; {\"tests\":16,\"pass\":16,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 11419 ms. Skipped tests do not count as production validation.",
+      "details": "Exit 0; {\"tests\":22,\"pass\":22,\"fail\":0,\"cancelled\":0,\"skipped\":0,\"todo\":0}; 48226 ms. Skipped tests do not count as production validation.",
       "evidencePath": "artifacts\\evidence\\integration-tests.tap.log"
     },
     {
@@ -79,9 +79,9 @@
     {
       "id": "postgres-memgraph-live",
       "title": "Fresh/upgrade migrations, PostgreSQL transactions and Memgraph outage/replay",
-      "status": "BLOCKED",
+      "status": "PASS",
       "evidencePath": "artifacts/evidence/postgres-memgraph-live.json",
-      "details": "Evidence targets 4653c84f21e9652affeebbb36f5803cd7354d397, but current HEAD is 637e1b15059892550192597e237c54ada51e87b9; rerun against the exact release revision."
+      "details": "Evidence validated; 3 referenced artifact(s)."
     },
     {
       "id": "tenant-isolation-review",
@@ -176,9 +176,9 @@
     }
   ],
   "summary": {
-    "pass": 7,
+    "pass": 9,
     "partial": 1,
-    "blocked": 2,
+    "blocked": 0,
     "missingEvidence": 13,
     "notRun": 0
   },
@@ -195,14 +195,14 @@
       "title": "Fresh PostgreSQL migrations and idempotency",
       "status": "PASS",
       "evidencePath": "artifacts/evidence/fresh-migrations.json",
-      "details": "All 13 migrations applied to a disposable fresh local PostgreSQL database, all 13 skipped on a second pass, then only that disposable database was dropped."
+      "details": "All 14 migrations applied to a disposable fresh local PostgreSQL database, all 14 skipped on a second pass, then only that disposable database was dropped."
     },
     {
       "id": "playwright-smoke",
       "title": "Playwright Chromium smoke tests (not full accessibility acceptance)",
       "status": "PASS",
       "evidencePath": "artifacts/evidence/browser-smoke.log",
-      "details": "4 Chromium smoke tests passed with one worker; broader browser acceptance and manual WCAG review remain open."
+      "details": "The configured Chromium Playwright suite passed with zero failed tests; manual screen-reader and broader WCAG review remain open."
     },
     {
       "id": "npm-audit",
@@ -244,7 +244,7 @@
       "title": "CycloneDX SBOM artifact schema",
       "status": "PASS",
       "evidencePath": "artifacts/systemfabric.sbom.cdx.json",
-      "details": "Format CycloneDX 1.5; 162 components and 163 dependency records. Human review/provenance remain open."
+      "details": "Format CycloneDX 1.5; 163 components and 164 dependency records. Human review/provenance remain open."
     }
   ]
 }
