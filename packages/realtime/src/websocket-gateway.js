@@ -117,6 +117,7 @@ function createWebSocketGateway({
           let cleanupPromise = null;
           let alive = true;
           let timer = null;
+          let heartbeatInProgress = false;
           const messageTimes = [];
           const documentSubscriptions = new Map();
           let processingMessages = Promise.resolve();
@@ -221,14 +222,63 @@ function createWebSocketGateway({
             if (sync.reloadRequired) {
               sendDocumentReload(contentId, sync);
               entry.lastSequence = Number(sync.sequence);
-              return;
+              incrementMetric(metrics, 'document_sync_reload_required_total');
+              return 0;
             }
+            let recoveredOperations = 0;
             for (const item of sync.operations || []) {
-              if (documentSubscriptions.get(contentId) !== entry || cleaned) return;
+              if (documentSubscriptions.get(contentId) !== entry || cleaned) return recoveredOperations;
               const operation = item.appliedOperation || item.operation;
-              sendDocumentOperation(contentId, entry, operation, item.sequence);
+              if (sendDocumentOperation(contentId, entry, operation, item.sequence)) recoveredOperations += 1;
             }
-            entry.lastSequence = Math.max(entry.lastSequence, Number(sync.sequence));
+            if (recoveredOperations > 0) {
+              incrementMetric(metrics, 'document_sync_recovered_operations_total', recoveredOperations);
+            }
+            return recoveredOperations;
+          }
+
+          async function reconcileDocument(contentId, entry) {
+            if (entry.reconcilePromise) return entry.reconcilePromise;
+            const pending = (async () => {
+              incrementMetric(metrics, 'document_sync_reconciliations_total');
+              try {
+                const sync = await store.getCollaborationSync({
+                  siteId,
+                  contentId,
+                  afterSequence: entry.lastSequence
+                });
+                if (cleaned || documentSubscriptions.get(contentId) !== entry) {
+                  return { recoveredOperations: 0, reloadRequired: false, stale: true };
+                }
+                const recoveredOperations = await deliverDocumentSync(contentId, entry, sync);
+                return {
+                  recoveredOperations,
+                  reloadRequired: sync.reloadRequired === true,
+                  stale: false
+                };
+              } catch (error) {
+                incrementMetric(metrics, 'document_sync_failures_total');
+                throw error;
+              }
+            })();
+            entry.reconcilePromise = pending;
+            try {
+              const result = await pending;
+              entry.syncDegradedNotified = false;
+              return result;
+            } finally {
+              if (entry.reconcilePromise === pending) entry.reconcilePromise = null;
+            }
+          }
+
+          function notifyDocumentSyncDegraded(contentId, entry) {
+            if (entry.syncDegradedNotified) return;
+            entry.syncDegradedNotified = true;
+            send({
+              type: 'document.sync.degraded',
+              contentId,
+              code: 'ERR_SYSTEMFABRIC_COLLABORATION_SYNC_DEGRADED'
+            });
           }
 
           function startDocumentPump(contentId, entry) {
@@ -240,13 +290,13 @@ function createWebSocketGateway({
                   const eventSequence = Number(event.payload.sequence);
                   if (!Number.isSafeInteger(eventSequence) || eventSequence <= entry.lastSequence) continue;
                   if (eventSequence > entry.lastSequence + 1) {
-                    const sync = await store.getCollaborationSync({
-                      siteId,
-                      contentId,
-                      afterSequence: entry.lastSequence
-                    });
-                    if (documentSubscriptions.get(contentId) !== entry) break;
-                    await deliverDocumentSync(contentId, entry, sync);
+                    try {
+                      await reconcileDocument(contentId, entry);
+                    } catch {
+                      if (documentSubscriptions.get(contentId) !== entry || cleaned) break;
+                      notifyDocumentSyncDegraded(contentId, entry);
+                      continue;
+                    }
                   }
                   if (eventSequence <= entry.lastSequence || documentSubscriptions.get(contentId) !== entry) continue;
                   if (event.payload.originConnectionId === connectionId) {
@@ -515,14 +565,15 @@ function createWebSocketGateway({
           });
 
           timer = setInterval(async () => {
-            if (cleaned || ws.readyState !== WebSocket.OPEN) return;
-            if (!alive) {
-              incrementMetric(metrics, 'websocket_reconnect_required_total');
-              close(1013, 'heartbeat-timeout');
-              return;
-            }
-            alive = false;
+            if (cleaned || ws.readyState !== WebSocket.OPEN || heartbeatInProgress) return;
+            heartbeatInProgress = true;
             try {
+              if (!alive) {
+                incrementMetric(metrics, 'websocket_reconnect_required_total');
+                close(1013, 'heartbeat-timeout');
+                return;
+              }
+              alive = false;
               if (!(await hub.reauthorize(subscription))) {
                 close(1008, 'authorization-expired');
                 return;
@@ -538,6 +589,14 @@ function createWebSocketGateway({
                   documentSubscriptions.delete(contentId);
                   entry.subscription.close();
                   send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+                  continue;
+                }
+                try {
+                  await reconcileDocument(contentId, entry);
+                } catch {
+                  if (!cleaned && documentSubscriptions.get(contentId) === entry) {
+                    notifyDocumentSyncDegraded(contentId, entry);
+                  }
                 }
               }
               if (lease && !(await lease.renew())) {
@@ -550,6 +609,8 @@ function createWebSocketGateway({
             } catch {
               incrementMetric(metrics, 'websocket_reconnect_required_total');
               close(1013, 'connection-unavailable');
+            } finally {
+              heartbeatInProgress = false;
             }
           }, heartbeatMs);
           timer.unref?.();

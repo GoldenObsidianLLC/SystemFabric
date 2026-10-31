@@ -148,7 +148,7 @@ git commit -m "feat(collaboration): use shared document fanout adapter"
 - Consumes: Task 2 publisher callback and F1.9 `store.getCollaborationSync({ siteId, contentId, afterSequence })`.
 - Produces: one per-subscription reconciliation method shared by Pub/Sub gap recovery and the existing WebSocket heartbeat.
 
-- [ ] **Step 1: Write failing heartbeat recovery tests**
+- [x] **Step 1: Write failing heartbeat recovery tests**
 
 Add tests that:
 - Join a document on a socket, advance the test store to sequence 1 without publishing any hub/Redis event, wait for the configured heartbeat interval and assert the socket receives sequence 1.
@@ -156,12 +156,12 @@ Add tests that:
 - Make the first heartbeat sync fail, assert only a bounded `document.sync.degraded` message is emitted and the base presence WebSocket stays open, then restore the store and assert the next heartbeat catches up.
 - Track concurrent `getCollaborationSync` calls and assert at most one in-flight reconciliation per document subscription.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test test/realtime-websocket.test.js`
-Expected: FAIL because heartbeat currently reauthorizes document subscriptions but does not reconcile their sequence.
+Expected: RED — 20 pass / 1 fail. The new recovery test timed out waiting for `document.sync.degraded` because heartbeat performed no document sync.
 
-- [ ] **Step 3: Implement single-flight reconciliation**
+- [x] **Step 3: Implement single-flight reconciliation**
 
 In `packages/realtime/src/websocket-gateway.js`:
 - Add `reconcileDocument(contentId, entry)` using an `entry.reconcilePromise` so heartbeat and sequence-gap recovery share one in-flight sync.
@@ -171,12 +171,12 @@ In `packages/realtime/src/websocket-gateway.js`:
 - On a transient sync error, preserve the WebSocket and document subscription, send a bounded `document.sync.degraded` message, and retry on the next heartbeat. Do not advance `lastSequence` without a successful replay or reload.
 - Keep queue overflow and slow-consumer behavior bounded; reconnect continues to use PostgreSQL.
 
-- [ ] **Step 4: Run focused gateway tests**
+- [x] **Step 4: Run focused gateway tests**
 
 Run: `node --test test/realtime-websocket.test.js`
-Expected: all tests PASS; heartbeat repairs a final lost notification and does not duplicate gap-recovered operations.
+Expected: 21/21 tests PASS; heartbeat repairs a final lost notification, preserves the socket on transient sync failure, and gap recovery shares the in-flight sync without duplicate delivery.
 
-- [ ] **Step 5: Commit the recovery task**
+- [x] **Step 5: Commit the recovery task**
 
 ```bash
 git add packages/realtime/src/websocket-gateway.js test/realtime-websocket.test.js

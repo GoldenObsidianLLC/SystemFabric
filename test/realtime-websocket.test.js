@@ -687,3 +687,134 @@ test('WebSocket committed operations use the shared publisher and report degrade
   assert.match(publications[0].originConnectionId, /^[0-9a-f-]{36}$/i);
   assert.equal(publications[0].operation.opId, operation.opId);
 });
+
+
+test('document heartbeat reconciles a lost final notification and shares single-flight sync with sequence-gap recovery', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const operationOne = {
+    schemaVersion: 1,
+    opId: '33333333-3333-4333-8333-333333333333',
+    clientId: 'heartbeat-a',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'Recovered first operation' }
+  };
+  const operationTwo = {
+    schemaVersion: 1,
+    opId: '44444444-4444-4444-8444-444444444444',
+    clientId: 'heartbeat-b',
+    baseSequence: 1,
+    type: 'document.set_title',
+    payload: { title: 'Recovered second operation' }
+  };
+  let syncCalls = 0;
+  let activeSyncCalls = 0;
+  let maxActiveSyncCalls = 0;
+  let releasePendingSync;
+  let signalPendingSync;
+  const pendingSync = new Promise(resolve => { releasePendingSync = resolve; });
+  const pendingSyncStarted = new Promise(resolve => { signalPendingSync = resolve; });
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && id === contentId
+        ? {
+          id, site_id: SITE_ID, content_type: 'page', status: 'draft', created_by: null,
+          body: { schemaVersion: 1, documentId: 'heartbeat-doc', type: 'page', title: 'Before', children: [] }
+        }
+        : null;
+    },
+    async getCollaborationSync() {
+      syncCalls += 1;
+      activeSyncCalls += 1;
+      maxActiveSyncCalls = Math.max(maxActiveSyncCalls, activeSyncCalls);
+      try {
+        if (syncCalls === 1) {
+          return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+        }
+        if (syncCalls === 2) {
+          const error = new Error('temporary PostgreSQL sync outage');
+          error.code = 'ERR_TEST_TRANSIENT_SYNC';
+          throw error;
+        }
+        if (syncCalls === 3) {
+          signalPendingSync();
+          await pendingSync;
+          return {
+            reloadRequired: false,
+            sequence: 2,
+            oldestReplaySequence: 0,
+            operations: [
+              { sequence: 1, operation: operationOne, appliedOperation: operationOne },
+              { sequence: 2, operation: operationTwo, appliedOperation: operationTwo }
+            ]
+          };
+        }
+        throw new Error('unexpected overlapping reconciliation query');
+      } finally {
+        activeSyncCalls -= 1;
+      }
+    }
+  };
+  const { server, url, origin } = await createServer(t, {
+    contentStore: store,
+    realtimeHeartbeatMs: 5_000
+  });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+  assert.equal(syncCalls, 1, 'join takes the initial canonical sync');
+
+  // No operation event is published after this point. A missed final Redis hint
+  // must be repaired by the periodic heartbeat even though the socket stays open.
+  const degraded = await nextMessage(socket, 7_000);
+  assert.equal(degraded.type, 'document.sync.degraded');
+  assert.equal(degraded.contentId, contentId);
+  assert.equal(socket.readyState, WebSocket.OPEN, 'a transient database sync failure does not close the base WebSocket');
+
+  await Promise.race([
+    pendingSyncStarted,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('heartbeat did not start the next sync')), 6_000))
+  ]);
+  assert.equal(syncCalls, 3);
+  assert.equal(activeSyncCalls, 1);
+
+  // A sequence-2 Pub/Sub event arrives while the heartbeat reconciliation is
+  // pending. The gateway must share the same promise, not issue another query.
+  await server.systemfabric.realtimeHub.publish({
+    siteId: SITE_ID,
+    topic: 'document:' + contentId,
+    payload: {
+      kind: 'document.operation',
+      sequence: 2,
+      originConnectionId: null,
+      operation: operationTwo
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.equal(syncCalls, 3, 'gap recovery and heartbeat share the single in-flight PostgreSQL sync');
+  assert.equal(maxActiveSyncCalls, 1);
+
+  releasePendingSync();
+  const firstRecovered = await nextMessage(socket, 2_000);
+  const secondRecovered = await nextMessage(socket, 2_000);
+  assert.equal(firstRecovered.type, 'document.sync.operation');
+  assert.equal(firstRecovered.sequence, 1);
+  assert.equal(firstRecovered.operation.payload.title, 'Recovered first operation');
+  assert.equal(secondRecovered.type, 'document.sync.operation');
+  assert.equal(secondRecovered.sequence, 2);
+  assert.equal(secondRecovered.operation.payload.title, 'Recovered second operation');
+
+  await assert.rejects(
+    nextMessage(socket, 150),
+    /Timed out waiting for WebSocket message/,
+    'the Pub/Sub hint that initiated gap recovery is not delivered a second time'
+  );
+  assert.equal(socket.readyState, WebSocket.OPEN);
+  const counters = server.systemfabric.realtimeMetrics.counters;
+  assert.equal(counters.document_sync_failures_total, 1);
+  assert.equal(counters.document_sync_reconciliations_total, 2);
+  assert.equal(counters.document_sync_recovered_operations_total, 2);
+});
