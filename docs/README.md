@@ -11,6 +11,7 @@ This directory contains task-oriented documentation. The root [README](../README
 | Apply the manifesto to product and engineering decisions | [Engineering Principles](SYSTEMFABRIC-PRINCIPLES.md) |
 | Understand the proposed real-time, collaboration and AI architecture | [Real-Time and AI Architecture](REALTIME-AI-ARCHITECTURE.md) |
 | Review the implemented developer-preview presence foundation and its limits | [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) |
+| Review the CRDT/OT evaluation and collaborative editing recommendation | [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) |
 | Review existing AI provider adapters and integration boundaries | [AI Integration](AI-INTEGRATION.md) |
 | Review recorded architecture trade-offs | [Architecture Decisions](ARCHITECTURE-DECISIONS.md) |
 | Compare current feature coverage with planned capabilities | [Feature Coverage Matrix](FEATURE-PARITY.md) |

@@ -28,6 +28,21 @@ All notable project-level changes should be recorded here. This changelog does n
 - Add Redis/Memurai-compatible shared presence leases with atomic Lua updates, per-site sorted-set indexes, hashed session keys, multi-session aggregation, hidden-state handling, capacity limits and lazy expiry callbacks.
 - Add API bootstrap settings for memory or Redis presence, bounded reconnect behavior and fail-closed store errors; add live coverage proving two independent Redis clients share presence snapshots.
 - Add cross-instance Redis Pub/Sub presence-refresh invalidation fan-out to authenticated SSE clients, including site validation, bounded inbound dispatch, authorization rechecks and lazy lease-expiry propagation. PostgreSQL remains the durable event source. WebSocket delivery, reconnect/replay, distributed connection quotas and production certification remain open.
+- Add targeted authorization invalidation for membership changes, session logout/revocation, password reset and MFA disable; propagate UUID-only invalidation envelopes across Redis-backed API instances.
+- Bind SSE subscriptions to their authenticated session and absolute expiry; revalidate session revocation, idle expiry, account status and site capability on each heartbeat, closing streams when access is no longer valid.
+
+### Real-time observability (F1.6)
+
+- Add a fixed-name realtime metric registry with counters, gauges and histograms for active subscriptions/SSE connections, authorization denials and revocations, event fan-out and lag, queue overflow, backpressure, presence leases and Redis Pub/Sub publications, receives, failures and reconnects.
+- Instrument event hub, SSE gateway, memory/Redis presence adapters, Redis Pub/Sub bridge and realtime API authorization checks; telemetry failures are isolated from request and delivery paths.
+- Extend the existing bearer-token-protected Prometheus `/metrics` endpoint with realtime series. Keep metrics disabled by default, avoid high-cardinality identity/site labels, and document process-local aggregation and lazy Redis lease-expiry semantics.
+- Add focused tests for registry validation/rendering, hub lifecycle/fan-out, presence lease accounting and protected API scraping.
+
+### Collaborative editing architecture spike (F1.7)
+
+- Compare CRDT and operational transformation against the current page-document v1 tree, editor mutation model, PostgreSQL revision history and one-way SSE transport.
+- Record a provisional server-authoritative semantic-OT recommendation for the first online CMS collaboration release, with stable node/sibling anchors, operation sequencing, conflict semantics, PostgreSQL durability and explicit CRDT revisit conditions.
+- Document the follow-on two-client browser prototype and security/performance acceptance gates. No collaboration runtime, CRDT dependency, operation table, migration, WebSocket route or editor collaboration behavior is claimed.
 
 ### Release engineering and local validation
 

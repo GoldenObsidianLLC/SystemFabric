@@ -85,7 +85,8 @@ function createRedisPresenceAdapter({
   expiryRetentionMs = 30_000,
   onExpired = () => {},
   now = Date.now,
-  closeClient = false
+  closeClient = false,
+  metrics = null
 } = {}) {
   if (!client || typeof client.eval !== 'function') {
     throw new TypeError('A connected Redis-compatible client with eval() is required.');
@@ -136,6 +137,7 @@ function createRedisPresenceAdapter({
     for (const value of values) {
       const expired = decodeRecord(value, siteId);
       if (!expired) continue;
+      try { metrics?.increment?.('presence_expiry_notifications_total'); } catch {}
       try {
         const result = onExpired({
           siteId: expired.siteId,
@@ -216,9 +218,11 @@ function createRedisPresenceAdapter({
         throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store returned an invalid response.');
       }
       notifyExpired(result[1], safeSiteId);
-      return result[0]
+      const records = result[0]
         .map(value => decodeRecord(value, safeSiteId))
         .filter(record => record && record.expiresAtMs > now());
+      try { metrics?.setGauge?.('presence_redis_last_site_lease_count', records.length); } catch {}
+      return records;
     },
 
     async close() {
@@ -245,7 +249,8 @@ async function createRedisPresenceService({
   onExpired = () => {},
   now = Date.now,
   onError = () => {},
-  createClient: createClientOverride
+  createClient: createClientOverride,
+  metrics = null
 } = {}) {
   if (typeof url !== 'string' || !url) {
     throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is required when the Redis presence store is selected.');
@@ -267,11 +272,13 @@ async function createRedisPresenceService({
       connectTimeout: 5_000,
       reconnectStrategy(retries) {
         if (retries > 10) return new Error('Redis presence reconnect limit reached.');
+        try { metrics?.increment?.('redis_reconnect_attempts_total'); } catch {}
         return Math.min(100 * retries, 2_000);
       }
     }
   });
   client.on?.('error', error => {
+    try { metrics?.increment?.('redis_errors_total'); } catch {}
     try { onError({ errorCode: String(error?.code || 'ERR_REDIS_CONNECTION').slice(0, 100) }); } catch {}
   });
   try {
@@ -288,9 +295,10 @@ async function createRedisPresenceService({
       expiryRetentionMs,
       onExpired,
       now,
-      closeClient: true
+      closeClient: true,
+      metrics
     });
-    return createPresenceService({ adapter, leaseMs, now });
+    return createPresenceService({ adapter, leaseMs, now, metrics });
   } catch (error) {
     if (client.isOpen && typeof client.quit === 'function') await client.quit().catch(() => {});
     else client.destroy?.();

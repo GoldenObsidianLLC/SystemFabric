@@ -230,11 +230,13 @@ A collaborative session should support:
 
 ### 5.2 CRDT versus operational transformation
 
-Do not select a collaboration algorithm solely because it is popular or convenient. Prototype CRDT and operational-transformation approaches against real SystemFabric document structures and editing operations.
+F1.7 completed the codebase-specific CRDT/OT assessment. The provisional direction for the first online CMS collaboration release is server-authoritative, document-specific semantic OT: operations target stable node IDs, parent IDs and sibling anchors, and a PostgreSQL sequencer transforms stale operations before schema validation and commit. This is a recommendation only; no collaboration engine, persistence migration, CRDT library or bidirectional transport is implemented. See [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019.
 
-Evaluate:
+### Follow-on implementation proof
 
-- Nested JSON page documents, rich text, component properties and reorder operations.
+The follow-on prototype must verify:
+
+- Nested JSON page documents, component properties and reorder operations; the current page schema uses plain strings rather than a rich-text AST.
 - Concurrent edits to the same property and to independent document regions.
 - Schema validation and invalid intermediate states.
 - Snapshot size, update volume, compaction and long-running sessions.
@@ -464,7 +466,7 @@ Each step requires an architecture decision record where a technology or consist
 | Real-time transport | WebSocket, SSE, polling fallback, hybrid | Browser/proxy compatibility, latency, reconnect, operations and cost |
 | Event fan-out | PostgreSQL-backed relay plus broker, managed event service, other topology | Multi-instance delivery, throughput, ordering scope, retry and recovery |
 | Presence store | Redis/Valkey-compatible ephemeral store or another TTL-capable service | TTL behavior, failover, multi-region needs, latency and operational burden |
-| Collaboration algorithm | CRDT, OT, hybrid/document-specific strategy | Structured document correctness, conflict semantics, offline/reconnect, memory and update cost |
+| Collaboration algorithm | Provisional: server-authoritative semantic OT for online-first CMS; revisit CRDT for offline-first/multi-master requirements | Two-client browser convergence, full conflict matrix, snapshot/replay, schema validation, authorization, latency and resource cost |
 | Search | PostgreSQL lexical search, dedicated search, vector/hybrid retrieval | Relevance benchmark, tenant filtering, freshness, deletion and operating cost |
 | AI provider routing | Explicit provider selection, policy-based routing, fallback strategy | Data policy, model quality, latency, cost, portability and provider failure |
 | Workflow execution | Existing worker model, isolated worker pool, sandboxed runtime | Threat model, side-effect recovery, quotas, isolation and auditability |
@@ -475,7 +477,7 @@ Each step requires an architecture decision record where a technology or consist
 - This design does not authorize arbitrary AI-generated code execution or unrestricted plugin/tool access.
 - Presence and AI-generated status are not sources of truth for permissions, billing, content publication or workflow outcomes.
 - Memgraph is not promoted to the canonical transactional database by this proposal.
-- No specific transport, broker, CRDT library, search engine or ephemeral store is selected until the decision gates have evidence.
+- No specific transport, broker, CRDT library, search engine or ephemeral store is selected until its decision gates have evidence. ADR-019 records a provisional semantic-OT direction for the first CMS collaboration release, subject to a two-client prototype and independent security review.
 - Adding an AI feature does not remove the requirement for transparent user control, accessibility, privacy, human accountability and auditability.
 
 ## Related documents

@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { createRealtimeMetrics } = require('../packages/observability/src/metrics');
 const {
   DEFAULT_KEY_PREFIX,
   createRedisPresenceAdapter,
@@ -107,9 +108,11 @@ test('Redis presence emits expiry notifications when a site index is swept', asy
     expiresAtMs: 15_000
   };
   const seen = [];
+  const metrics = createRealtimeMetrics();
   const client = fakeClient({ replies: [[[], [JSON.stringify(expired)]]] });
   const adapter = createRedisPresenceAdapter({
     client,
+    metrics,
     now: () => 20_000,
     onExpired: event => seen.push(event)
   });
@@ -121,6 +124,8 @@ test('Redis presence emits expiry notifications when a site index is swept', asy
     lastSeenAtMs: 10_000,
     expiredAtMs: 15_000
   }]);
+  assert.equal(metrics.snapshot().counters.presence_expiry_notifications_total, 1);
+  assert.equal(metrics.snapshot().gauges.presence_redis_last_site_lease_count, 0);
   await adapter.close();
 });
 
@@ -154,10 +159,12 @@ test('Redis presence fails closed on store errors and invalid scopes', async () 
 
 test('Redis presence service factory connects, uses bounded reconnect policy, and closes its owned client', async () => {
   const client = fakeClient();
+  const metrics = createRealtimeMetrics();
   client.on = (event, handler) => { client.errorHandler = handler; };
   client.connect = async () => { client.connected = true; };
   const service = await createRedisPresenceService({
     url: 'redis://127.0.0.1:6379',
+    metrics,
     createClient(options) {
       client.options = options;
       return client;
@@ -166,6 +173,9 @@ test('Redis presence service factory connects, uses bounded reconnect policy, an
   assert.equal(client.connected, true);
   assert.equal(client.options.socket.connectTimeout, 5000);
   assert.equal(client.options.socket.reconnectStrategy(1), 100);
+  client.errorHandler(Object.assign(new Error('test'), { code: 'ECONNRESET' }));
+  assert.equal(metrics.snapshot().counters.redis_reconnect_attempts_total, 1);
+  assert.equal(metrics.snapshot().counters.redis_errors_total, 1);
   assert.ok(client.options.socket.reconnectStrategy(99) instanceof Error);
   await service.close();
   assert.equal(client.isOpen, false);

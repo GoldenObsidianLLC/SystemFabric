@@ -12,6 +12,32 @@ function safeErrorCode(error) {
   return String(error?.code || 'ERR_REDIS_CONNECTION').slice(0, 100);
 }
 
+function validateAuthorizationEnvelope(value, maxMessageBytes) {
+  if (typeof value !== 'string' || Buffer.byteLength(value) > maxMessageBytes) return null;
+  let envelope;
+  try { envelope = JSON.parse(value); } catch { return null; }
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) || envelope.schemaVersion !== 1 ||
+      Object.keys(envelope).some(key => !['schemaVersion', 'publisherId', 'eventId', 'occurredAt', 'payload'].includes(key)) ||
+      !EVENT_ID_RE.test(envelope.eventId || '') || !EVENT_ID_RE.test(envelope.publisherId || '') ||
+      typeof envelope.occurredAt !== 'string' || !Number.isFinite(Date.parse(envelope.occurredAt))) return null;
+  const payload = envelope.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) || payload.kind !== 'authorization.invalidate') return null;
+  if (Object.keys(payload).some(key => !['kind', 'siteId', 'principalId', 'sessionId'].includes(key))) return null;
+  const siteId = payload.siteId === undefined ? null : payload.siteId;
+  const principalId = payload.principalId === undefined ? null : payload.principalId;
+  const sessionId = payload.sessionId === undefined ? null : payload.sessionId;
+  if ((siteId !== null && (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId))) ||
+      (principalId !== null && (typeof principalId !== 'string' || !SITE_ID_RE.test(principalId))) ||
+      (sessionId !== null && (typeof sessionId !== 'string' || !SITE_ID_RE.test(sessionId))) ||
+      (siteId === null && principalId === null && sessionId === null)) return null;
+  return {
+    eventId: envelope.eventId,
+    occurredAt: new Date(envelope.occurredAt).toISOString(),
+    payload: Object.freeze({ kind: 'authorization.invalidate', ...(siteId ? { siteId: siteId.toLowerCase() } : {}), ...(principalId ? { principalId: principalId.toLowerCase() } : {}), ...(sessionId ? { sessionId: sessionId.toLowerCase() } : {}) }),
+    publisherId: envelope.publisherId
+  };
+}
+
 function validatePresenceEnvelope(value, expectedSiteId, maxMessageBytes) {
   if (typeof value !== 'string' || Buffer.byteLength(value) > maxMessageBytes) return null;
   let envelope;
@@ -50,7 +76,8 @@ async function createRedisRealtimeBridge({
   maxInboundQueue = 1_024,
   onError = () => {},
   createClient: createClientOverride,
-  now = Date.now
+  now = Date.now,
+  metrics = null
 } = {}) {
   if (typeof url !== 'string' || !url) {
     throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is required for the Redis real-time bridge.');
@@ -82,6 +109,7 @@ async function createRedisRealtimeBridge({
       connectTimeout: 5_000,
       reconnectStrategy(retries) {
         if (retries > 10) return new Error('Redis real-time reconnect limit reached.');
+        incrementMetric('redis_reconnect_attempts_total');
         return Math.min(100 * retries, 2_000);
       }
     }
@@ -89,14 +117,22 @@ async function createRedisRealtimeBridge({
   const publisher = createClient(clientOptions);
   const subscriber = createClient(clientOptions);
   const instanceId = randomUUID();
-  const pattern = channelPrefix + ':*:presence';
+  const presencePattern = channelPrefix + ':*:presence';
+  const authorizationPattern = channelPrefix + ':authorization';
   let hub = null;
   let attached = false;
   let closed = false;
   let draining = false;
   const inbound = [];
 
+  function incrementMetric(name, amount = 1) {
+    try { metrics?.increment?.(name, amount); } catch {}
+  }
+  function setQueueGauge() {
+    try { metrics?.setGauge?.('redis_inbound_queue_size', inbound.length); } catch {}
+  }
   function reportError(error) {
+    incrementMetric('redis_errors_total');
     try { onError({ errorCode: safeErrorCode(error) }); } catch {}
   }
 
@@ -125,8 +161,17 @@ async function createRedisRealtimeBridge({
     try {
       while (inbound.length && !closed) {
         const message = inbound.shift();
+        setQueueGauge();
+        if (message.kind === 'authorization') {
+          const event = validateAuthorizationEnvelope(message.message, maxMessageBytes);
+          if (!event) { incrementMetric('redis_invalid_messages_total'); continue; }
+          if (event.publisherId === instanceId) continue;
+          try { hub.invalidateAuthorization(event.payload); } catch (error) { reportError(error); }
+          continue;
+        }
         const event = validatePresenceEnvelope(message.message, message.siteId, maxMessageBytes);
-        if (!event || event.publisherId === instanceId) continue;
+        if (!event) { incrementMetric('redis_invalid_messages_total'); continue; }
+        if (event.publisherId === instanceId) continue;
         try {
           await hub.publish({
             siteId: event.siteId,
@@ -147,8 +192,8 @@ async function createRedisRealtimeBridge({
 
   async function attach(targetHub) {
     if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
-    if (!targetHub || typeof targetHub.publish !== 'function') {
-      throw new TypeError('A local authorization-aware real-time hub is required.');
+    if (!targetHub || typeof targetHub.publish !== 'function' || typeof targetHub.invalidateAuthorization !== 'function') {
+      throw new TypeError('A local hub with publish and authorization invalidation support is required.');
     }
     if (attached) {
       if (hub === targetHub) return;
@@ -156,19 +201,36 @@ async function createRedisRealtimeBridge({
     }
     hub = targetHub;
     try {
-      await subscriber.pSubscribe(pattern, (message, channel) => {
+      const receive = (kind, message, channel) => {
         if (closed || typeof channel !== 'string' || typeof message !== 'string') return;
-        const prefix = channelPrefix + ':';
-        if (!channel.startsWith(prefix) || !channel.endsWith(':presence')) return;
-        const siteId = channel.slice(prefix.length, -':presence'.length);
-        if (!SITE_ID_RE.test(siteId)) return;
-        if (inbound.length >= maxInboundQueue) {
-          reportError({ code: 'ERR_REALTIME_INBOUND_QUEUE_FULL' });
-          return;
+        if (kind === 'presence') {
+          const prefix = channelPrefix + ':';
+          if (!channel.startsWith(prefix) || !channel.endsWith(':presence')) return;
+          const siteId = channel.slice(prefix.length, -':presence'.length);
+          if (!SITE_ID_RE.test(siteId)) return;
+          if (inbound.length >= maxInboundQueue) {
+            incrementMetric('redis_inbound_queue_overflows_total');
+            reportError({ code: 'ERR_REALTIME_INBOUND_QUEUE_FULL' });
+            return;
+          }
+          inbound.push({ kind, message, siteId: siteId.toLowerCase() });
+          incrementMetric('redis_pubsub_messages_total');
+          setQueueGauge();
+        } else {
+          if (channel !== authorizationPattern) return;
+          if (inbound.length >= maxInboundQueue) {
+            incrementMetric('redis_inbound_queue_overflows_total');
+            reportError({ code: 'ERR_REALTIME_INBOUND_QUEUE_FULL' });
+            return;
+          }
+          inbound.push({ kind, message });
+          incrementMetric('redis_pubsub_messages_total');
+          setQueueGauge();
         }
-        inbound.push({ message, siteId: siteId.toLowerCase() });
         void drainInbound();
-      });
+      };
+      await subscriber.pSubscribe(presencePattern, (message, channel) => receive('presence', message, channel));
+      await subscriber.pSubscribe(authorizationPattern, (message, channel) => receive('authorization', message, channel));
       attached = true;
     } catch (error) {
       hub = null;
@@ -209,7 +271,9 @@ async function createRedisRealtimeBridge({
     }
     try {
       await publisher.publish(channelFor(envelope.siteId), serialized);
+      incrementMetric('redis_pubsub_publishes_total');
     } catch {
+      incrementMetric('redis_publish_failures_total');
       throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis real-time bridge is unavailable.');
     }
     // The publisher does not receive its own Redis Pub/Sub message, so deliver
@@ -223,10 +287,45 @@ async function createRedisRealtimeBridge({
     });
   }
 
+  async function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
+    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
+    const payload = { kind: 'authorization.invalidate' };
+    if (siteId !== null) payload.siteId = siteId;
+    if (principalId !== null) payload.principalId = principalId;
+    if (sessionId !== null) payload.sessionId = sessionId;
+    const envelope = {
+      schemaVersion: 1,
+      publisherId: instanceId,
+      eventId: randomUUID(),
+      occurredAt: new Date(now()).toISOString(),
+      payload
+    };
+    const serialized = JSON.stringify(envelope);
+    if (Buffer.byteLength(serialized) > maxMessageBytes) {
+      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Authorization invalidation exceeds the configured size limit.');
+    }
+    if (!validateAuthorizationEnvelope(serialized, maxMessageBytes)) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'Authorization invalidation requires valid UUID selectors.');
+    }
+    // Revoke local streams even if Redis is unavailable; other replicas also
+    // revalidate sessions on each SSE heartbeat as a bounded fallback.
+    const local = hub.invalidateAuthorization({ siteId, principalId, sessionId });
+    try {
+      await publisher.publish(authorizationPattern, serialized);
+      incrementMetric('redis_pubsub_publishes_total');
+    } catch {
+      incrementMetric('redis_publish_failures_total');
+      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis authorization invalidation bridge is unavailable.');
+    }
+    return { ...local, eventId: envelope.eventId };
+  }
+
   async function close() {
     if (closed) return;
     closed = true;
     inbound.length = 0;
+    setQueueGauge();
     const results = await Promise.allSettled([publisher, subscriber].map(async client => {
       try {
         if (client.isOpen && typeof client.quit === 'function') await client.quit();
@@ -243,6 +342,7 @@ async function createRedisRealtimeBridge({
   return Object.freeze({
     attach,
     publish,
+    invalidateAuthorization,
     close,
     get instanceId() { return instanceId; },
     get inboundQueueSize() { return inbound.length; },
@@ -253,5 +353,6 @@ async function createRedisRealtimeBridge({
 module.exports = {
   DEFAULT_CHANNEL_PREFIX,
   createRedisRealtimeBridge,
-  validatePresenceEnvelope
+  validatePresenceEnvelope,
+  validateAuthorizationEnvelope
 };

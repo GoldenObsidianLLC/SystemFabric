@@ -5,12 +5,20 @@ const assert = require('node:assert/strict');
 const {
   createRedisRealtimeBridge,
   validatePresenceEnvelope,
+  validateAuthorizationEnvelope,
   DEFAULT_CHANNEL_PREFIX
 } = require('../packages/realtime/src/redis-realtime');
 const { createRealtimeHub } = require('../packages/realtime/src/event-hub');
+const { createRealtimeMetrics } = require('../packages/observability/src/metrics');
 
 const SITE_A = '11111111-1111-4111-8111-111111111111';
 const SITE_B = '22222222-2222-4222-8222-222222222222';
+const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const USER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+const SESSION_A1 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const SESSION_A2 = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const SESSION_B1 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const SESSION_A3 = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const REDIS_URL = 'redis://127.0.0.1:6379';
 
 class FakeRedisBroker {
@@ -68,8 +76,10 @@ test('Redis realtime bridge fans site-scoped presence invalidations across indep
     url: REDIS_URL,
     createClient: () => broker.createClient()
   };
-  const bridgeA = await createRedisRealtimeBridge(options);
-  const bridgeB = await createRedisRealtimeBridge(options);
+  const metricsA = createRealtimeMetrics();
+  const bridgeA = await createRedisRealtimeBridge({ ...options, metrics: metricsA });
+  const metricsB = createRealtimeMetrics();
+  const bridgeB = await createRedisRealtimeBridge({ ...options, metrics: metricsB });
   const hubA = createRealtimeHub({ authorizeSubscribe: async () => true });
   const hubB = createRealtimeHub({ authorizeSubscribe: async () => true });
   await Promise.all([bridgeA.attach(hubA), bridgeB.attach(hubB)]);
@@ -101,6 +111,9 @@ test('Redis realtime bridge fans site-scoped presence invalidations across indep
   assert.equal(remoteEvent.value.payload.kind, 'presence.refresh');
   assert.equal(remoteEvent.value.siteId, SITE_A);
   assert.equal(remoteEvent.value.topic, 'presence');
+  assert.equal(metricsA.snapshot().counters.redis_pubsub_publishes_total, 1);
+  assert.equal(metricsB.snapshot().counters.redis_pubsub_messages_total, 1);
+  assert.equal(metricsB.snapshot().gauges.redis_inbound_queue_size, 0);
 
   const noCrossSiteDelivery = await Promise.race([
     otherSiteIterator.next().then(() => 'unexpected-event'),
@@ -110,6 +123,31 @@ test('Redis realtime bridge fans site-scoped presence invalidations across indep
   local.close();
   remote.close();
   otherSite.close();
+});
+
+test('Redis realtime bridge propagates site-scoped authorization invalidation across instances', async t => {
+  const broker = new FakeRedisBroker();
+  const options = { url: REDIS_URL, createClient: () => broker.createClient() };
+  const bridgeA = await createRedisRealtimeBridge(options);
+  const metricsB = createRealtimeMetrics();
+  const bridgeB = await createRedisRealtimeBridge({ ...options, metrics: metricsB });
+  const hubA = createRealtimeHub({ authorizeSubscribe: async () => true });
+  const hubB = createRealtimeHub({ authorizeSubscribe: async () => true });
+  await Promise.all([bridgeA.attach(hubA), bridgeB.attach(hubB)]);
+  t.after(async () => { hubA.close(); hubB.close(); await Promise.all([bridgeA.close(), bridgeB.close()]); });
+
+  await hubA.subscribe({ principal: { id: USER_A }, sessionId: SESSION_A1, siteId: SITE_A, topic: 'presence' });
+  await hubB.subscribe({ principal: { id: USER_A }, sessionId: SESSION_A2, siteId: SITE_A, topic: 'presence' });
+  await hubB.subscribe({ principal: { id: USER_A }, sessionId: SESSION_B1, siteId: SITE_B, topic: 'presence' });
+  await hubB.subscribe({ principal: { id: USER_B }, sessionId: SESSION_A3, siteId: SITE_A, topic: 'presence' });
+
+  const local = await bridgeA.invalidateAuthorization({ siteId: SITE_A, principalId: USER_A });
+  assert.equal(local.revoked, 1);
+  for (let attempt = 0; attempt < 20 && hubB.subscriberCount !== 2; attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(hubA.subscriberCount, 0);
+  assert.equal(hubB.subscriberCount, 2, 'only the matching site and principal are revoked on the remote instance');
+  assert.equal(metricsB.snapshot().counters.redis_pubsub_messages_total, 1);
+  assert.equal(metricsB.snapshot().gauges.redis_inbound_queue_size, 0);
 });
 
 test('Redis realtime bridge rejects payloads that could expose presence records or identities', async t => {
@@ -134,6 +172,10 @@ test('Redis realtime bridge rejects payloads that could expose presence records 
     bridge.publish({ siteId: SITE_A, topic: 'presence', payload: { kind: 'presence.refresh' }, eventId: 'not-a-uuid' }),
     error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_EVENT_ID_INVALID'
   );
+  await assert.rejects(
+    bridge.invalidateAuthorization({ principalId: 'local-developer' }),
+    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE'
+  );
 });
 
 test('Redis realtime envelope validation enforces channel site, UUID identity and exact invalidation shape', () => {
@@ -150,5 +192,17 @@ test('Redis realtime envelope validation enforces channel site, UUID identity an
   assert.equal(validatePresenceEnvelope(JSON.stringify(valid), SITE_B, 4096), null);
   assert.equal(validatePresenceEnvelope(JSON.stringify({ ...valid, payload: { kind: 'presence.refresh', userId: 'secret' } }), SITE_A, 4096), null);
   assert.equal(validatePresenceEnvelope(JSON.stringify(valid), SITE_A, 32), null);
+
+  const authorization = {
+    schemaVersion: 1,
+    publisherId: USER_B,
+    eventId: SESSION_A3,
+    occurredAt: new Date().toISOString(),
+    payload: { kind: 'authorization.invalidate', siteId: SITE_A, principalId: USER_A }
+  };
+  assert.equal(validateAuthorizationEnvelope(JSON.stringify(authorization), 4096).payload.principalId, USER_A);
+  assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, payload: { kind: 'authorization.invalidate' } }), 4096), null);
+  assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, payload: { ...authorization.payload, sessionToken: 'secret' } }), 4096), null);
+  assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, sessionToken: 'secret' }), 4096), null);
   assert.equal(DEFAULT_CHANNEL_PREFIX, 'systemfabric:realtime:v1');
 });

@@ -10,6 +10,7 @@
 - Product/order/membership domain foundations; 0.5.1 adds finite-stock reservation lifecycle helpers, provider-aware reconciliation of expired Stripe Checkout Sessions, and ambiguous create-session recovery with exact request snapshots. It fails closed and retains holds when the session ID/provider state is unknown. Live Stripe/DB tests remain gated.
 - 0.5.1 adds partial site-scoped direct-conversation/message, notifications/read markers, blocks, reports and moderation routes with rate limiting; group privacy, forums, export/deletion and full browser workflows remain open.
 - Release-readiness tooling records syntax/unit/vendor/integration results separately from required deployment evidence and produces a fail-closed gate report.
+- F1.7 completes a documented CRDT-versus-semantic-OT assessment for the current page-document/editor model and records a provisional server-authoritative OT direction in ADR-019; implementation remains a separate milestone.
 - Optional ClamAV scanner adapter, fail-closed production upload policy, non-production quarantine, local disk object reconciliation tool.
 - Read-only cloud-storage probe methods (live provider operations require provider credentials and were not tested here).
 - PostgreSQL outbox concurrency/dead-letter test definition, Memgraph monotonic projection integration test, and CI definitions for supported Node, database services, Playwright and CodeQL.

@@ -57,14 +57,19 @@ function configuredPublicBase(env) {
   return parsed.origin;
 }
 
-function createIdentityService({ pool, env = process.env, clock = () => Date.now() } = {}) {
+function createIdentityService({ pool, env = process.env, clock = () => Date.now(), onAuthorizationChange = async () => {} } = {}) {
   if (!pool) throw new TypeError('Identity service requires a PostgreSQL pool.');
+  if (typeof onAuthorizationChange !== 'function') throw new TypeError('onAuthorizationChange must be a function.');
   const sessionTtlHours = Number(env.SESSION_TTL_HOURS || SESSION_TTL_HOURS);
   const sessionIdleTtlMinutes = Number(env.SESSION_IDLE_TTL_MINUTES || 60);
   if (!Number.isInteger(sessionTtlHours) || sessionTtlHours < 1 || sessionTtlHours > 720) throw authError(500, 'ERR_SYSTEMFABRIC_SESSION_TTL_CONFIG', 'SESSION_TTL_HOURS must be an integer from 1 to 720.');
   if (!Number.isInteger(sessionIdleTtlMinutes) || sessionIdleTtlMinutes < 5 || sessionIdleTtlMinutes > 43_200) throw authError(500, 'ERR_SYSTEMFABRIC_SESSION_IDLE_TTL_CONFIG', 'SESSION_IDLE_TTL_MINUTES must be an integer from 5 to 43200.');
   const sessionTtlMs = 1000 * 60 * 60 * sessionTtlHours;
   const loginBuckets = new Map();
+
+  async function notifyAuthorizationChange(change) {
+    await onAuthorizationChange(Object.freeze({ ...change }));
+  }
 
   function throttleLogin(key) {
     const now = clock(); const normalized = String(key || 'unknown').slice(0, 300);
@@ -221,7 +226,9 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
         await client.query('DELETE FROM user_mfa_recovery_codes WHERE user_id=$1', [userId]);
         await client.query('UPDATE users SET mfa_enabled=false,mfa_enabled_at=NULL,updated_at=now() WHERE id=$1', [userId]);
         await client.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [userId]);
-        await client.query('COMMIT'); return { disabled: true };
+        await client.query('COMMIT');
+        await notifyAuthorizationChange({ principalId: userId });
+        return { disabled: true };
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
       finally { client.release(); }
     },
@@ -254,7 +261,9 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
         await client.query('UPDATE users SET password_hash=$2,updated_at=now() WHERE id=$1', [action.user_id, passwordHash]);
         await client.query('UPDATE identity_action_tokens SET consumed_at=now() WHERE id=$1', [action.id]);
         await client.query('UPDATE auth_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [action.user_id]);
-        await client.query('COMMIT'); return { reset: true };
+        await client.query('COMMIT');
+        await notifyAuthorizationChange({ principalId: action.user_id });
+        return { reset: true };
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; } finally { client.release(); }
     },
 
@@ -294,7 +303,9 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
 
     async revokeSession({ userId, sessionId }) {
       const result = await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL RETURNING id', [sessionId, userId]);
-      return { revoked: result.rowCount > 0 };
+      const revoked = result.rowCount > 0;
+      if (revoked) await notifyAuthorizationChange({ principalId: userId, sessionId });
+      return { revoked };
     },
 
     async createOidcState({ state, nonce, verifier, issuer }) {
@@ -375,6 +386,17 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
       };
     },
 
+    async isSessionActive({ userId, sessionId }) {
+      if (typeof userId !== 'string' || !userId || typeof sessionId !== 'string' || !sessionId) return false;
+      const result = await pool.query(
+        `SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id
+         WHERE s.id=$1 AND s.user_id=$2 AND s.revoked_at IS NULL AND s.expires_at>now()
+           AND s.last_seen_at>now()-($3 * interval '1 minute') AND u.status='active' LIMIT 1`,
+        [sessionId, userId, sessionIdleTtlMinutes]
+      );
+      return result.rowCount > 0;
+    },
+
     async validateCsrf(token, csrf) {
       if (typeof token !== 'string' || typeof csrf !== 'string') return false;
       const result = await pool.query('SELECT csrf_hash FROM auth_sessions WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>now()', [digest(token)]);
@@ -382,8 +404,11 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
     },
 
     async logout(token) {
-      if (!token) return;
-      await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL', [digest(token)]);
+      if (!token) return { revoked: false };
+      const result = await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL RETURNING id,user_id', [digest(token)]);
+      const session = result.rows[0];
+      if (session) await notifyAuthorizationChange({ principalId: session.user_id, sessionId: session.id });
+      return { revoked: Boolean(session) };
     },
 
     async listSites(userId) {
@@ -442,7 +467,8 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
       const user = await pool.query("SELECT id,email,display_name,status FROM users WHERE lower(email)=$1 AND status='active'", [email]);
       if (!user.rows[0]) { const error = new Error('No active account exists for that email. Create an invitation instead.'); error.statusCode = 404; error.code = 'ERR_SYSTEMFABRIC_USER_NOT_FOUND'; throw error; }
       const role = await pool.query('SELECT id FROM roles WHERE slug=$1', [roleSlug]);
-      await pool.query('INSERT INTO site_memberships(site_id,user_id,role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [siteId, user.rows[0].id, role.rows[0].id]);
+      const membership = await pool.query('INSERT INTO site_memberships(site_id,user_id,role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING user_id', [siteId, user.rows[0].id, role.rows[0].id]);
+      if (membership.rowCount > 0) await notifyAuthorizationChange({ siteId, principalId: user.rows[0].id });
       return safeUser(user.rows[0]);
     },
 
@@ -455,8 +481,9 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
           const owners = await client.query(`SELECT count(*)::integer AS count FROM site_memberships m JOIN roles r ON r.id=m.role_id JOIN users u ON u.id=m.user_id WHERE m.site_id=$1 AND r.slug='site-owner' AND u.status='active'`, [siteId]);
           if (owners.rows[0].count <= 1) { const error = new Error('The last active site owner cannot be removed.'); error.statusCode = 409; error.code = 'ERR_SYSTEMFABRIC_LAST_OWNER'; throw error; }
         }
-        await client.query('DELETE FROM site_memberships WHERE site_id=$1 AND user_id=$2', [siteId, userId]);
+        const removed = await client.query('DELETE FROM site_memberships WHERE site_id=$1 AND user_id=$2 RETURNING user_id', [siteId, userId]);
         await client.query('COMMIT');
+        if (removed.rowCount > 0) await notifyAuthorizationChange({ siteId, principalId: userId });
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
       finally { client.release(); }
     },
@@ -499,7 +526,9 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
         } else if (user.rows[0].status !== 'active') { const error = new Error('This account is disabled. Contact the site administrator.'); error.statusCode = 403; error.code = 'ERR_SYSTEMFABRIC_ACCOUNT_DISABLED'; throw error; }
         await client.query('INSERT INTO site_memberships(site_id,user_id,role_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [data.site_id, user.rows[0].id, data.role_id]);
         await client.query('UPDATE site_invitations SET accepted_at=now() WHERE id=$1', [data.id]);
-        await client.query('COMMIT'); return { user: safeUser(user.rows[0]), siteId: data.site_id, role: data.role_slug };
+        await client.query('COMMIT');
+        await notifyAuthorizationChange({ siteId: data.site_id, principalId: user.rows[0].id });
+        return { user: safeUser(user.rows[0]), siteId: data.site_id, role: data.role_slug };
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
       finally { client.release(); }
     },
