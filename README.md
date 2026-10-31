@@ -117,7 +117,7 @@ npm run check
 # Vendored rendering/runtime test suite
 npm --prefix vendor/enginex test
 
-# Browser/editor smoke tests (Chromium must be installed)
+# Browser/editor smoke tests (install the configured Chrome browser channel first)
 npm run test:e2e -- --workers=1
 
 # Live PostgreSQL + Memgraph integration suite
@@ -163,6 +163,7 @@ Start at **[the documentation index](docs/README.md)**.
 | [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md) | Project mission and human-AI symbiosis vision. |
 | [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) | Human agency, consent, accountability and engineering constraints. |
 | [Real-Time Foundation 1](docs/REALTIME-FOUNDATION-F1.md) | Developer-preview presence and event streaming foundation, with limitations. |
+| [Contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) | First clone, dependency install, basic checks, and service requirements. |
 | [Development](docs/DEVELOPMENT.md) | Local setup, configuration, and contributor workflow. |
 | [Testing](docs/TESTING.md) | Test commands, prerequisites, scope, and validation caveats. |
 | [Security](docs/SECURITY.md) | Threat assumptions, secret handling, and security-sensitive controls. |

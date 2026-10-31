@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { Pool } = require('pg');
+const { migrationChecksum } = require('../../scripts/migration-checksum');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
@@ -19,10 +20,6 @@ const targetMigration = '0009_fix_content_item_slug_constraint.sql';
 
 function quoteIdentifier(value) {
   return `"${String(value).replace(/"/g, '""')}"`;
-}
-
-function migrationHash(sql) {
-  return crypto.createHash('sha256').update(sql).digest('hex');
 }
 
 test(
@@ -125,7 +122,7 @@ test(
             await client.query(
               `INSERT INTO systemfabric_schema_migrations(version, sha256)
                VALUES($1, $2)`,
-              [file, migrationHash(sql)]
+              [file, migrationChecksum(sql)]
             );
 
             await client.query('COMMIT');
@@ -295,7 +292,7 @@ test(
         assert.equal(registered.rows.length, 1);
         assert.equal(
           registered.rows[0].sha256,
-          migrationHash(migrationSql)
+          migrationChecksum(migrationSql)
         );
       } finally {
         verificationClient.release();

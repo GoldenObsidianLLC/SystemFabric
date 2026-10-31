@@ -9,6 +9,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Serialize live integration test files that share the dedicated PostgreSQL database and graph fixture, preventing cross-suite outbox/event cleanup races from making the Memgraph consumer-group test flaky.
 - Separate explicitly authenticated bearer sessions from cookie sessions; cookie-authenticated writes always undergo same-origin and CSRF validation even when an invalid bearer header is also supplied.
 - Pin CI runners to Ubuntu 24.04 and use full-commit SHA pins for current Node.js 24-compatible checkout, setup-node, and artifact-upload actions.
+- Seed the PostgreSQL migration-upgrade fixture with the shared line-ending-normalized checksum helper so Windows CRLF checkouts match the migration runner's checksum contract.
 - Expand tenant-isolation integration coverage for repeated and malformed site selectors, accepted matching route/header/query selectors, cross-site denial, response non-disclosure, and rejected-write side effects.
 
 ### Documentation and maintainability
@@ -17,6 +18,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Add task-oriented documentation for architecture, development setup, testing, security boundaries, roadmap, and release evidence.
 - Document README design standards and the influence of public README examples without copying their template text.
 - Add structured issue and pull-request templates to encourage reproducible reports and clear validation notes.
+- Add a linked first-contribution quickstart with verified setup commands, service prerequisites, safe troubleshooting, and issue-reporting guidance.
 
 ### Real-time and durable event foundation
 

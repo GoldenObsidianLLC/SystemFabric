@@ -6,6 +6,7 @@ This directory contains task-oriented documentation. The root [README](../README
 
 | If you need to… | Read |
 |---|---|
+| Make your first contribution from a fresh clone | [Contributor Quickstart](CONTRIBUTOR-QUICKSTART.md) |
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
 | Understand the project mission and human-AI symbiosis vision | [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) |
 | Apply the manifesto to product and engineering decisions | [Engineering Principles](SYSTEMFABRIC-PRINCIPLES.md) |
