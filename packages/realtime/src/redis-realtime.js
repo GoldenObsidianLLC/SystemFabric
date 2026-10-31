@@ -2,11 +2,15 @@
 
 const { randomUUID } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
+const { validateCollaborationOperation } = require('../../collaboration/src');
 
 const DEFAULT_CHANNEL_PREFIX = 'systemfabric:realtime:v1';
 const CHANNEL_PREFIX_RE = /^[A-Za-z0-9:_-]{1,96}$/;
 const EVENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESENCE_PAYLOAD = Object.freeze({ kind: 'presence.refresh' });
+const DOCUMENT_ID_RE = SITE_ID_RE;
+const DEFAULT_DOCUMENT_MESSAGE_BYTES = 16_384;
+const DEFAULT_DOCUMENT_INBOUND_QUEUE = 1_024;
 
 function safeErrorCode(error) {
   return String(error?.code || 'ERR_REDIS_CONNECTION').slice(0, 100);
@@ -38,6 +42,55 @@ function validateAuthorizationEnvelope(value, maxMessageBytes) {
   };
 }
 
+function validateDocumentEnvelope(value, expectedSiteId, expectedContentId, maxMessageBytes) {
+  if (typeof value !== 'string' || Buffer.byteLength(value) > maxMessageBytes ||
+      typeof expectedSiteId !== 'string' || !SITE_ID_RE.test(expectedSiteId) ||
+      typeof expectedContentId !== 'string' || !DOCUMENT_ID_RE.test(expectedContentId)) return null;
+
+  let envelope;
+  try { envelope = JSON.parse(value); } catch { return null; }
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) ||
+      Object.keys(envelope).some(key => ![
+        'schemaVersion', 'publisherId', 'eventId', 'siteId', 'contentId', 'topic', 'occurredAt', 'payload'
+      ].includes(key)) ||
+      envelope.schemaVersion !== 1 ||
+      !EVENT_ID_RE.test(envelope.publisherId || '') ||
+      !EVENT_ID_RE.test(envelope.eventId || '') ||
+      typeof envelope.siteId !== 'string' || !SITE_ID_RE.test(envelope.siteId) ||
+      envelope.siteId.toLowerCase() !== expectedSiteId.toLowerCase() ||
+      typeof envelope.contentId !== 'string' || !DOCUMENT_ID_RE.test(envelope.contentId) ||
+      envelope.contentId.toLowerCase() !== expectedContentId.toLowerCase() ||
+      envelope.topic !== 'document' ||
+      typeof envelope.occurredAt !== 'string' ||
+      !Number.isFinite(Date.parse(envelope.occurredAt))) return null;
+
+  const payload = envelope.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+      Object.keys(payload).some(key => !['kind', 'sequence', 'originConnectionId', 'operation'].includes(key)) ||
+      payload.kind !== 'document.operation' ||
+      !Number.isSafeInteger(payload.sequence) || payload.sequence < 1 ||
+      !(payload.originConnectionId === null ||
+        (typeof payload.originConnectionId === 'string' && EVENT_ID_RE.test(payload.originConnectionId)))) return null;
+
+  const operationValidation = validateCollaborationOperation(payload.operation);
+  if (!operationValidation.valid) return null;
+
+  return {
+    eventId: envelope.eventId.toLowerCase(),
+    publisherId: envelope.publisherId.toLowerCase(),
+    siteId: envelope.siteId.toLowerCase(),
+    contentId: envelope.contentId.toLowerCase(),
+    topic: 'document',
+    occurredAt: new Date(envelope.occurredAt).toISOString(),
+    payload: {
+      kind: 'document.operation',
+      sequence: payload.sequence,
+      originConnectionId: payload.originConnectionId === null ? null : payload.originConnectionId.toLowerCase(),
+      operation: payload.operation
+    }
+  };
+}
+
 function validatePresenceEnvelope(value, expectedSiteId, maxMessageBytes) {
   if (typeof value !== 'string' || Buffer.byteLength(value) > maxMessageBytes) return null;
   let envelope;
@@ -65,15 +118,17 @@ function validatePresenceEnvelope(value, expectedSiteId, maxMessageBytes) {
 }
 
 /**
- * Redis Pub/Sub bridge for small, ephemeral presence invalidations.
- * PostgreSQL remains the durable event source; this bridge carries no user,
- * session, resource or presence-record data.
+ * Redis Pub/Sub bridge for ephemeral presence/authorization hints and bounded
+ * document-operation notifications. PostgreSQL remains the durable source of
+ * collaboration state; this bridge carries no identity/session data or snapshots.
  */
 async function createRedisRealtimeBridge({
   url,
   channelPrefix = DEFAULT_CHANNEL_PREFIX,
   maxMessageBytes = 4_096,
   maxInboundQueue = 1_024,
+  maxDocumentMessageBytes = DEFAULT_DOCUMENT_MESSAGE_BYTES,
+  maxDocumentInboundQueue = DEFAULT_DOCUMENT_INBOUND_QUEUE,
   onError = () => {},
   createClient: createClientOverride,
   now = Date.now,
@@ -98,6 +153,12 @@ async function createRedisRealtimeBridge({
   if (!Number.isInteger(maxInboundQueue) || maxInboundQueue < 1 || maxInboundQueue > 10_000) {
     throw new RangeError('maxInboundQueue must be between 1 and 10000.');
   }
+  if (!Number.isInteger(maxDocumentMessageBytes) || maxDocumentMessageBytes < 256 || maxDocumentMessageBytes > 65_536) {
+    throw new RangeError('maxDocumentMessageBytes must be between 256 and 65536.');
+  }
+  if (!Number.isInteger(maxDocumentInboundQueue) || maxDocumentInboundQueue < 1 || maxDocumentInboundQueue > 10_000) {
+    throw new RangeError('maxDocumentInboundQueue must be between 1 and 10000.');
+  }
   if (typeof onError !== 'function' || typeof now !== 'function') {
     throw new TypeError('onError and now must be functions.');
   }
@@ -119,17 +180,23 @@ async function createRedisRealtimeBridge({
   const instanceId = randomUUID();
   const presencePattern = channelPrefix + ':*:presence';
   const authorizationPattern = channelPrefix + ':authorization';
+  const documentPattern = channelPrefix + ':*:document:*';
   let hub = null;
   let attached = false;
   let closed = false;
   let draining = false;
+  let drainingDocuments = false;
   const inbound = [];
+  const documentInbound = [];
 
   function incrementMetric(name, amount = 1) {
     try { metrics?.increment?.(name, amount); } catch {}
   }
   function setQueueGauge() {
     try { metrics?.setGauge?.('redis_inbound_queue_size', inbound.length); } catch {}
+  }
+  function setDocumentQueueGauge() {
+    try { metrics?.setGauge?.('redis_document_inbound_queue_size', documentInbound.length); } catch {}
   }
   function setRelayState(ready) {
     const clientsReady = Boolean(publisher.isReady ?? publisher.isOpen) && Boolean(subscriber.isReady ?? subscriber.isOpen);
@@ -170,6 +237,9 @@ async function createRedisRealtimeBridge({
   function channelFor(siteId) {
     return channelPrefix + ':' + siteId.toLowerCase() + ':presence';
   }
+  function channelForDocument(siteId, contentId) {
+    return channelPrefix + ':' + siteId.toLowerCase() + ':document:' + contentId.toLowerCase();
+  }
 
   async function drainInbound() {
     if (draining || closed) return;
@@ -206,6 +276,42 @@ async function createRedisRealtimeBridge({
     }
   }
 
+  async function drainDocumentInbound() {
+    if (drainingDocuments || closed) return;
+    drainingDocuments = true;
+    try {
+      while (documentInbound.length && !closed) {
+        const message = documentInbound.shift();
+        setDocumentQueueGauge();
+        const event = validateDocumentEnvelope(
+          message.message,
+          message.siteId,
+          message.contentId,
+          maxDocumentMessageBytes
+        );
+        if (!event) {
+          incrementMetric('redis_document_invalid_messages_total');
+          continue;
+        }
+        if (event.publisherId === instanceId) continue;
+        try {
+          await hub.publish({
+            siteId: event.siteId,
+            topic: 'document:' + event.contentId,
+            payload: event.payload,
+            eventId: event.eventId,
+            occurredAt: event.occurredAt
+          });
+        } catch (error) {
+          reportError(error);
+        }
+      }
+    } finally {
+      drainingDocuments = false;
+      if (documentInbound.length && !closed) void drainDocumentInbound();
+    }
+  }
+
   async function attach(targetHub) {
     if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
     if (!targetHub || typeof targetHub.publish !== 'function' || typeof targetHub.invalidateAuthorization !== 'function') {
@@ -232,6 +338,25 @@ async function createRedisRealtimeBridge({
           inbound.push({ kind, message, siteId: siteId.toLowerCase() });
           incrementMetric('redis_pubsub_messages_total');
           setQueueGauge();
+        } else if (kind === 'document') {
+          const prefix = channelPrefix + ':';
+          if (!channel.startsWith(prefix)) return;
+          const scope = /^([0-9a-f-]{36}):document:([0-9a-f-]{36})$/i.exec(channel.slice(prefix.length));
+          if (!scope || !SITE_ID_RE.test(scope[1]) || !DOCUMENT_ID_RE.test(scope[2])) return;
+          if (documentInbound.length >= maxDocumentInboundQueue) {
+            incrementMetric('redis_document_inbound_queue_overflows_total');
+            setDocumentQueueGauge();
+            return;
+          }
+          documentInbound.push({
+            message,
+            siteId: scope[1].toLowerCase(),
+            contentId: scope[2].toLowerCase()
+          });
+          incrementMetric('redis_document_pubsub_messages_total');
+          setDocumentQueueGauge();
+          void drainDocumentInbound();
+          return;
         } else {
           if (channel !== authorizationPattern) return;
           if (inbound.length >= maxInboundQueue) {
@@ -247,6 +372,7 @@ async function createRedisRealtimeBridge({
       };
       await subscriber.pSubscribe(presencePattern, (message, channel) => receive('presence', message, channel));
       await subscriber.pSubscribe(authorizationPattern, (message, channel) => receive('authorization', message, channel));
+      await subscriber.pSubscribe(documentPattern, (message, channel) => receive('document', message, channel));
       attached = true;
     } catch (error) {
       hub = null;
@@ -311,6 +437,92 @@ async function createRedisRealtimeBridge({
     }
   }
 
+  async function publishDocumentOperation({
+    siteId,
+    contentId,
+    sequence,
+    originConnectionId = null,
+    operation
+  } = {}) {
+    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
+    if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId) ||
+        typeof contentId !== 'string' || !DOCUMENT_ID_RE.test(contentId)) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SCOPE_INVALID', 'A valid site and document scope is required.');
+    }
+    if (!Number.isSafeInteger(sequence) || sequence < 1) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SEQUENCE_INVALID', 'A positive safe document sequence is required.');
+    }
+    if (originConnectionId !== null &&
+        (typeof originConnectionId !== 'string' || !EVENT_ID_RE.test(originConnectionId))) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_ORIGIN_INVALID', 'originConnectionId must be null or a UUID.');
+    }
+    const validation = validateCollaborationOperation(operation);
+    if (!validation.valid) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION', validation.errors.join('; '));
+    }
+
+    const envelope = {
+      schemaVersion: 1,
+      publisherId: instanceId,
+      eventId: randomUUID(),
+      siteId: siteId.toLowerCase(),
+      contentId: contentId.toLowerCase(),
+      topic: 'document',
+      occurredAt: new Date(now()).toISOString(),
+      payload: {
+        kind: 'document.operation',
+        sequence,
+        originConnectionId: originConnectionId === null ? null : originConnectionId.toLowerCase(),
+        operation
+      }
+    };
+    const serialized = JSON.stringify(envelope);
+    if (Buffer.byteLength(serialized, 'utf8') > maxDocumentMessageBytes) {
+      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Document operation envelope exceeds the configured size limit.');
+    }
+
+    const startedAt = now();
+    let local = { delivered: 0, revoked: 0, dropped: 0 };
+    let localDegraded = false;
+    try {
+      local = await hub.publish({
+        siteId: envelope.siteId,
+        topic: 'document:' + envelope.contentId,
+        payload: envelope.payload,
+        eventId: envelope.eventId,
+        occurredAt: envelope.occurredAt
+      });
+    } catch (error) {
+      localDegraded = true;
+      reportError(error);
+    }
+
+    try {
+      await publisher.publish(channelForDocument(envelope.siteId, envelope.contentId), serialized);
+      incrementMetric('redis_document_pubsub_publishes_total');
+      setRelayState(true);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - startedAt)); } catch {}
+      return {
+        ...local,
+        eventId: envelope.eventId,
+        relayPublished: true,
+        degraded: localDegraded
+      };
+    } catch (error) {
+      incrementMetric('redis_document_publish_failures_total');
+      incrementMetric('fanout_failures_total');
+      reportError(error);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - startedAt)); } catch {}
+      return {
+        ...local,
+        eventId: envelope.eventId,
+        relayPublished: false,
+        degraded: true
+      };
+    }
+  }
+
   async function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
     if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
     if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
@@ -356,7 +568,9 @@ async function createRedisRealtimeBridge({
     closed = true;
     setRelayState(false);
     inbound.length = 0;
+    documentInbound.length = 0;
     setQueueGauge();
+    setDocumentQueueGauge();
     const results = await Promise.allSettled([publisher, subscriber].map(async client => {
       try {
         if (client.isOpen && typeof client.quit === 'function') await client.quit();
@@ -373,10 +587,12 @@ async function createRedisRealtimeBridge({
   return Object.freeze({
     attach,
     publish,
+    publishDocumentOperation,
     invalidateAuthorization,
     close,
     get instanceId() { return instanceId; },
     get inboundQueueSize() { return inbound.length; },
+    get documentInboundQueueSize() { return documentInbound.length; },
     get isReady() { return attached && !closed && Boolean(publisher.isReady ?? publisher.isOpen) && Boolean(subscriber.isReady ?? subscriber.isOpen); }
   });
 }
@@ -385,5 +601,8 @@ module.exports = {
   DEFAULT_CHANNEL_PREFIX,
   createRedisRealtimeBridge,
   validatePresenceEnvelope,
-  validateAuthorizationEnvelope
+  validateAuthorizationEnvelope,
+  validateDocumentEnvelope,
+  DEFAULT_DOCUMENT_MESSAGE_BYTES,
+  DEFAULT_DOCUMENT_INBOUND_QUEUE
 };
