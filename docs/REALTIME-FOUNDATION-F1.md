@@ -1,11 +1,11 @@
-# Real-Time Foundation 1: Presence and Collaboration Previews
+# Real-Time Foundation 1: Presence and Collaborative Document Previews
 
-**Status:** Implemented developer-preview foundation and F1.9 collaborative CMS correctness proof; not production-certified
-**Working branch:** `feat/f1-9-collaborative-cms`
+**Status:** Implemented developer-preview foundation, F1.9 collaborative CMS correctness proof and F1.10 cross-instance document delivery proof; not production-certified
+**Working branch:** `feat/f1-10-cross-instance-collaboration`
 **Baseline:** SystemFabric 0.5.1
-**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery; Foundation 1.9 draft-only semantic OT, PostgreSQL operation sequencing, authenticated document REST/WebSocket protocol and two-session browser proof.
+**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery; Foundation 1.9 draft-only semantic OT, PostgreSQL operation sequencing, authenticated document REST/WebSocket protocol and two-session browser proof; Foundation 1.10 bounded Redis document-operation hints, shared REST/WebSocket publication, cross-instance heartbeat repair and two-node 2/5/10-editor browser proof.
 
-This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source and the canonical sequencer for collaborative draft operations. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh plus authorization invalidation; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. F1.9 adds a process-local live document notification path plus durable PostgreSQL reconnect/sync, but not cross-instance live document fan-out or production certification.
+This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source and the canonical sequencer/materialized store for collaborative draft operations. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh, authorization invalidation and bounded document-operation notifications; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. F1.10 extends document notifications across API instances without moving the operation log or acknowledgement source out of PostgreSQL. Dropped, duplicate or out-of-order hints are repaired from the per-document sequence on heartbeat, sequence gap or reconnect. This remains a developer-preview correctness/load baseline, not production certification.
 
 ## 1. Implemented components
 
@@ -14,8 +14,10 @@ This developer-preview track creates reusable seams for SystemFabric while keepi
 | Event hub | `packages/realtime/src/event-hub.js` | Site/topic-scoped fan-out, async subscriptions, bounded queues, authorization checks and targeted subscription invalidation |
 | Presence service | `packages/realtime/src/presence.js` | Session leases, heartbeat renewal, multi-session aggregation, hidden-state filtering |
 | SSE gateway | `packages/realtime/src/sse-gateway.js` | SSE fallback, shared connection quota leases, periodic session/capability reauthorization, backpressure handling and snapshot-refresh recovery |
-| WebSocket gateway | `packages/realtime/src/websocket-gateway.js` | Authenticated presence commands, periodic reauthorization, ping/pong liveness, bounded frames/rates/buffers and cleanup |
+| WebSocket gateway | `packages/realtime/src/websocket-gateway.js` | Authenticated presence and draft-document commands, per-document replay/heartbeat reconciliation, origin-echo suppression, periodic reauthorization, ping/pong liveness, bounded frames/rates/buffers and cleanup |
 | Connection quota | `packages/realtime/src/connection-quota.js` | Global/site/principal leases with memory preview and atomic Redis Lua adapter; lease expiry reclaims crashed connections |
+| Redis realtime bridge | `packages/realtime/src/redis-realtime.js` | Shared ephemeral presence/authorization hints and strictly validated, bounded document-operation notifications; local-first publish and independent ingress queues |
+| Collaboration sequencer | `packages/db/src/postgres-store.js` | Canonical per-document operation sequence, accepted history, transactionally materialized document and reconnect/sync authority |
 | Transport protocol | `packages/realtime/src/realtime-protocol.js` | Versioned ready/reconnect contract with explicit snapshot-refresh semantics |
 | Package exports | `packages/realtime/src/index.js` | Stable module entry point |
 | API integration | `apps/api/src/server.js` | Authenticated site-scoped preview endpoints |
@@ -445,3 +447,43 @@ WebSocket document notifications are process-local in F1.9. An operation committ
 - REST/WebSocket tests cover site/draft/capability boundaries, session-derived actor identity, 12 KiB operation and 16 KiB frame boundaries, document-topic isolation, replay-on-join, reload snapshots, authorization revocation and disconnect cleanup.
 - A Playwright test with two separate cookie-authenticated Chromium contexts and actual browser WebSockets proves concurrent property edits converge; it also proves an unacknowledged accepted op can be replayed and safely retried, and that an expired replay cursor installs a canonical snapshot. The browser proof uses an in-memory store and does not access PostgreSQL.
 - F1.9 remains a developer-preview correctness proof. The 2/5/10-editor load matrix, multi-instance live document fan-out/recovery under node loss, browser/proxy reconnect soak, independent security review, accessibility review, retention/backup runbooks and production operational ownership remain open. Production remains NO-GO.
+
+
+## 10. Cross-instance collaborative document notifications (F1.10)
+
+F1.10 extends the F1.9 draft-only semantic-OT path across multiple API instances. PostgreSQL remains the authoritative operation sequencer, idempotency store, accepted-operation history and canonical materialized document. Redis Pub/Sub carries only bounded, ephemeral operation notifications to connected peers on other API instances. It is not the durable operation log, acknowledgement source or recovery cursor.
+
+### Redis document channel contract
+
+- Each document notification is published to `<channelPrefix>:<siteId>:document:<contentId>`. The subscriber pattern is `<channelPrefix>:*:document:*`; the bridge re-parses and validates both UUIDs from the channel and envelope before dispatch.
+- The version-1 JSON envelope contains only `schemaVersion`, `publisherId`, `eventId`, `siteId`, `contentId`, `topic`, `occurredAt` and the operation notification `payload`. The payload contains `kind=document.operation`, a positive per-document `sequence`, a nullable server connection-origin UUID and the validated semantic operation.
+- The complete Redis envelope is bounded to 16 KiB. The operation validator independently enforces the 12 KiB operation limit. The bridge rejects unknown fields, malformed UUIDs/timestamps, channel/envelope scope mismatch and unsupported operation payloads.
+- Presence/authorization ingress retains its own queue. Document ingress uses a separate bounded queue (default 1,024, configurable up to 10,000) and a dedicated drain loop, so a burst of document operations cannot starve authorization invalidations or presence refreshes. The queue is lossy by design: overflow or Redis outage is repaired by PostgreSQL sync, not by an unbounded in-memory backlog.
+- The bridge suppresses a publisher's own Redis subscription echo using its private publisher UUID. The local hub receives the event before the Redis publish is attempted. A publish interruption therefore does not suppress same-instance delivery; the publisher result records `relayPublished=false` and `degraded=true`.
+- The REST and WebSocket operation paths use the same injected document-publisher seam. A durable PostgreSQL commit is acknowledged even when remote Pub/Sub publication fails; the WebSocket acknowledgement exposes `fanoutDegraded`, while peers on other nodes reconcile from PostgreSQL.
+
+### Sequence repair and origin handling
+
+- Each WebSocket document subscription has an independently monotonic `lastSequence`. Duplicate or stale Pub/Sub hints at or below that sequence are ignored.
+- A hint that skips one or more sequence numbers triggers a sync from the current last sequence before the hint is considered. The gateway sends accepted operations in PostgreSQL order and then discards an already-covered out-of-order hint.
+- Each document subscription also performs a bounded PostgreSQL reconciliation on the connection heartbeat, even when no later operation arrives. One `reconcilePromise` per document subscription makes heartbeat and immediate gap recovery share a single in-flight sync rather than issuing overlapping queries. A transient sync failure reports a bounded `document.sync.degraded` notice and leaves the subscription available for the next heartbeat.
+- WebSocket-originated notifications carry the server-generated connection UUID. The origin socket does not need an echo because its post-commit acknowledgement includes the exact transformed operation. A bounded 1,000-entry per-subscription opId set also prevents a sequence-gap PostgreSQL replay from repeating an operation already acknowledged to that socket. This is separate from the durable idempotency keys in PostgreSQL.
+- REST-originated operations have no WebSocket connection origin and can reach any authorized live socket, including sockets on the API instance that handled the REST call.
+- On reconnect or node loss, the client joins any healthy API instance with its last sequence. The API subscribes to the Redis document topic before fetching the PostgreSQL sync, closing the join/snapshot race. If the replay cursor has expired, the canonical reload snapshot is sent instead of speculative transformation.
+
+### Observability
+
+The bounded metric registry includes document Pub/Sub publish/message/failure/invalid/queue-overflow counters, document ingress queue gauges, bridge-ready/degraded gauges, plus WebSocket sequence-reconciliation, recovered-operation, reload-required and sync-failure counters. Labels remain fixed-name and low-cardinality; no user, site, session or document identifiers are added as metric labels.
+
+### F1.10 validation evidence recorded on 2026-10-31
+
+- Live loopback Redis integration: 2/2 pass using `redis://127.0.0.1:6379` only, with independent bridge/client pairs, random per-test channel prefixes, same-document cross-instance fan-out, strict site/document isolation, self-echo behavior, and an injected Redis PUBLISH failure after local delivery. The gate rejects non-loopback Redis URLs and URLs containing credentials/query/hash. No Redis database flush or key scan is performed.
+- Real-browser two-node proof: 3/3 Playwright tests pass on Chrome 156.0.8078.48. Separate API servers have independent hubs/bridges, isolated cookie sessions, and a shared in-memory content store; the browser suite does not open PostgreSQL or the application's configured database.
+- Scenarios include A-to-B and B-to-A delivery, cross-site/document isolation, heartbeat repair after a deliberately dropped Redis hint with no later operation, sequence-2-before-sequence-1 reconciliation, duplicate/stale hint suppression, and reconnect to the surviving API node after the first node closes.
+- The 2/5/10-editor matrix passed on two API instances with no missing or duplicate peer sequence and canonical document convergence. The local harness recorded 153 peer-delivery samples with p50 1,347 ms, p95 2,575 ms and p99 2,620 ms; the dropped-hint heartbeat repair in the same harness completed in approximately 3.57 seconds with a 5-second heartbeat setting. These values are repeatable test-harness observations, not production capacity SLOs or a deployment benchmark.
+- Focused real-time/collaboration suite: 63/63 pass, including 2/2 live Redis integration tests and the sender-echo sequence-gap regression. Full `npm run check`: 206/206; artifact verification checked 141 required paths and 138 JavaScript files.
+- No F1.10 migration, package dependency, primary-database operation or production Redis operation was performed. The browser E2E uses in-memory content/identity fixtures; the live Redis integration uses only loopback Redis.
+
+### Remaining production gates
+
+F1.10 proves the notification and reconciliation behavior in a local two-process harness. It does not certify Redis Cluster topology, broker/network partitions, rolling-deploy or process-crash recovery under production load, autoscaling, durable notification delivery or operational capacity. The 2/5/10 matrix is a correctness check, not a large-scale benchmark. Still required: deployment-specific sustained/peak load and reconnect soak, Redis Cluster slot/failover and network-partition review, node-loss/rolling-deploy rehearsal with the real orchestration platform, adversarial authorization/security review, accessibility/browser review, backup/retention and alert/runbook ownership. Production remains NO-GO.

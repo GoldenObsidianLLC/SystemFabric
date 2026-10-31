@@ -256,26 +256,26 @@ git commit -m "test(collaboration): prove multi-instance redis recovery"
 - Consumes: bridge, publisher, reconciliation and multi-instance evidence from Tasks 1–4.
 - Produces: F1.10 architecture/release-gate documentation and a clean local feature branch.
 
-- [ ] **Step 1: Document F1.10 behavior and limits**
+- [x] **Step 1: Document F1.10 behavior and limits**
 
 Record the channel/envelope contract, separate queue and bounds, Redis ephemeral semantics, PostgreSQL heartbeat repair, origin echo handling, metrics, tests and explicitly unclosed production gates. Update ADR-019 and the roadmap only for behaviors demonstrated by tests.
 
-- [ ] **Step 2: Run focused and full verification**
+- [x] **Step 2: Run focused and full verification**
 
 Run:
-- `node --test test/redis-realtime.test.js test/realtime.test.js test/collaboration.test.js test/collaboration-api.test.js test/realtime-websocket.test.js`
-- Explicit local Redis integration test from Task 4.
-- Multi-instance Playwright test from Task 4.
-- `npm run check`
-- `git diff --check`
+- `node --test test/redis-realtime.test.js test/realtime.test.js test/collaboration.test.js test/collaboration-api.test.js test/realtime-websocket.test.js test/integration/redis-collaboration.integration.test.js` → 63/63 (includes both live loopback Redis tests, zero skips).
+- Multi-instance Playwright test `test/e2e/collaboration-multinode.spec.js` → 3/3 on Chrome channel 156.0.8078.48; includes 2/5/10 editor matrix and records 153 peer-delivery samples.
+- F1.9 regression browser proof `test/e2e/collaboration.spec.js` → 1/1 on Chrome channel 156.0.8078.48.
+- `npm run check` → 206/206; artifact check: 141 required paths and 138 JavaScript files syntax-checked.
+- `git diff --check` → pass.
 
 Expected: all focused, local Redis, browser and full repository checks pass; no primary database, migration or deployment operation occurs.
 
-- [ ] **Step 3: Perform whole-branch review**
+- [x] **Step 3: Perform whole-branch review**
 
 Read the spec and review the complete diff from the F1.9 base. Focus on channel selector mismatch, sensitive envelope fields, queue starvation, Redis publish failure after commit, sequence races, heartbeat single-flight and reconnect behavior. Record self-review because no independent subagent is available.
 
-- [ ] **Step 4: Commit documentation and close out F1.10**
+- [x] **Step 4: Commit documentation and close out F1.10**
 
 ```bash
 git add docs/REALTIME-FOUNDATION-F1.md docs/REALTIME-AI-ARCHITECTURE.md docs/ARCHITECTURE-DECISIONS.md docs/ROADMAP.md CHANGELOG.md

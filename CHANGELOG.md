@@ -64,6 +64,16 @@ All notable project-level changes should be recorded here. This changelog does n
 - Prove concurrent edits, convergence, lost-ack idempotent retry, reconnect replay and expired-history reload using two separate cookie-authenticated browser contexts and real Chromium WebSocket connections.
 - Production remains NO-GO pending multi-instance fan-out/recovery, the 2/5/10-editor load matrix, reconnect soak, independent security/accessibility review, backup/retention runbooks and operational ownership.
 
+### Cross-instance collaborative document delivery (F1.10)
+
+- Extend the shared Redis realtime bridge with a strictly validated document-operation channel scoped by site and content UUID. Operation notifications are bounded to 16 KiB, use a separate bounded ingress queue and carry the PostgreSQL-accepted sequence plus a server-generated WebSocket origin selector.
+- Share one document-publisher adapter across REST and WebSocket operations; publish to same-instance subscribers before attempting ephemeral Redis fan-out, and acknowledge a committed operation as degraded rather than failing the durable write when Redis publication is interrupted.
+- Reconcile each active document subscription from PostgreSQL on sequence gaps and on the bounded WebSocket heartbeat. Use one in-flight sync per document subscription, filter duplicate/stale sequence hints, recover dropped/reordered notifications and avoid re-echoing operations already acknowledged to the originating socket.
+- Add live loopback-Redis integration coverage for two independent bridge/hub pairs, same-document fan-out, site/document isolation, self-echo suppression and local-first degraded publication.
+- Add two-API-instance Playwright coverage for A↔B browser WebSocket delivery, scope isolation, dropped-hint heartbeat recovery, reordered/duplicate hints, node loss/reconnect and the 2/5/10-editor convergence matrix. Record local-harness peer-delivery samples (153 samples: p50 1,347 ms, p95 2,575 ms, p99 2,620 ms); this is correctness evidence, not a production capacity benchmark.
+- A focused gateway regression test covers a gap-replay that includes the origin socket's already-acknowledged operation; a bounded 1,000-entry per-subscription opId set suppresses the duplicate while preserving the missing remote sequence.
+- Production remains NO-GO pending Redis Cluster/partition/failover validation, sustained load beyond the 2/5/10 matrix, orchestrated rolling-deploy/node-loss rehearsal, browser/proxy soak, independent security/accessibility review and operational runbooks/ownership.
+
 ### Release engineering and local validation
 
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.
