@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const { randomUUID } = require('node:crypto');
+const WebSocket = require('ws');
 const {
   makeId,
   initialDocument,
@@ -72,6 +73,108 @@ async function closeClients(clients) {
     await client.page.evaluate(() => window.__systemfabricCollaboration?.close()).catch(() => {});
     await client.context.close().catch(() => {});
   }
+}
+
+function createRawCollaborationClient(socket) {
+  const messages = [];
+  const waiters = [];
+  const matches = (type, message) => type === 'document.operation.any'
+    ? ['document.operation', 'document.sync.operation'].includes(message.type)
+    : message.type === type;
+
+  const client = {
+    socket,
+    messages,
+    waitFor(type, timeoutMs = 3_000) {
+      const index = messages.findIndex(message => matches(type, message));
+      if (index >= 0) return Promise.resolve(messages.splice(index, 1)[0]);
+      return new Promise((resolve, reject) => {
+        const waiter = { type, resolve, timer: null };
+        waiter.timer = setTimeout(() => {
+          const pendingIndex = waiters.indexOf(waiter);
+          if (pendingIndex >= 0) waiters.splice(pendingIndex, 1);
+          reject(new Error('Timed out waiting for WebSocket message: ' + type));
+        }, timeoutMs);
+        waiters.push(waiter);
+      });
+    },
+    send(command) {
+      if (socket.readyState !== WebSocket.OPEN) throw new Error('WebSocket is not open');
+      socket.send(JSON.stringify(command));
+    },
+    close() {
+      if (socket.readyState === WebSocket.CLOSED) return Promise.resolve();
+      return new Promise(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(fallback);
+          resolve();
+        };
+        const fallback = setTimeout(() => {
+          socket.terminate();
+          finish();
+        }, 1_000);
+        socket.once('close', finish);
+        if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
+        else if (socket.readyState === WebSocket.OPEN) socket.close();
+      });
+    }
+  };
+
+  socket.on('message', data => {
+    const message = JSON.parse(data.toString());
+    const waiterIndex = waiters.findIndex(waiter => matches(waiter.type, message));
+    if (waiterIndex >= 0) {
+      const [waiter] = waiters.splice(waiterIndex, 1);
+      clearTimeout(waiter.timer);
+      waiter.resolve(message);
+    } else {
+      messages.push(message);
+    }
+  });
+  socket.on('error', error => {
+    for (const waiter of waiters.splice(0)) {
+      clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
+  });
+  return client;
+}
+
+async function openRawCollaborationClient({ baseUrl, siteId, contentId, sessionNumber, clientId, afterSequence = 0 }) {
+  const wsUrl = baseUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
+    + '/api/v1/sites/' + siteId + '/realtime/ws';
+  const socket = new WebSocket(wsUrl, {
+    headers: {
+      origin: baseUrl,
+      cookie: 'sf_session=f1-10-session-' + sessionNumber
+    }
+  });
+  const client = createRawCollaborationClient(socket);
+  await new Promise((resolve, reject) => {
+    const onOpen = () => {
+      socket.off('error', onError);
+      resolve();
+    };
+    const onError = error => {
+      socket.off('open', onOpen);
+      reject(error);
+    };
+    socket.once('open', onOpen);
+    socket.once('error', onError);
+    socket.once('unexpected-response', (_request, response) => {
+      socket.off('open', onOpen);
+      response.resume();
+      reject(new Error('WebSocket upgrade rejected with ' + response.statusCode));
+    });
+  });
+  await client.waitFor('connection.ready');
+  client.send({ type: 'document.join', contentId, afterSequence });
+  client.joined = await client.waitFor('document.joined');
+  client.clientId = clientId;
+  return client;
 }
 
 async function startTwoNodes({ siteIds = [SITE_A], dropNextOnA = false } = {}) {
@@ -375,6 +478,114 @@ test('2/5/10 editor matrix across two API instances converges without duplicate 
   } finally {
     await closeClients(clients);
     await runtime.nodeA.close();
+    await runtime.nodeB.close();
+  }
+});
+
+
+test('two-node loss recovers a ten-editor reconnect storm from shared operation history', async () => {
+  test.setTimeout(120_000);
+  const runtime = await startTwoNodes({ siteIds: [SITE_A] });
+  const clients = [];
+  const editorCount = 10;
+  const replayCount = 24;
+  try {
+    for (let index = 1; index <= editorCount; index += 1) {
+      clients.push(await openRawCollaborationClient({
+        baseUrl: index % 2 === 1 ? runtime.nodeA.baseUrl : runtime.nodeB.baseUrl,
+        siteId: SITE_A,
+        contentId: CONTENT_A,
+        sessionNumber: index,
+        clientId: 'reconnect-storm-editor-' + index
+      }));
+    }
+
+    for (let sequence = 1; sequence <= replayCount; sequence += 1) {
+      const committed = await runtime.store.applyCollaborationOperation({
+        siteId: SITE_A,
+        contentId: CONTENT_A,
+        actorId: makeId(101),
+        operation: titleOperation({
+          number: 34000 + sequence,
+          clientId: 'durable-seed-' + sequence,
+          baseSequence: sequence - 1,
+          title: 'Durable reconnect state ' + sequence
+        })
+      });
+      expect(committed.sequence).toBe(sequence);
+    }
+
+    // Stop one API replica, then reconnect every session to the survivor.
+    await runtime.nodeA.close();
+    await Promise.all(clients.map(client => client.close()));
+    clients.length = 0;
+
+    const reconnectStartedAt = Date.now();
+    const reconnected = await Promise.all(Array.from({ length: editorCount }, (_, index) =>
+      openRawCollaborationClient({
+        baseUrl: runtime.nodeB.baseUrl,
+        siteId: SITE_A,
+        contentId: CONTENT_A,
+        sessionNumber: index + 1,
+        clientId: 'reconnected-editor-' + (index + 1),
+        afterSequence: 0
+      })
+    ));
+    clients.push(...reconnected);
+
+    for (const client of reconnected) {
+      expect(client.joined.sequence).toBe(replayCount);
+    }
+    await Promise.all(reconnected.map(async client => {
+      for (let sequence = 1; sequence <= replayCount; sequence += 1) {
+        const replayed = await client.waitFor('document.operation.any', 15_000);
+        expect(replayed.sequence).toBe(sequence);
+        expect(replayed.operation.payload.title).toBe('Durable reconnect state ' + sequence);
+      }
+    }));
+
+    const replayRecoveryMs = Date.now() - reconnectStartedAt;
+    const finalOperation = titleOperation({
+      number: 35001,
+      clientId: 'reconnected-editor-1',
+      baseSequence: replayCount,
+      title: 'Edits continue after reconnect storm'
+    });
+    reconnected[0].send({
+      type: 'document.operation',
+      contentId: CONTENT_A,
+      operation: finalOperation
+    });
+    const acknowledgement = await reconnected[0].waitFor('document.operation.ack');
+    expect(acknowledgement.sequence).toBe(replayCount + 1);
+    expect(acknowledgement.operation.payload.title).toBe(finalOperation.payload.title);
+
+    const peerUpdates = await Promise.all(reconnected.slice(1).map(client =>
+      client.waitFor('document.operation.any', 10_000)
+    ));
+    expect(peerUpdates.map(message => message.sequence)).toEqual(
+      Array(editorCount - 1).fill(replayCount + 1)
+    );
+
+    expect(peerUpdates.map(message => message.operation.payload.title)).toEqual(
+      Array(editorCount - 1).fill(finalOperation.payload.title)
+    );
+    expect(runtime.store.snapshot({ siteId: SITE_A, contentId: CONTENT_A }).document.title)
+      .toBe(finalOperation.payload.title);
+
+    console.log(JSON.stringify({
+      scenario: 'two-node-ten-editor-reconnect-storm',
+      failedApiNode: 'A',
+      survivingApiNode: 'B',
+      reconnectingEditors: editorCount,
+      replayedOperationsPerEditor: replayCount,
+      totalReplayDeliveries: editorCount * replayCount,
+      recoveryLatencyMs: replayRecoveryMs,
+      postRecoveryOperationSequence: acknowledgement.sequence
+    }));
+  } finally {
+    await Promise.all(clients.map(client => client.close().catch(() => {})));
+    await runtime.nodeA.close().catch(() => {});
     await runtime.nodeB.close();
   }
 });

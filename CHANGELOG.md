@@ -74,6 +74,15 @@ All notable project-level changes should be recorded here. This changelog does n
 - A focused gateway regression test covers a gap-replay that includes the origin socket's already-acknowledged operation; a bounded 1,000-entry per-subscription opId set suppresses the duplicate while preserving the missing remote sequence.
 - Production remains NO-GO pending Redis Cluster/partition/failover validation, sustained load beyond the 2/5/10 matrix, orchestrated rolling-deploy/node-loss rehearsal, browser/proxy soak, independent security/accessibility review and operational runbooks/ownership.
 
+### Collaboration resilience qualification (F1.11)
+
+- Add an opt-in, loopback-only real-Redis failure/recovery test proving that a one-shot document PUBLISH failure preserves local delivery and that a subsequent publish restores bridge readiness.
+- Add a bounded sustained fan-out integration test. Local Memurai/Redis validation delivered 2,000 operations to ten subscribers (20,000/20,000 deliveries) at approximately 69 publications/second, with p50/p95/p99 subscriber delivery latency of 0.98/1.45/1.93 ms and zero document-ingress or slow-consumer queue overflows. These are local harness observations, not production capacity or SLO claims.
+- Add a ten-session WebSocket reconnect-storm check after one local API instance is stopped. Each session replays 24 stored operations in order (240 deliveries), and a subsequent sequence-25 operation reaches all peers; measured reconnect/replay interval was 529 ms using an in-memory test store.
+- Re-run the browser-backed 2/5/10 editor matrix independently: 1/1 pass with 153 samples (p50/p95/p99: 1,613/3,123/3,189 ms). A combined Chrome rerun encountered host page-resource failures, so the full browser set must be rerun on clean CI before release.
+- Focused collaboration/realtime unit tests passed 61/61; full `npm run check` passed 206/206, with 141 required paths and 139 JavaScript files syntax-checked. The F1.9 two-session browser collaboration regression passed 1/1.
+- Production remains NO-GO pending Redis Cluster/network-partition and orchestrator failover rehearsals, sustained production-shaped load and soak, complete browser-suite validation on clean CI, independent security/accessibility review, and owned operational runbooks.
+
 ### Release engineering and local validation
 
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.
