@@ -315,8 +315,12 @@ report.releaseClassification = report.readyForProduction ? 'PRODUCTION_RELEASE_G
 const jsonFile = path.join(artifactsDir, 'release-readiness.json');
 const markdownFile = path.join(artifactsDir, 'release-readiness.md');
 fs.writeFileSync(jsonFile, `${JSON.stringify(report, null, 2)}\n`);
-const rows = [...report.checks, ...report.evidenceGates].map(item => `| ${item.title.replace(/\|/g, '\\|')} | **${item.status}** | ${item.details.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`).join('\n');
-const supplementalRows = report.supplementalEvidence.map(item => `| ${item.title.replace(/\|/g, '\\|')} | **${item.status}** | ${item.details.replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`).join('\n');
+const escapeMarkdownTableCell = (value) => String(value)
+  .replace(/\\/g, '\\\\')
+  .replace(/\|/g, '\\|')
+  .replace(/\r?\n/g, ' ');
+const rows = [...report.checks, ...report.evidenceGates].map(item => `| ${escapeMarkdownTableCell(item.title)} | **${item.status}** | ${escapeMarkdownTableCell(item.details)} |`).join('\n');
+const supplementalRows = report.supplementalEvidence.map(item => `| ${escapeMarkdownTableCell(item.title)} | **${item.status}** | ${escapeMarkdownTableCell(item.details)} |`).join('\n');
 const markdown = `# SystemFabric ${pkg.version} — Release Readiness Report\n\n- Generated: ${report.generatedAt}\n- Node.js: ${process.version} (${process.platform}/${process.arch})\n- Production-ready: **${report.readyForProduction ? 'YES' : 'NO'}**\n- Release classification: \`${report.releaseClassification}\`\n- Summary: ${report.summary.pass} pass; ${report.summary.partial} partial; ${report.summary.blocked} blocked; ${report.summary.missingEvidence} missing evidence; ${report.summary.notRun} not run.\n\n> A successful source test suite does not substitute for live integrations, independent review, deployment drills, or parity acceptance. Missing or skipped evidence is not a pass.\n\n| Gate | Status | Details |\n|---|---|---|\n${rows}\n\n## Supplemental local evidence (not included in the formal gate count)\n\nThese additional local checks passed. They do not replace the independent/external acceptance gates above.\n\n| Local check | Status | Details |\n|---|---|---|\n${supplementalRows}\n\nJSON source of truth: \`artifacts/release-readiness.json\`. See \`docs/RELEASE-EVIDENCE.md\` for evidence format.\n`;
 fs.writeFileSync(markdownFile, markdown);
 console.log(markdown);
