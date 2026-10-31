@@ -148,7 +148,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, logger = console } = {}) {
+function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, logger = console } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -163,6 +163,9 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
   const devToken = env.SYSTEMFABRIC_API_TOKEN;
   const realtimeBridge = injectedRealtimeBridge || null;
+  if (injectedDocumentPublisher !== undefined && injectedDocumentPublisher !== null && typeof injectedDocumentPublisher !== 'function') {
+    throw new TypeError('publishDocumentOperation must be a function when provided.');
+  }
   let realtimeHub = null;
   const maxBody = boundedInt(env.MAX_REQUEST_BYTES, MAX_BODY_DEFAULT, 1_024, 16 * 1024 * 1024, 'MAX_REQUEST_BYTES');
   const maxMediaBody = Math.max(maxBody, MAX_MEDIA_BODY);
@@ -218,6 +221,16 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedRealtimeConnectionLimiter) {
     throw new Error('Redis-backed real-time requires a distributed connection-quota adapter; memory quotas are not valid for multi-instance mode.');
   }
+  if (realtimeEnabled && configuredPresenceStore === 'redis' &&
+      typeof realtimeBridge?.publishDocumentOperation !== 'function') {
+    throw new Error('Redis-backed real-time requires a realtimeBridge with publishDocumentOperation().');
+  }
+  if (realtimeEnabled && env.NODE_ENV === 'production' &&
+      (realtimeBridge
+        ? typeof realtimeBridge.publishDocumentOperation !== 'function'
+        : typeof injectedDocumentPublisher !== 'function')) {
+    throw new Error('Production real-time requires a document publisher backed by the distributed realtime bridge.');
+  }
   realtimeHub = injectedRealtimeHub || (realtimeEnabled && env.NODE_ENV !== 'production'
     ? createRealtimeHub({
       authorizeSubscribe: async ({ principal, sessionId, siteId, topic }) => {
@@ -257,6 +270,24 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       leaseMs: boundedInt(env.SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS, 45_000, 5_000, 300_000, 'SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS'),
       metrics: realtimeMetrics
     }) : null);
+  const documentPublisher = injectedDocumentPublisher
+    || (realtimeBridge && typeof realtimeBridge.publishDocumentOperation === 'function'
+      ? input => realtimeBridge.publishDocumentOperation(input)
+      : realtimeHub
+        ? async ({ siteId, contentId, sequence, originConnectionId = null, operation }) => {
+          const local = await realtimeHub.publish({
+            siteId,
+            topic: 'document:' + contentId,
+            payload: {
+              kind: 'document.operation',
+              sequence,
+              originConnectionId,
+              operation
+            }
+          });
+          return { ...local, relayPublished: null, degraded: false };
+        }
+        : null);
   const realtimeGateway = realtimeHub ? createSseGateway({ hub: realtimeHub, metrics: realtimeMetrics, connectionLimiter: realtimeConnectionLimiter }) : null;
   const realtimeWebSocketGateway = realtimeHub && presence ? createWebSocketGateway({
     hub: realtimeHub,
@@ -265,6 +296,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     authorizeDocument: authorizeCollaborationDocument,
     connectionLimiter: realtimeConnectionLimiter,
     publishPresence: realtimeBridge ? input => realtimeBridge.publish(input) : input => realtimeHub.publish(input),
+    publishDocumentOperation: documentPublisher,
     metrics: realtimeMetrics
   }) : null;
   const realtimeBridgeReady = realtimeBridge ? Promise.resolve().then(() => realtimeBridge.attach(realtimeHub)) : Promise.resolve();
@@ -1313,18 +1345,16 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
             return sendJson(res, 409, { ...result, code: 'ERR_SYSTEMFABRIC_COLLABORATION_RELOAD_REQUIRED', requestId });
           }
           let fanoutDegraded = false;
-          if (!result.duplicate && realtimeHub) {
+          if (!result.duplicate && documentPublisher) {
             try {
-              await realtimeHub.publish({
+              const publication = await documentPublisher({
                 siteId,
-                topic: 'document:' + contentId,
-                payload: {
-                  kind: 'document.operation',
-                  sequence: result.sequence,
-                  originConnectionId: null,
-                  operation: result.operation
-                }
+                contentId,
+                sequence: result.sequence,
+                originConnectionId: null,
+                operation: result.operation
               });
+              fanoutDegraded = publication?.degraded === true;
             } catch {
               fanoutDegraded = true;
             }

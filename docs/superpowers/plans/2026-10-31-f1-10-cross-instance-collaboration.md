@@ -100,7 +100,7 @@ git commit -m "feat(realtime): relay bounded document operations through redis"
 - Consumes: Task 1 `bridge.publishDocumentOperation({ siteId, contentId, sequence, originConnectionId, operation })`.
 - Produces: one injected `publishDocumentOperation` callback used by both REST and WebSocket commit paths. Local-only mode adapts to `realtimeHub.publish`; Redis mode delegates to the bridge.
 
-- [ ] **Step 1: Write failing REST and WebSocket publisher-injection tests**
+- [x] **Step 1: Write failing REST and WebSocket publisher-injection tests**
 
 Add tests that inject a document publisher and assert:
 - REST operation submission calls it once with the site, page, committed sequence, null origin and transformed operation.
@@ -108,12 +108,12 @@ Add tests that inject a document publisher and assert:
 - A returned degraded result is included as `fanoutDegraded: true` while the committed acknowledgement remains successful.
 - Redis mode refuses an injected realtime bridge that lacks `publishDocumentOperation`; local memory-preview mode still works without a Redis bridge.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `node --test test/collaboration-api.test.js test/realtime-websocket.test.js`
-Expected: FAIL because both commit paths still call the local hub directly.
+Expected: RED on REST `fanoutDegraded`, WS `fanoutDegraded`, and Redis bridge missing publisher checks (22 pass / 3 fail).
 
-- [ ] **Step 3: Implement the shared publisher seam**
+- [x] **Step 3: Implement the shared publisher seam**
 
 In `apps/api/src/server.js`:
 - Build one callback that delegates to `realtimeBridge.publishDocumentOperation` when supplied and otherwise publishes the same bounded event to the local hub.
@@ -126,12 +126,12 @@ In `packages/realtime/src/websocket-gateway.js`:
 - Use the callback for committed operations, passing the server-generated `connectionId`; do not accept an origin ID from the client.
 - Keep the post-commit acknowledgement's operation, sequence, version, lockVersion and duplicate flag unchanged; add the publisher's degradation result.
 
-- [ ] **Step 4: Run focused API and WebSocket tests**
+- [x] **Step 4: Run focused API and WebSocket tests**
 
-Run: `node --test test/collaboration-api.test.js test/realtime-websocket.test.js`
-Expected: all focused tests PASS, including existing authentication, authorization, size/rate and disconnect controls.
+Run: `node --test test/collaboration-api.test.js test/realtime-websocket.test.js test/realtime.test.js`
+Expected: 37/37 tests PASS, including existing authentication, authorization, size/rate and disconnect controls.
 
-- [ ] **Step 5: Commit the routing task**
+- [x] **Step 5: Commit the routing task**
 
 ```bash
 git add apps/api/src/server.js packages/realtime/src/websocket-gateway.js test/collaboration-api.test.js test/realtime-websocket.test.js

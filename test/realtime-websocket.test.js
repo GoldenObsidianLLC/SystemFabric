@@ -628,3 +628,62 @@ test('WebSocket disconnect releases both the base and document subscriptions', a
   }
   assert.equal(server.systemfabric.realtimeHub.subscriberCount, 0);
 });
+
+test('WebSocket committed operations use the shared publisher and report degraded relay after commit', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const operation = {
+    schemaVersion: 1,
+    opId: '33333333-3333-4333-8333-333333333333',
+    clientId: 'browser-editor',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'Shared publisher' }
+  };
+  const publications = [];
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && id === contentId
+        ? {
+          id, site_id: SITE_ID, content_type: 'page', status: 'draft',
+          created_by: null,
+          body: { schemaVersion: 1, documentId: 'doc-publisher', type: 'page', title: 'Before', children: [] }
+        }
+        : null;
+    },
+    async getCollaborationSync() {
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    },
+    async applyCollaborationOperation({ operation: submitted }) {
+      return {
+        sequence: 1, version: 2, lockVersion: 2,
+        operation: submitted, duplicate: false
+      };
+    }
+  };
+  const { url, origin } = await createServer(t, {
+    contentStore: store,
+    publishDocumentOperation: async input => {
+      publications.push(input);
+      return { relayPublished: false, degraded: true };
+    }
+  });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+
+  socket.send(JSON.stringify({ type: 'document.operation', contentId, operation }));
+  const ack = await nextMessage(socket);
+  assert.equal(ack.type, 'document.operation.ack');
+  assert.equal(ack.sequence, 1);
+  assert.equal(ack.fanoutDegraded, true);
+  assert.deepEqual(ack.operation, operation);
+  assert.equal(publications.length, 1);
+  assert.equal(publications[0].siteId, SITE_ID);
+  assert.equal(publications[0].contentId, contentId);
+  assert.equal(publications[0].sequence, 1);
+  assert.match(publications[0].originConnectionId, /^[0-9a-f-]{36}$/i);
+  assert.equal(publications[0].operation.opId, operation.opId);
+});

@@ -349,6 +349,7 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
   const realtimeBridge = {
     async attach() {},
     async publish() { return { delivered: 0 }; },
+    async publishDocumentOperation() { return { delivered: 0, relayPublished: true, degraded: false }; },
     async close() { bridgeClosed = true; }
   };
   let quotaClosed = false;

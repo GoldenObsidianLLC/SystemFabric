@@ -28,6 +28,7 @@ function createWebSocketGateway({
   authorizeDocument = null,
   connectionLimiter = null,
   publishPresence = null,
+  publishDocumentOperation = null,
   heartbeatMs = 15_000,
   maxMessageBytes = MAX_MESSAGE_BYTES,
   maxBufferedBytes = MAX_BUFFERED_BYTES,
@@ -49,6 +50,9 @@ function createWebSocketGateway({
   }
   if (publishPresence !== null && typeof publishPresence !== 'function') {
     throw new TypeError('publishPresence must be a function when provided.');
+  }
+  if (publishDocumentOperation !== null && typeof publishDocumentOperation !== 'function') {
+    throw new TypeError('publishDocumentOperation must be a function when provided.');
   }
   if (!Number.isInteger(heartbeatMs) || heartbeatMs < 5_000 || heartbeatMs > 60_000) {
     throw new RangeError('heartbeatMs must be between 5000 and 60000.');
@@ -357,18 +361,27 @@ function createWebSocketGateway({
               return;
             }
             let fanoutDegraded = false;
-            if (!result.duplicate && hub) {
+            if (!result.duplicate) {
               try {
-                await hub.publish({
-                  siteId,
-                  topic: 'document:' + contentId,
-                  payload: {
-                    kind: 'document.operation',
+                const publication = publishDocumentOperation
+                  ? await publishDocumentOperation({
+                    siteId,
+                    contentId,
                     sequence: result.sequence,
                     originConnectionId: connectionId,
                     operation: result.operation
-                  }
-                });
+                  })
+                  : await hub.publish({
+                    siteId,
+                    topic: 'document:' + contentId,
+                    payload: {
+                      kind: 'document.operation',
+                      sequence: result.sequence,
+                      originConnectionId: connectionId,
+                      operation: result.operation
+                    }
+                  });
+                fanoutDegraded = publication?.degraded === true;
               } catch {
                 fanoutDegraded = true;
               }

@@ -17,6 +17,7 @@ test('collaboration REST endpoints require an editable draft and return committe
     payload: { title: 'REST title' }
   };
   const calls = [];
+  const publishedOperations = [];
   const content = {
     id: contentId,
     site_id: '11111111-1111-4111-8111-111111111111',
@@ -49,6 +50,10 @@ test('collaboration REST endpoints require an editable draft and return committe
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
     contentStore: store,
+    publishDocumentOperation: async input => {
+      publishedOperations.push(input);
+      return { relayPublished: false, degraded: true };
+    },
     logger: { error() {} }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -61,7 +66,16 @@ test('collaboration REST endpoints require an editable draft and return committe
     assert.equal(write.status, 200);
     const ack = await write.json();
     assert.equal(ack.sequence, 1);
+    assert.equal(ack.fanoutDegraded, true, 'a committed operation remains acknowledged when Redis fan-out is degraded');
     assert.equal(calls[0].actorId, null, 'actor identity must come from the authenticated session, not request JSON');
+    assert.equal(publishedOperations.length, 1);
+    assert.deepEqual(publishedOperations[0], {
+      siteId: content.site_id,
+      contentId,
+      sequence: 1,
+      originConnectionId: null,
+      operation
+    });
 
     const sync = await fetch(base + '/api/v1/pages/' + contentId + '/collaboration/sync?afterSequence=0', {
       headers: { authorization: 'Bearer collab-api-token' }
@@ -210,4 +224,25 @@ test('collaboration REST writes enforce content:edit or own-content ownership fr
     await server.systemfabric.close();
     await new Promise(resolve => server.close(resolve));
   }
+});
+
+
+test('Redis-backed realtime rejects a bridge that lacks document publication', () => {
+  const presence = { heartbeat() {}, leave() {} };
+  const limiter = { acquire() { return Promise.resolve({ release() {} }); } };
+  const bridge = { async attach() {}, async close() {} };
+
+  assert.throws(() => createApiServer({
+    env: {
+      NODE_ENV: 'test',
+      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+      AI_PROVIDER: 'mock'
+    },
+    presenceService: presence,
+    realtimeBridge: bridge,
+    realtimeConnectionLimiter: limiter,
+    publishDocumentOperation: async () => ({ degraded: false }),
+    logger: { error() {} }
+  }), /publishDocumentOperation/);
 });
