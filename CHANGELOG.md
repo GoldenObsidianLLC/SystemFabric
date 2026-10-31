@@ -9,6 +9,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Serialize live integration test files that share the dedicated PostgreSQL database and graph fixture, preventing cross-suite outbox/event cleanup races from making the Memgraph consumer-group test flaky.
 - Separate explicitly authenticated bearer sessions from cookie sessions; cookie-authenticated writes always undergo same-origin and CSRF validation even when an invalid bearer header is also supplied.
 - Pin CI runners to Ubuntu 24.04 and use full-commit SHA pins for current Node.js 24-compatible checkout, setup-node, and artifact-upload actions.
+- Expand tenant-isolation integration coverage for repeated and malformed site selectors, accepted matching route/header/query selectors, cross-site denial, response non-disclosure, and rejected-write side effects.
 
 ### Documentation and maintainability
 
