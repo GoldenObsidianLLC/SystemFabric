@@ -88,6 +88,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.
 - Add npm run test:migrations:fresh to apply all 14 migrations to a disposable database derived only from TEST_DATABASE_URL, verify a second pass is idempotent, and drop only the generated test database.
 - Add dedicated Redis services to PostgreSQL/Memgraph and browser/accessibility CI; pass the explicit loopback URL to the multi-instance browser suite and retain zero-skip integration evidence.
+- Inject independent Redis-backed connection-quota adapters into multi-instance presence/SSE integration fixtures, using a shared per-test namespace so the test topology matches the runtime's distributed-quota requirement; local loopback Redis presence/API/authorization integration passed 4/4 with zero skips.
 - Make the WebSocket close-cleanup regression test wait for the server-side connection gauge to reach zero rather than assuming client and server close-event ordering is synchronous.
 - Pin the CI Memgraph loopback port for the outage/restart test so the service remains reachable after Docker restarts its fixed-port container.
 - Refresh release-readiness evidence and regenerate the CycloneDX SBOM after dependency and test-harness changes.

@@ -4,6 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { createRedisPresenceService } = require('../../packages/realtime/src/redis-presence');
+const { createRedisRealtimeConnectionLimiter } = require('../../packages/realtime/src/connection-quota');
+
+async function createQuotaPair(url, keyPrefix) {
+  const options = { url, keyPrefix, leaseMs: 10_000 };
+  return Promise.all([
+    createRedisRealtimeConnectionLimiter(options),
+    createRedisRealtimeConnectionLimiter(options)
+  ]);
+}
 
 const enabled = process.env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION === 'true' &&
   Boolean(process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL);
@@ -86,6 +95,10 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
   };
   const presenceA = await createRedisPresenceService(options);
   const presenceB = await createRedisPresenceService(options);
+  const [quotaA, quotaB] = await createQuotaPair(
+    options.url,
+    `systemfabric:realtime:quota:presence-api-it:${randomUUID().replaceAll('-', '')}`
+  );
   const { createRedisRealtimeBridge } = require('../../packages/realtime/src/redis-realtime');
   const bridgePrefix = 'systemfabric:realtime:api-snapshot-it:' + randomUUID().replaceAll('-', '');
   const bridgeA = await createRedisRealtimeBridge({ url: options.url, channelPrefix: bridgePrefix });
@@ -104,12 +117,14 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
     env: sharedEnv,
     presenceService: presenceA,
     realtimeBridge: bridgeA,
+    realtimeConnectionLimiter: quotaA,
     logger: { error() {} }
   });
   const serverB = createApiServer({
     env: sharedEnv,
     presenceService: presenceB,
     realtimeBridge: bridgeB,
+    realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
   await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
@@ -185,6 +200,10 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
     leaseMs: 5_000,
     now: () => now
   });
+  const [quotaA, quotaB] = await createQuotaPair(
+    redisUrl,
+    `systemfabric:realtime:quota:presence-sse-it:${suffix}`
+  );
   const { createApiServer } = require('../../apps/api/src/server');
   const sharedEnv = {
     NODE_ENV: 'test',
@@ -199,12 +218,14 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
     env: sharedEnv,
     presenceService: presenceA,
     realtimeBridge: bridgeA,
+    realtimeConnectionLimiter: quotaA,
     logger: { error() {} }
   });
   const serverB = createApiServer({
     env: sharedEnv,
     presenceService: presenceB,
     realtimeBridge: bridgeB,
+    realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
   await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
@@ -324,7 +345,11 @@ test('Redis authorization integration: membership and session invalidations clos
     async isSessionActive() { return true; },
     async authorizeSite() { return true; }
   };
-  const presenceService = { async close() {} };
+  const presenceService = { async heartbeat() {}, async leave() {}, async close() {} };
+  const [quotaA, quotaB] = await createQuotaPair(
+    redisUrl,
+    `systemfabric:realtime:quota:authz-it:${suffix}`
+  );
   const sharedEnv = {
     NODE_ENV: 'test',
     SYSTEMFABRIC_REALTIME_ENABLED: 'true',
@@ -334,8 +359,8 @@ test('Redis authorization integration: membership and session invalidations clos
     RATE_LIMIT_MAX_REQUESTS: '100'
   };
   const { createApiServer } = require('../../apps/api/src/server');
-  const serverA = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeA, logger: { error() {} } });
-  const serverB = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeB, logger: { error() {} } });
+  const serverA = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeA, realtimeConnectionLimiter: quotaA, logger: { error() {} } });
+  const serverB = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeB, realtimeConnectionLimiter: quotaB, logger: { error() {} } });
   await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
   await Promise.all([
     new Promise(resolve => serverA.listen(0, '127.0.0.1', resolve)),
