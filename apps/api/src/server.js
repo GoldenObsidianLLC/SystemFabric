@@ -220,11 +220,11 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     if (identity) {
       // A valid explicit bearer credential is non-ambient authentication; browser
       // cookies are handled separately and always receive CSRF checks on writes.
-      if (bearer) {
-        const bearerSession = await identity.authenticate(bearer);
-        if (bearerSession) {
-          return { mode: 'session', sessionToken: bearer, sessionId: bearerSession.sessionId, user: bearerSession.user, memberships: bearerSession.memberships };
-        }
+      // Authenticate the candidate credential through the identity store; only
+      // the returned server-side session record can establish bearer identity.
+      const bearerSession = await identity.authenticate(bearer || '');
+      if (bearerSession) {
+        return { mode: 'session', sessionToken: bearer, sessionId: bearerSession.sessionId, user: bearerSession.user, memberships: bearerSession.memberships };
       }
       const cookieSessionToken = cookies.sf_session;
       if (cookieSessionToken) {
