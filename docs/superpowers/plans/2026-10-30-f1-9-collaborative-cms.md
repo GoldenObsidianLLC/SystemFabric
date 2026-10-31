@@ -72,15 +72,17 @@
 
 **Files:**
 - Modify: apps/api/src/server.js
+- Modify: packages/realtime/src/event-hub.js
 - Modify: packages/realtime/src/websocket-gateway.js
-- Test: test/realtime-websocket.test.js, test/api.test.js
+- Create: test/collaboration-api.test.js
+- Test: test/realtime-websocket.test.js
 
-- [ ] Add REST operation and sync routes with site/document checks, content:edit/owner authorization, draft-only behavior and bounded bodies.
-- [ ] Extend hub authorization for a UUID-scoped document topic; require a live session and content:edit capability.
-- [ ] Add document.join/operation/leave commands, per-document subscriptions, snapshot/replay join response, committed acknowledgements and document-scoped local fan-out.
-- [ ] Raise only the WebSocket frame ceiling to 16 KiB, cap operation payload at 12 KiB, keep 60 messages/minute and 1 MiB backpressure.
-- [ ] Test wrong-site access, insufficient capability, cross-document delivery isolation, operation rejection, disconnect cleanup, authorization revocation and replay join.
-- [ ] Run focused API/WebSocket tests.
+- [x] Add REST operation and sync routes with site/document checks, content:edit/owner authorization, draft-only behavior and bounded bodies.
+- [x] Extend hub authorization for a UUID-scoped document topic; require a live session and content:edit or own-content edit capability.
+- [x] Add document.join/operation/leave commands, per-document subscriptions, snapshot/replay join response, committed acknowledgements and document-scoped local fan-out.
+- [x] Raise only the WebSocket frame ceiling to 16 KiB, cap operation payload at 12 KiB, keep 60 messages/minute and 1 MiB backpressure.
+- [x] Test wrong-site access, insufficient capability, cross-document delivery isolation, operation rejection, disconnect cleanup, authorization revocation and replay join.
+- [x] Run focused API/WebSocket tests (22/22 pass).
 
 ### Task 4: Two-session browser proof
 

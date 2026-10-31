@@ -4,10 +4,11 @@ const { WebSocketServer, WebSocket } = require('ws');
 const { realtimeError } = require('./event-hub');
 const { createConnectionReadyPayload } = require('./realtime-protocol');
 
-const MAX_MESSAGE_BYTES = 4_096;
+const MAX_MESSAGE_BYTES = 16_384;
 const MAX_BUFFERED_BYTES = 1_048_576;
 const MAX_MESSAGES_PER_MINUTE = 60;
 const ALLOWED_AVAILABILITY = new Set(['active', 'idle', 'away', 'hidden']);
+const DOCUMENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function incrementMetric(metrics, name, amount = 1) {
   try { metrics?.increment?.(name, amount); } catch {}
@@ -22,6 +23,8 @@ function observeMetric(metrics, name, value) {
 function createWebSocketGateway({
   hub,
   presence,
+  store = null,
+  authorizeDocument = null,
   connectionLimiter = null,
   publishPresence = null,
   heartbeatMs = 15_000,
@@ -36,6 +39,9 @@ function createWebSocketGateway({
   }
   if (!presence || typeof presence.heartbeat !== 'function' || typeof presence.leave !== 'function') {
     throw new TypeError('A presence service with heartbeat and leave support is required.');
+  }
+  if (authorizeDocument !== null && typeof authorizeDocument !== 'function') {
+    throw new TypeError('authorizeDocument must be a function when provided.');
   }
   if (connectionLimiter && typeof connectionLimiter.acquire !== 'function') {
     throw new TypeError('connectionLimiter must expose acquire().');
@@ -106,6 +112,7 @@ function createWebSocketGateway({
           let alive = true;
           let timer = null;
           const messageTimes = [];
+          const documentSubscriptions = new Map();
           let processingMessages = Promise.resolve();
 
           const cleanup = () => {
@@ -115,6 +122,8 @@ function createWebSocketGateway({
               if (timer) clearInterval(timer);
               clients.delete(ws);
               subscription.close();
+              for (const entry of documentSubscriptions.values()) entry.subscription.close();
+              documentSubscriptions.clear();
               if (lease) await lease.release().catch(() => {});
               cleanups.delete(ws);
               incrementMetric(metrics, 'websocket_connections_closed_total');
@@ -139,8 +148,14 @@ function createWebSocketGateway({
               close(1013, 'reconnect-required');
               return false;
             }
+            let serialized;
             try {
-              ws.send(JSON.stringify(value), error => {
+              serialized = JSON.stringify(value);
+              if (Buffer.byteLength(serialized, 'utf8') > maxMessageBytes) {
+                incrementMetric(metrics, 'websocket_message_rejections_total');
+                return false;
+              }
+              ws.send(serialized, error => {
                 if (error) {
                   incrementMetric(metrics, 'websocket_reconnect_required_total');
                   close(1013, 'transport-unavailable');
@@ -151,6 +166,216 @@ function createWebSocketGateway({
               close(1013, 'transport-unavailable');
               return false;
             }
+          }
+
+
+          async function closeDocumentSubscription(contentId) {
+            const entry = documentSubscriptions.get(contentId);
+            if (!entry) return false;
+            documentSubscriptions.delete(contentId);
+            entry.subscription.close();
+            return true;
+          }
+
+          function sendDocumentOperation(contentId, entry, operation, sequence, messageType = 'document.sync.operation') {
+            if (!Number.isSafeInteger(Number(sequence)) || Number(sequence) <= entry.lastSequence) return false;
+            const sent = send({
+              type: messageType,
+              contentId,
+              sequence: Number(sequence),
+              operation
+            });
+            if (sent) entry.lastSequence = Number(sequence);
+            return sent;
+          }
+
+          function sendDocumentReload(contentId, sync) {
+            const snapshot = {
+              type: 'document.reload',
+              contentId,
+              sequence: sync.sequence,
+              oldestReplaySequence: sync.oldestReplaySequence,
+              document: sync.document,
+              title: sync.title,
+              version: sync.version,
+              lockVersion: sync.lockVersion
+            };
+            if (!send(snapshot)) {
+              send({
+                type: 'document.reload.required',
+                contentId,
+                sequence: sync.sequence,
+                oldestReplaySequence: sync.oldestReplaySequence,
+                syncPath: '/api/v1/pages/' + contentId + '/collaboration/sync'
+              });
+            }
+          }
+
+          async function deliverDocumentSync(contentId, entry, sync) {
+            if (sync.reloadRequired) {
+              sendDocumentReload(contentId, sync);
+              entry.lastSequence = Number(sync.sequence);
+              return;
+            }
+            for (const item of sync.operations || []) {
+              if (documentSubscriptions.get(contentId) !== entry || cleaned) return;
+              const operation = item.appliedOperation || item.operation;
+              sendDocumentOperation(contentId, entry, operation, item.sequence);
+            }
+            entry.lastSequence = Math.max(entry.lastSequence, Number(sync.sequence));
+          }
+
+          function startDocumentPump(contentId, entry) {
+            entry.pump = (async () => {
+              try {
+                for await (const event of entry.subscription.events) {
+                  if (cleaned || documentSubscriptions.get(contentId) !== entry) break;
+                  if (event.payload?.kind !== 'document.operation') continue;
+                  const eventSequence = Number(event.payload.sequence);
+                  if (!Number.isSafeInteger(eventSequence) || eventSequence <= entry.lastSequence) continue;
+                  if (eventSequence > entry.lastSequence + 1) {
+                    const sync = await store.getCollaborationSync({
+                      siteId,
+                      contentId,
+                      afterSequence: entry.lastSequence
+                    });
+                    if (documentSubscriptions.get(contentId) !== entry) break;
+                    await deliverDocumentSync(contentId, entry, sync);
+                  }
+                  if (eventSequence <= entry.lastSequence || documentSubscriptions.get(contentId) !== entry) continue;
+                  sendDocumentOperation(
+                    contentId,
+                    entry,
+                    event.payload.operation,
+                    eventSequence,
+                    'document.operation'
+                  );
+                }
+              } catch {
+                if (!cleaned && documentSubscriptions.get(contentId) === entry) {
+                  send({ type: 'document.reload.required', contentId, syncPath: '/api/v1/pages/' + contentId + '/collaboration/sync' });
+                  await closeDocumentSubscription(contentId);
+                }
+              }
+            })();
+          }
+
+          async function joinDocument(command) {
+            if (!store || typeof store.getCollaborationSync !== 'function' ||
+                !DOCUMENT_ID_PATTERN.test(String(command.contentId || '')) ||
+                !Number.isSafeInteger(command.afterSequence) || command.afterSequence < 0 ||
+                Object.keys(command).some(key => !['type', 'contentId', 'afterSequence'].includes(key))) {
+              send({ type: 'document.error', code: 'ERR_SYSTEMFABRIC_COLLABORATION_COMMAND_INVALID' });
+              return;
+            }
+            const contentId = command.contentId.toLowerCase();
+            await closeDocumentSubscription(contentId);
+            let documentSubscription;
+            try {
+              if (authorizeDocument && !(await authorizeDocument({
+                principal,
+                sessionId,
+                siteId,
+                contentId
+              }))) {
+                throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN', 'The principal cannot edit this draft.');
+              }
+              documentSubscription = await hub.subscribe({
+                principal: { id: principalId, isDeveloper: principal.isDeveloper === true },
+                siteId,
+                topic: 'document:' + contentId,
+                sessionId,
+                expiresAt
+              });
+              const entry = { subscription: documentSubscription, lastSequence: command.afterSequence, pump: null };
+              documentSubscriptions.set(contentId, entry);
+              const sync = await store.getCollaborationSync({
+                siteId,
+                contentId,
+                afterSequence: command.afterSequence
+              });
+              if (cleaned || documentSubscriptions.get(contentId) !== entry) return;
+              send({
+                type: 'document.joined',
+                contentId,
+                sequence: sync.sequence,
+                oldestReplaySequence: sync.oldestReplaySequence,
+                reloadRequired: sync.reloadRequired === true
+              });
+              await deliverDocumentSync(contentId, entry, sync);
+              if (documentSubscriptions.get(contentId) === entry && !cleaned) startDocumentPump(contentId, entry);
+            } catch (error) {
+              documentSubscription?.close();
+              documentSubscriptions.delete(contentId);
+              send({
+                type: 'document.error',
+                contentId,
+                code: String(error?.code || 'ERR_SYSTEMFABRIC_COLLABORATION_UNAVAILABLE').slice(0, 100)
+              });
+            }
+          }
+
+          async function submitDocumentOperation(command) {
+            if (!store || typeof store.applyCollaborationOperation !== 'function' ||
+                !DOCUMENT_ID_PATTERN.test(String(command.contentId || '')) ||
+                Object.keys(command).some(key => !['type', 'contentId', 'operation'].includes(key)) ||
+                !documentSubscriptions.has(String(command.contentId || '').toLowerCase())) {
+              send({ type: 'document.error', code: 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_JOINED' });
+              return;
+            }
+            const contentId = command.contentId.toLowerCase();
+            const entry = documentSubscriptions.get(contentId);
+            if (authorizeDocument && !(await authorizeDocument({
+              principal,
+              sessionId,
+              siteId,
+              contentId
+            }))) {
+              await closeDocumentSubscription(contentId);
+              send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+              return;
+            }
+            if (!(await hub.reauthorize(entry.subscription))) {
+              await closeDocumentSubscription(contentId);
+              send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+              return;
+            }
+            const result = await store.applyCollaborationOperation({
+              siteId,
+              contentId,
+              actorId: principal.isDeveloper ? null : principalId,
+              operation: command.operation
+            });
+            if (result.reloadRequired) {
+              sendDocumentReload(contentId, result);
+              return;
+            }
+            let fanoutDegraded = false;
+            if (!result.duplicate && hub) {
+              try {
+                await hub.publish({
+                  siteId,
+                  topic: 'document:' + contentId,
+                  payload: {
+                    kind: 'document.operation',
+                    sequence: result.sequence,
+                    operation: result.operation
+                  }
+                });
+              } catch {
+                fanoutDegraded = true;
+              }
+            }
+            send({
+              type: 'document.operation.ack',
+              contentId,
+              operationId: command.operation?.opId || null,
+              sequence: result.sequence,
+              version: result.version,
+              lockVersion: result.lockVersion,
+              duplicate: result.duplicate === true,
+              fanoutDegraded
+            });
           }
 
           send(JSON.parse(readyMessage));
@@ -198,6 +423,27 @@ function createWebSocketGateway({
                 send({ type: 'pong', at: new Date(timestamp).toISOString() });
                 return;
               }
+              if (command.type === 'document.join') {
+                await joinDocument(command);
+                return;
+              }
+              if (command.type === 'document.operation') {
+                if (Buffer.byteLength(JSON.stringify(command.operation ?? null), 'utf8') > 12 * 1024) {
+                  send({ type: 'document.error', contentId: command.contentId, code: 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION' });
+                  return;
+                }
+                await submitDocumentOperation(command);
+                return;
+              }
+              if (command.type === 'document.leave' &&
+                  Object.keys(command).length === 2 &&
+                  typeof command.contentId === 'string' &&
+                  DOCUMENT_ID_PATTERN.test(command.contentId)) {
+                const contentId = command.contentId.toLowerCase();
+                await closeDocumentSubscription(contentId);
+                send({ type: 'document.left', contentId });
+                return;
+              }
               if (command.type === 'presence.heartbeat' &&
                   Object.keys(command).every(key => ['type', 'availability'].includes(key)) &&
                   (command.availability === undefined || ALLOWED_AVAILABILITY.has(command.availability))) {
@@ -227,6 +473,12 @@ function createWebSocketGateway({
               if (error?.code === 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' ||
                   error?.code === 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRED') {
                 close(1008, 'authorization-expired');
+              } else if (typeof command.type === 'string' && command.type.startsWith('document.')) {
+                send({
+                  type: 'document.error',
+                  contentId: typeof command.contentId === 'string' ? command.contentId : undefined,
+                  code: String(error?.code || 'ERR_SYSTEMFABRIC_COLLABORATION_UNAVAILABLE').slice(0, 100)
+                });
               } else {
                 send({ type: 'error', code: 'command-unavailable' });
               }
@@ -253,6 +505,19 @@ function createWebSocketGateway({
               if (!(await hub.reauthorize(subscription))) {
                 close(1008, 'authorization-expired');
                 return;
+              }
+              for (const [contentId, entry] of documentSubscriptions) {
+                const allowed = !authorizeDocument || await authorizeDocument({
+                  principal,
+                  sessionId,
+                  siteId,
+                  contentId
+                });
+                if (!allowed || !(await hub.reauthorize(entry.subscription))) {
+                  documentSubscriptions.delete(contentId);
+                  entry.subscription.close();
+                  send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+                }
               }
               if (lease && !(await lease.renew())) {
                 incrementMetric(metrics, 'websocket_reconnect_required_total');

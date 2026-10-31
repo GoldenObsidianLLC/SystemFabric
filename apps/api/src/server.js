@@ -221,11 +221,22 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   realtimeHub = injectedRealtimeHub || (realtimeEnabled && env.NODE_ENV !== 'production'
     ? createRealtimeHub({
       authorizeSubscribe: async ({ principal, sessionId, siteId, topic }) => {
-        if (topic !== 'presence') return false;
+        if (topic === 'presence') {
+          if (principal.isDeveloper) return env.NODE_ENV !== 'production';
+          if (!identity || !sessionId || typeof identity.isSessionActive !== 'function') return false;
+          if (!(await identity.isSessionActive({ userId: principal.id, sessionId }))) return false;
+          return Boolean(await identity.authorizeSite(principal.id, siteId, 'content:read'));
+        }
+        const documentMatch = /^document:([0-9a-f-]{36})$/i.exec(topic);
+        if (!documentMatch || !store) return false;
+        const document = await store.getById({ siteId, id: documentMatch[1] }).catch(() => null);
+        if (!document || document.content_type !== 'page' || document.status !== 'draft') return false;
         if (principal.isDeveloper) return env.NODE_ENV !== 'production';
         if (!identity || !sessionId || typeof identity.isSessionActive !== 'function') return false;
         if (!(await identity.isSessionActive({ userId: principal.id, sessionId }))) return false;
-        return Boolean(await identity.authorizeSite(principal.id, siteId, 'content:read'));
+        if (await identity.authorizeSite(principal.id, siteId, 'content:edit')) return true;
+        return document.created_by === principal.id &&
+          Boolean(await identity.authorizeSite(principal.id, siteId, 'content:edit:own'));
       },
       metrics: realtimeMetrics
     })
@@ -250,6 +261,8 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   const realtimeWebSocketGateway = realtimeHub && presence ? createWebSocketGateway({
     hub: realtimeHub,
     presence,
+    store,
+    authorizeDocument: authorizeCollaborationDocument,
     connectionLimiter: realtimeConnectionLimiter,
     publishPresence: realtimeBridge ? input => realtimeBridge.publish(input) : input => realtimeHub.publish(input),
     metrics: realtimeMetrics
@@ -336,6 +349,17 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       try { realtimeMetrics.increment('authorization_denials_total'); } catch {}
       throw error;
     }
+  }
+  async function authorizeCollaborationDocument({ principal, sessionId, siteId, contentId }) {
+    if (!store || typeof store.getById !== 'function') return false;
+    const document = await store.getById({ siteId, id: contentId }).catch(() => null);
+    if (!document || document.content_type !== 'page' || document.status !== 'draft') return false;
+    if (principal?.isDeveloper === true) return env.NODE_ENV !== 'production';
+    if (!identity || !sessionId || typeof identity.isSessionActive !== 'function') return false;
+    if (!(await identity.isSessionActive({ userId: principal?.id, sessionId }))) return false;
+    if (await identity.authorizeSite(principal.id, siteId, 'content:edit')) return true;
+    return document.created_by === principal.id &&
+      Boolean(await identity.authorizeSite(principal.id, siteId, 'content:edit:own'));
   }
   async function canEditContent(actor, siteId, content) {
     if (actor.isDeveloper) return;
@@ -1250,6 +1274,73 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const saved = await store.saveDraft({ siteId, id: safe.id, title: safe.document.title, slug: safe.slug, locale: safe.locale, contentType: 'page', document: safe.document, authorId: actor.user.id, expectedVersion: safe.expectedVersion, note: safe.note, correlationId: requestId });
         if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'content.draft_saved', targetType: 'content', targetId: saved.id, requestId, details: { version: saved.version } });
         return sendJson(res, 201, { status: 'draft', persisted: true, published: Boolean(saved.published_version), content: saved, requestId });
+      }
+
+      const collaborationMatch = url.pathname.match(/^\/api\/v1\/pages\/([0-9a-f-]{36})\/collaboration\/(operations|sync)$/i);
+      if (collaborationMatch) {
+        if (!store || typeof store.getCollaborationSync !== 'function' || typeof store.applyCollaborationOperation !== 'function') {
+          return sendJson(res, 503, { error: 'Collaborative editing requires the PostgreSQL-backed content store.', code: 'ERR_SYSTEMFABRIC_COLLABORATION_DISABLED', requestId });
+        }
+        const contentId = collaborationMatch[1];
+        const action = collaborationMatch[2];
+        if ((action === 'operations' && req.method !== 'POST') || (action === 'sync' && req.method !== 'GET')) {
+          throw fail(405, 'ERR_SYSTEMFABRIC_METHOD_NOT_ALLOWED', 'Use POST for operations and GET for collaboration sync.');
+        }
+        const siteId = await siteIdFor({ req, url, actor });
+        const current = await store.getById({ siteId, id: contentId });
+        if (!current || current.content_type !== 'page') {
+          throw fail(404, 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND', 'Page not found.');
+        }
+        await canEditContent(actor, siteId, current);
+        if (current.status !== 'draft') {
+          throw fail(409, 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT', 'Collaborative editing is available only while the page is a draft.');
+        }
+
+        if (action === 'operations') {
+          const body = await readJson(req, Math.min(maxBody, 12 * 1024));
+          if (!body || typeof body !== 'object' || Array.isArray(body) ||
+              Object.keys(body).length !== 1 || !Object.hasOwn(body, 'operation')) {
+            throw fail(400, 'ERR_SYSTEMFABRIC_COLLABORATION_BODY_INVALID', 'Only the operation field is accepted.');
+          }
+          const result = await store.applyCollaborationOperation({
+            siteId,
+            contentId,
+            actorId: actor.user.id || null,
+            operation: body.operation,
+            correlationId: requestId
+          });
+          if (result.reloadRequired) {
+            return sendJson(res, 409, { ...result, code: 'ERR_SYSTEMFABRIC_COLLABORATION_RELOAD_REQUIRED', requestId });
+          }
+          let fanoutDegraded = false;
+          if (!result.duplicate && realtimeHub) {
+            try {
+              await realtimeHub.publish({
+                siteId,
+                topic: 'document:' + contentId,
+                payload: {
+                  kind: 'document.operation',
+                  sequence: result.sequence,
+                  operation: result.operation
+                }
+              });
+            } catch {
+              fanoutDegraded = true;
+            }
+          }
+          return sendJson(res, 200, { ...result, fanoutDegraded, requestId });
+        }
+
+        const cursorValues = url.searchParams.getAll('afterSequence');
+        if (cursorValues.length !== 1 || !/^(0|[1-9]\\d*)$/.test(cursorValues[0])) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SEQUENCE', 'Provide one non-negative afterSequence query parameter.');
+        }
+        const afterSequence = Number(cursorValues[0]);
+        if (!Number.isSafeInteger(afterSequence)) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SEQUENCE', 'afterSequence must be a safe integer.');
+        }
+        const sync = await store.getCollaborationSync({ siteId, contentId, afterSequence });
+        return sendJson(res, 200, { ...sync, requestId });
       }
 
       const pageIdMatch = url.pathname.match(/^\/api\/v1\/pages\/([0-9a-f-]{36})$/i);

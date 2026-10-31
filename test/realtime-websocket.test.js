@@ -243,7 +243,7 @@ test('WebSocket server rejects binary and over-limit frames', async t => {
   const oversized = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
   await nextMessage(oversized);
   const oversizedClosed = new Promise(resolve => oversized.once('close', code => resolve(code)));
-  oversized.send(JSON.stringify({ type: 'ping', padding: 'x'.repeat(5_000) }));
+  oversized.send(JSON.stringify({ type: 'ping', padding: 'x'.repeat(20_000) }));
   assert.equal(await oversizedClosed, 1009);
 });
 
@@ -309,4 +309,321 @@ test('API shutdown ends active SSE streams and awaits shared quota release', asy
   assert.match(new TextDecoder().decode(shutdownFrame.value), /server-shutdown/);
   const ended = await reader.read();
   assert.equal(ended.done, true);
+});
+
+test('two WebSocket sessions join the same draft, receive committed operations, and leave cleanly', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const operation = {
+    schemaVersion: 1,
+    opId: '33333333-3333-4333-8333-333333333333',
+    clientId: 'browser-a',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'Shared title' }
+  };
+  const content = {
+    id: contentId,
+    site_id: SITE_ID,
+    content_type: 'page',
+    status: 'draft',
+    created_by: null,
+    body: { schemaVersion: 1, documentId: 'doc-test', type: 'page', title: 'Before', children: [] }
+  };
+  const store = {
+    async getById({ siteId, id }) { return siteId === SITE_ID && id === contentId ? content : null; },
+    async getCollaborationSync({ afterSequence }) {
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    },
+    async applyCollaborationOperation({ operation: submitted, actorId }) {
+      assert.equal(actorId, null, 'developer identity must not be trusted from the command envelope');
+      return {
+        sequence: 1, version: 2, lockVersion: 2, title: submitted.payload.title,
+        operation: submitted, duplicate: false
+      };
+    }
+  };
+  const { url, origin, server } = await createServer(t, { contentStore: store });
+  const first = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  const second = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => { first.close(); second.close(); });
+  await nextMessage(first);
+  await nextMessage(second);
+
+  first.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  second.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  const joinedA = await nextMessage(first);
+  const joinedB = await nextMessage(second);
+  assert.equal(joinedA.type, 'document.joined');
+  assert.equal(joinedA.sequence, 0);
+  assert.equal(joinedB.type, 'document.joined');
+
+  first.send(JSON.stringify({ type: 'document.operation', contentId, operation }));
+  const ack = await nextMessage(first);
+  assert.equal(ack.type, 'document.operation.ack');
+  assert.equal(ack.sequence, 1);
+  const event = await nextMessage(second);
+  assert.equal(event.type, 'document.operation');
+  assert.equal(event.contentId, contentId);
+  assert.equal(event.sequence, 1);
+  assert.equal(event.operation.payload.title, 'Shared title');
+
+  second.send(JSON.stringify({ type: 'document.leave', contentId }));
+  assert.equal((await nextMessage(second)).type, 'document.left');
+  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 3, 'the first session still holds its document subscription');
+});
+
+test('WebSocket document subscription rejects missing, non-draft, and oversized document operations', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  let status = 'draft';
+  const store = {
+    async getById({ siteId, id }) {
+      if (siteId !== SITE_ID || id !== contentId) return null;
+      return { id, site_id: SITE_ID, content_type: 'page', status, created_by: null };
+    },
+    async getCollaborationSync() {
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    },
+    async applyCollaborationOperation() {
+      const error = new Error('operation too large');
+      error.statusCode = 400;
+      error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+      throw error;
+    }
+  };
+  const { url, origin } = await createServer(t, { contentStore: store });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId: '33333333-3333-4333-8333-333333333333', afterSequence: 0 }));
+  const missing = await nextMessage(socket);
+  assert.equal(missing.type, 'document.error');
+  assert.equal(missing.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+
+  status = 'published';
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  const notDraft = await nextMessage(socket);
+  assert.equal(notDraft.type, 'document.error');
+  assert.equal(notDraft.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+
+  status = 'draft';
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+  socket.send(JSON.stringify({
+    type: 'document.operation',
+    contentId,
+    operation: {
+      schemaVersion: 1,
+      opId: '55555555-5555-4555-8555-555555555555',
+      clientId: 'oversized-client',
+      baseSequence: 0,
+      type: 'text.insert',
+      payload: { nodeId: 'text-1', key: 'text', offset: 0, text: 'x'.repeat(13_000) }
+    }
+  }));
+  const oversizedOperation = await nextMessage(socket);
+  assert.equal(oversizedOperation.type, 'document.error');
+  assert.equal(oversizedOperation.code, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION');
+});
+
+test('WebSocket document collaboration requires an active session and edit or edit-own capability', async t => {
+  const ownerId = '22222222-2222-4222-8222-222222222222';
+  const otherId = '33333333-3333-4333-8333-333333333333';
+  let active = true;
+  const identityService = {
+    async authenticate(token) {
+      if (token !== 'editor-session-token') return null;
+      return {
+        sessionId: 'editor-session',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'editor@example.test', status: 'active' },
+        memberships: [{ siteId: SITE_ID, capabilities: ['content:read', 'content:edit:own'] }]
+      };
+    },
+    async isSessionActive({ userId, sessionId }) {
+      return active && userId === 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' && sessionId === 'editor-session';
+    },
+    async authorizeSite(_userId, _siteId, capability) {
+      return capability === 'content:read' || capability === 'content:edit:own';
+    }
+  };
+  const store = {
+    async getById({ siteId, id }) {
+      if (siteId !== SITE_ID || ![ownerId, otherId].includes(id)) return null;
+      return {
+        id, site_id: SITE_ID, content_type: 'page', status: 'draft',
+        created_by: id === ownerId ? 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' : 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+      };
+    },
+    async getCollaborationSync() {
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    },
+    async applyCollaborationOperation() {
+      return { sequence: 1, version: 2, lockVersion: 2, duplicate: false };
+    }
+  };
+  const { url, origin } = await createServer(t, { identityService, contentStore: store });
+  const socket = await connect(url, { authorization: 'Bearer editor-session-token', origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId: ownerId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId: otherId, afterSequence: 0 }));
+  const denied = await nextMessage(socket);
+  assert.equal(denied.type, 'document.error');
+  assert.equal(denied.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+
+  active = false;
+  const revoked = new Promise(resolve => socket.once('close', code => resolve(code)));
+  socket.send(JSON.stringify({
+    type: 'document.operation',
+    contentId: ownerId,
+    operation: {
+      schemaVersion: 1,
+      opId: '44444444-4444-4444-8444-444444444444',
+      clientId: 'browser-editor',
+      baseSequence: 0,
+      type: 'document.set_title',
+      payload: { title: 'Should not be accepted' }
+    }
+  }));
+  assert.equal(await revoked, 1008, 'revocation of the authenticated session closes the WebSocket');
+
+
+});
+
+test('WebSocket collaboration returns canonical reload data or a bounded REST reload instruction', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const snapshot = {
+    schemaVersion: 1,
+    documentId: 'doc-reload',
+    type: 'page',
+    title: 'Canonical reload',
+    children: []
+  };
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && id === contentId
+        ? { id, site_id: SITE_ID, content_type: 'page', status: 'draft', created_by: null }
+        : null;
+    },
+    async getCollaborationSync() {
+      return {
+        reloadRequired: true,
+        sequence: 1200,
+        oldestReplaySequence: 200,
+        document: snapshot,
+        title: snapshot.title,
+        version: 4,
+        lockVersion: 6
+      };
+    },
+    async applyCollaborationOperation() { throw new Error('should not be reached'); }
+  };
+  const { url, origin } = await createServer(t, { contentStore: store });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  const joined = await nextMessage(socket);
+  assert.equal(joined.type, 'document.joined');
+  assert.equal(joined.reloadRequired, true);
+  const reload = await nextMessage(socket);
+  assert.equal(reload.type, 'document.reload');
+  assert.deepEqual(reload.document, snapshot);
+  assert.equal(reload.sequence, 1200);
+});
+
+test('WebSocket join replays accepted operations and isolates delivery by document topic', async t => {
+  const firstId = '22222222-2222-4222-8222-222222222222';
+  const secondId = '33333333-3333-4333-8333-333333333333';
+  const replayedOperation = {
+    schemaVersion: 1,
+    opId: '44444444-4444-4444-8444-444444444444',
+    clientId: 'prior-editor',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'Replayed title' }
+  };
+  const submittedOperation = {
+    schemaVersion: 1,
+    opId: '55555555-5555-4555-8555-555555555555',
+    clientId: 'first-editor',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'First document only' }
+  };
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && [firstId, secondId].includes(id)
+        ? { id, site_id: SITE_ID, content_type: 'page', status: 'draft', created_by: null }
+        : null;
+    },
+    async getCollaborationSync({ contentId, afterSequence }) {
+      if (contentId === secondId && afterSequence === 0) {
+        return {
+          reloadRequired: false,
+          sequence: 1,
+          oldestReplaySequence: 0,
+          operations: [{ sequence: 1, operation: replayedOperation, appliedOperation: replayedOperation }]
+        };
+      }
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    },
+    async applyCollaborationOperation({ operation }) {
+      return { sequence: 1, version: 2, lockVersion: 2, operation, duplicate: false };
+    }
+  };
+  const { url, origin } = await createServer(t, { contentStore: store });
+  const first = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  const second = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => { first.close(); second.close(); });
+  await nextMessage(first);
+  await nextMessage(second);
+
+  first.send(JSON.stringify({ type: 'document.join', contentId: firstId, afterSequence: 0 }));
+  second.send(JSON.stringify({ type: 'document.join', contentId: secondId, afterSequence: 0 }));
+  assert.equal((await nextMessage(first)).type, 'document.joined');
+  assert.equal((await nextMessage(second)).type, 'document.joined');
+  const replay = await nextMessage(second);
+  assert.equal(replay.type, 'document.sync.operation');
+  assert.equal(replay.sequence, 1);
+  assert.equal(replay.operation.payload.title, 'Replayed title');
+
+  first.send(JSON.stringify({ type: 'document.operation', contentId: firstId, operation: submittedOperation }));
+  assert.equal((await nextMessage(first)).type, 'document.operation.ack');
+  assert.equal((await nextMessage(first)).type, 'document.operation');
+  await assert.rejects(
+    nextMessage(second, 100),
+    /Timed out waiting for WebSocket message/
+  );
+});
+
+test('WebSocket disconnect releases both the base and document subscriptions', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && id === contentId
+        ? { id, site_id: SITE_ID, content_type: 'page', status: 'draft', created_by: null }
+        : null;
+    },
+    async getCollaborationSync() {
+      return { reloadRequired: false, sequence: 0, oldestReplaySequence: 0, operations: [] };
+    }
+  };
+  const { url, origin, server } = await createServer(t, { contentStore: store });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  await nextMessage(socket);
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 2);
+  const closed = new Promise(resolve => socket.once('close', resolve));
+  socket.close();
+  await closed;
+  for (let attempt = 0; attempt < 20 && server.systemfabric.realtimeHub.subscriberCount !== 0; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 0);
 });
