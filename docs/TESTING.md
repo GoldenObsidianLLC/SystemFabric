@@ -8,7 +8,7 @@ Run commands from the repository root in a Windows PowerShell terminal unless a 
 |---|---|---|---|
 | Artifact and syntax checks + SystemFabric unit tests | `npm run check` | Node.js and installed npm dependencies | Validates configured paths/syntax and the unit suite; not a production certification. |
 | Vendored EnginEx tests | `npm --prefix vendor/enginex test` | Node.js | Exercises the vendored runtime's own suite; does not certify the full application. |
-| Browser/end-to-end tests | `npm run test:e2e -- --workers=1` | Playwright and Chromium | Smoke tests only; supplement with accessibility and cross-browser acceptance. |
+| Browser/end-to-end tests | `npm run test:e2e -- --workers=1` | Playwright and the configured Chrome browser channel | Smoke tests only; supplement with accessibility and cross-browser acceptance. |
 | Live DB integrations | `npm run test:integration:live` | PostgreSQL test DB `systemfabric_test` and Memgraph | Exercises selected real database integration paths; it does not cover the full operational lifecycle. |
 | Dependency audit | `npm audit` | Network access to npm advisories | Reports known dependency advisories in the selected dependency tree; it is not a complete security audit. |
 | Production dependency audit | `npm audit --omit=dev` | Network access to npm advisories | Audits runtime dependencies only. |

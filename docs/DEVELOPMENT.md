@@ -1,11 +1,13 @@
 # Development Setup
 
+New contributors can start with the step-by-step [First Contribution Quickstart](CONTRIBUTOR-QUICKSTART.md). This page remains the broader development environment reference.
+
 ## Prerequisites
 
 - Git.
 - Node.js `>=22.23.4` and npm.
 - PostgreSQL and Memgraph only when running live database integration tests.
-- A Chromium installation for the Playwright end-to-end suite.
+- Playwright and the configured Chrome browser channel for the end-to-end suite; see [Contributor Quickstart](CONTRIBUTOR-QUICKSTART.md) for browser installation notes.
 - Provider accounts/credentials only for explicit live provider validation; ordinary unit tests should use deterministic mocks.
 
 Check the runtime:
