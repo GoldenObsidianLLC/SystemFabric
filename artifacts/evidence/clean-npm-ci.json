@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "product": "SystemFabric",
+  "version": "0.5.1",
+  "gate": "clean-npm-ci-local",
+  "status": "passed",
+  "executedOn": "2026-10-30",
+  "environment": {
+    "os": "Windows x64",
+    "node": "v26.12.1"
+  },
+  "command": "npm ci --no-audit --no-fund",
+  "result": {
+    "exitCode": 0,
+    "packagesAdded": 167,
+    "postinstall": "KaTeX stylesheet and fonts materialized successfully"
+  },
+  "lockfileCorrection": {
+    "rootDependency": "redis@6.3.1",
+    "addedPackages": [
+      "@redis/bloom@6.3.1",
+      "@redis/client@6.3.1",
+      "@redis/json@6.3.1",
+      "@redis/search@6.3.1",
+      "@redis/time-series@6.3.1"
+    ]
+  },
+  "dependencyAudit": {
+    "command": "npm audit --audit-level=high",
+    "result": "found 0 vulnerabilities"
+  },
+  "limitations": [
+    "Fresh isolated local install only; CI matrix evidence remains open.",
+    "Human dependency review and SBOM/provenance review remain open."
+  ]
+}

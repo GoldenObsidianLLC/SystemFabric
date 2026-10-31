@@ -6,16 +6,18 @@ Do not deploy this build to a public production site until the gate below is com
 
 ## 1. Build and runtime
 
-- [ ] Test on Node.js 22.23.4 or newer, matching `package.json` and vendored EnginEx.
-- [ ] Generate, review, and commit a `package-lock.json` in a network-enabled clean environment.
-- [ ] Verify clean `npm ci`, `npm run check`, and repeatable installation in CI.
-- [ ] Run `npm audit`/dependency review and generate, review, and retain an SBOM.
+- [x] Validate on Node.js 22.23.4 or newer, matching `package.json` and vendored EnginEx; local evidence is Node.js 26.12.1 on 2026-10-30. The exact CI matrix still requires current-run evidence.
+- [x] `package-lock.json` exists, is tracked, and is synchronized with `package.json`. A fresh isolated `npm ci --no-audit --no-fund` passed on Windows x64 / Node.js 26.12.1 on 2026-10-30; see `artifacts/evidence/clean-npm-ci.json`.
+- [x] `npm run check` passed locally on Node.js 26.12.1 on 2026-10-30.
+- [ ] Verify repeatable installation in CI and retain evidence for the supported Node.js matrix.
+- [ ] Complete human dependency review and SBOM/provenance review. Local evidence: `npm audit --audit-level=high` reported 0 vulnerabilities and CycloneDX 1.5 SBOM generation completed (162 components, 163 dependency records); manual review, provenance and CI retention remain open.
 - [ ] Verify container images, provenance and deployment configuration are pinned and signed.
 - [ ] Run the configured GitHub Actions jobs and retain their actual logs and artifacts; workflow definitions alone are not release evidence.
 
 ## 2. Data and consistency
 
-- [ ] Apply migrations 0001–0008 to an empty PostgreSQL database and a supported upgrade fixture.
+- [x] Apply all 13 migrations to a newly created disposable local PostgreSQL database and verify idempotent re-run; evidence: `artifacts/evidence/fresh-migrations.json`.
+- [ ] Retain current-revision CI evidence for fresh install and supported upgrade fixtures before release.
 - [ ] Test constraints, transaction rollback, backup, restore, retention and schema drift.
 - [ ] Run outbox concurrent-worker, duplicate/out-of-order, graph outage/replay, poison-event and reconciliation tests against real PostgreSQL and Memgraph.
 - [ ] Rehearse the local object reconciler in dry-run, validate its SQL references and age guard, and verify storage recovery after process termination.
@@ -37,7 +39,7 @@ Do not deploy this build to a public production site until the gate below is com
 - [ ] Test optimistic versions, conflict responses, digest failure, delete/retention, metadata changes and replacement across storage adapters.
 - [ ] Test optional KaTeX, Sharp and FFmpeg on actual supported runtimes with timeouts, memory ceilings and adversarial inputs.
 - [ ] Test local object reconciliation dry-run and apply on disposable fixtures; verify it never follows symlinks, deletes referenced objects or traverses outside the storage root.
-- [ ] Complete Playwright tests for drag/drop, keyboard operation, undo/redo, autosave/recovery, revision conflict, responsive layout, media widgets and preview/public rendering.
+- [ ] Complete broad Playwright acceptance for drag/drop, keyboard operation, undo/redo, autosave/recovery, revision conflict, responsive layout, media widgets and preview/public rendering. Local smoke: 4 Chromium tests passed on 2026-10-30; this does not cover the full acceptance scope.
 - [ ] Run WCAG-focused accessibility scans and manual keyboard/screen-reader review for editor, libraries, icon controls and mega menus.
 - [ ] Test theme/template builder, global styles, dynamic content queries, reusable blocks and export/import before any Elementor parity claim.
 

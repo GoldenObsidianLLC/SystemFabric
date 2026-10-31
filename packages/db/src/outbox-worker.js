@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { eventEnvelopeFromOutboxRow } = require('../../realtime/src/event-contract');
 
 function createOutboxWorker({ pool, projector, workerId = `sf-${randomUUID()}`, batchSize = 25, leaseMs = 30_000, maxAttempts = 10, onError = () => {} }) {
   if (!pool || !projector || typeof projector.apply !== 'function') throw new TypeError('pool and projector.apply are required.');
@@ -9,7 +10,11 @@ function createOutboxWorker({ pool, projector, workerId = `sf-${randomUUID()}`, 
     try {
       await client.query('BEGIN');
       const selected = await client.query(
-        `SELECT id,event_type,payload,attempts FROM outbox_events WHERE ((status='pending' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now())) ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED`,
+        `SELECT id,aggregate_type,aggregate_id,aggregate_version,event_type,payload,attempts,
+                schema_version,site_id,actor_id,correlation_id,causation_id,classification,created_at
+           FROM outbox_events
+          WHERE ((status='pending' AND available_at<=now()) OR (status='processing' AND lease_expires_at<now()))
+          ORDER BY created_at,id LIMIT $1 FOR UPDATE SKIP LOCKED`,
         [batchSize]
       );
       if (selected.rows.length) {
@@ -25,9 +30,10 @@ function createOutboxWorker({ pool, projector, workerId = `sf-${randomUUID()}`, 
   }
   async function processOne(event) {
     try {
-      await projector.apply({ type: event.event_type, payload: event.payload });
+      const envelope = eventEnvelopeFromOutboxRow(event);
+      await projector.apply({ type: event.event_type, payload: event.payload, envelope });
       await pool.query(`UPDATE outbox_events SET status='processed',processed_at=now(),locked_by=NULL,locked_at=NULL,lease_expires_at=NULL,last_error_code=NULL WHERE id=$1 AND locked_by=$2`, [event.id, workerId]);
-      return { id: event.id, ok: true };
+      return { id: event.id, eventId: envelope.eventId, ok: true };
     } catch (error) {
       const attempts = Number(event.attempts || 0) + 1;
       const dead = attempts >= maxAttempts;

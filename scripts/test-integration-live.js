@@ -129,6 +129,20 @@ async function main() {
   };
   run('Apply versioned migrations to the isolated test database', ['scripts/migrate.js'], env, 'integration-migrations.log');
 
+  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
+  if (redisUrl) {
+    let parsedRedis;
+    try { parsedRedis = new URL(redisUrl); }
+    catch { throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is invalid.'); }
+    const allowedRedisHosts = new Set(['127.0.0.1', 'localhost', '::1', 'redis']);
+    if (!['redis:', 'rediss:'].includes(parsedRedis.protocol) || !allowedRedisHosts.has(parsedRedis.hostname.toLowerCase())) {
+      throw new Error('Safety stop: Redis integration is restricted to a local Redis/Memurai test service.');
+    }
+    env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION = 'true';
+  } else {
+    delete env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION;
+  }
+
   const integrationDir = path.join(root, 'test', 'integration');
   const files = fs.readdirSync(integrationDir).filter(file => file.endsWith('.test.js')).sort().map(file => path.join('test', 'integration', file));
   if (!files.length) throw new Error('No integration test files were found.');

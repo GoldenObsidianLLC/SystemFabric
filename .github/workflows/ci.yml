@@ -70,12 +70,23 @@ jobs:
         image: memgraph/memgraph:3.13.1
         ports:
           - 7687:7687
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
     env:
       NODE_ENV: test
       DATABASE_URL: postgres://systemfabric:systemfabric_test@127.0.0.1:5432/systemfabric
       TEST_DATABASE_URL: postgres://systemfabric:systemfabric_test@127.0.0.1:5432/systemfabric_test
       MEMGRAPH_URL: bolt://127.0.0.1:7687
       MEMGRAPH_TEST_URL: bolt://127.0.0.1:7687
+      MEMGRAPH_TEST_STATIC_PORT: "true"
+      SYSTEMFABRIC_PRESENCE_REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -118,6 +129,8 @@ jobs:
           fi
 
           echo "MEMGRAPH_TEST_CONTAINER_ID=${ids[0]}" >> "$GITHUB_ENV"
+      - name: Apply all migrations to a disposable fresh PostgreSQL database and verify idempotency
+        run: npm run test:migrations:fresh
       - name: Test PostgreSQL/Memgraph/community/commerce integration workflows (zero skips required)
         run: npm run test:integration:live
       - name: Exercise real Memgraph outage and outbox recovery
@@ -141,6 +154,8 @@ jobs:
             artifacts/evidence/integration-tests.tap.log
             artifacts/evidence/integration-migrations.log
             artifacts/evidence/integration-live.json
+            artifacts/evidence/fresh-migrations.json
+            artifacts/evidence/fresh-migrations.log
             artifacts/evidence/memgraph-outage-live.log
             artifacts/evidence/graph-rebuild-live.log
           if-no-files-found: warn

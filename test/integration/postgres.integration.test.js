@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { createPostgresPool, createPostgresStore } = require('../../packages/db/src/postgres-store');
 const { createOutboxWorker } = require('../../packages/db/src/outbox-worker');
+const { eventEnvelopeFromOutboxRow } = require('../../packages/realtime/src/event-contract');
 
 const enabled = Boolean(process.env.DATABASE_URL && process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true');
 
@@ -42,6 +43,28 @@ test('PostgreSQL integration: revisions, publication snapshots, outbox, and site
   assert.equal(await store.getPublishedBySlug({ siteId: siteB, slug: 'integration-page', locale: 'en' }), null);
   const outbox = await pool.query("SELECT count(*)::int AS n FROM outbox_events WHERE aggregate_id=$1 AND status='pending'", [saved.id]);
   assert.ok(outbox.rows[0].n >= 2);
+  const domainEvent = await pool.query(
+    "SELECT id,aggregate_type,aggregate_id,aggregate_version,event_type,payload,schema_version,site_id,actor_id,correlation_id,causation_id,classification,created_at FROM outbox_events WHERE aggregate_id=$1 AND event_type='content.upsert' ORDER BY created_at DESC LIMIT 1",
+    [saved.id]
+  );
+  assert.equal(domainEvent.rows[0].site_id, siteA);
+  assert.equal(domainEvent.rows[0].actor_id, authorId);
+  assert.equal(domainEvent.rows[0].schema_version, 1);
+  assert.equal(domainEvent.rows[0].classification, 'site-private');
+  const envelope = eventEnvelopeFromOutboxRow(domainEvent.rows[0]);
+  assert.equal(envelope.eventId, domainEvent.rows[0].id);
+  assert.equal(envelope.siteId, siteA);
+  assert.equal(envelope.actor.id, authorId);
+  assert.equal(domainEvent.rows[0].aggregate_version, saved.lock_version);
+  assert.equal(envelope.resource.version, saved.lock_version);
+  assert.equal(domainEvent.rows[0].payload.version, saved.version);
+  assert.equal(envelope.idempotencyKey, 'content:' + saved.id + ':' + saved.lock_version + ':content.upsert');
+  const publishEvent = await pool.query(
+    "SELECT aggregate_version,payload FROM outbox_events WHERE aggregate_id=$1 AND event_type='content.publish' ORDER BY created_at DESC LIMIT 1",
+    [saved.id]
+  );
+  assert.equal(publishEvent.rows[0].aggregate_version, published.lock_version);
+  assert.equal(publishEvent.rows[0].payload.version, saved.version, 'projection sequence and editorial revision remain distinct');
 });
 
 test('PostgreSQL integration: concurrent outbox workers claim events once and quarantine poison events', { skip: !enabled }, async t => {
@@ -52,7 +75,7 @@ test('PostgreSQL integration: concurrent outbox workers claim events once and qu
   for (const eventKey of runKeys) await pool.query("INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('integration-outbox',$1,1,'integration.noop',$2::jsonb) ON CONFLICT DO NOTHING", [randomUUID(), JSON.stringify({ eventKey })]);
   await pool.query("INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('integration-outbox-poison',$1,1,'integration.poison',$2::jsonb) ON CONFLICT DO NOTHING", [randomUUID(), JSON.stringify({ eventKey: poisonKey })]);
   const applied = [];
-  const projector = { async apply({ type, payload }) { if (type === 'integration.poison') { const e = new Error('fixture failure'); e.code = 'ERR_TEST_POISON'; throw e; } if (payload.eventKey) { await new Promise(resolve => setTimeout(resolve, 5)); applied.push(payload.eventKey); } } };
+  const projector = { async apply({ type, payload, envelope }) { assert.equal(envelope.eventType, type); assert.equal(envelope.classification, 'internal'); if (type === 'integration.poison') { const e = new Error('fixture failure'); e.code = 'ERR_TEST_POISON'; throw e; } if (payload.eventKey) { await new Promise(resolve => setTimeout(resolve, 5)); applied.push(payload.eventKey); } } };
   const first = createOutboxWorker({ pool, projector, workerId: `it-a-${randomUUID()}`, batchSize: 50, maxAttempts: 1 });
   const second = createOutboxWorker({ pool, projector, workerId: `it-b-${randomUUID()}`, batchSize: 50, maxAttempts: 1 });
   await Promise.all([first.runOnce(), second.runOnce()]);
@@ -151,8 +174,11 @@ test('PostgreSQL integration: outbox recovers after a transient graph-projection
   const eventId = inserted.rows[0].id;
 
   const projector = {
-    async apply({ type, payload }) {
+    async apply({ type, payload, envelope }) {
       assert.equal(type, 'integration.recovery');
+      assert.equal(envelope.eventType, type);
+      assert.equal(envelope.classification, 'internal');
+      assert.equal(envelope.resource.id, aggregateId);
 
       if (!graphAvailable) {
         throw Object.assign(
@@ -237,4 +263,178 @@ test('PostgreSQL integration: outbox recovers after a transient graph-projection
 
   assert.equal(third.claimed, 0);
   assert.deepEqual(projected, [eventKey]);
+});
+
+test('PostgreSQL integration: consumer groups independently deliver events under concurrent workers', { skip: !enabled }, async t => {
+  const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '8' });
+  const consumerGroup = `it.delivery.${randomUUID().replaceAll('-', '')}`;
+  const aggregateIds = Array.from({ length: 12 }, () => randomUUID());
+  const applied = [];
+  t.after(async () => {
+    await pool.query('DELETE FROM outbox_consumer_groups WHERE consumer_group=$1', [consumerGroup]).catch(() => {});
+    await pool.query("DELETE FROM outbox_events WHERE aggregate_type='integration-delivery' AND aggregate_id=ANY($1::uuid[])", [aggregateIds]).catch(() => {});
+    await pool.end();
+  });
+
+  for (let index = 0; index < aggregateIds.length; index++) {
+    await pool.query(
+      `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload)
+       VALUES('integration-delivery',$1,1,'integration.delivery',$2::jsonb)`,
+      [aggregateIds[index], JSON.stringify({ eventKey: `event-${index}` })]
+    );
+  }
+
+  const { createOutboxDeliveryWorker } = require('../../packages/db/src/outbox-delivery');
+  const handler = async ({ envelope, payload }) => {
+    assert.equal(envelope.eventType, 'integration.delivery');
+    await new Promise(resolve => setTimeout(resolve, 5));
+    applied.push(payload.eventKey);
+  };
+  const workerA = createOutboxDeliveryWorker({
+    pool, consumerGroup, eventTypes: ['integration.delivery'], handler, workerId: `it-delivery-a-${randomUUID()}`,
+    batchSize: 6, dispatchBatchSize: 50
+  });
+  const workerB = createOutboxDeliveryWorker({
+    pool, consumerGroup, eventTypes: ['integration.delivery'], handler, workerId: `it-delivery-b-${randomUUID()}`,
+    batchSize: 6, dispatchBatchSize: 50
+  });
+
+  await Promise.all([workerA.runOnce(), workerB.runOnce()]);
+  assert.equal(applied.length, aggregateIds.length);
+  assert.equal(new Set(applied).size, aggregateIds.length);
+
+  const deliveryCounts = await pool.query(
+    `SELECT status,count(*)::int AS count
+       FROM outbox_deliveries
+      WHERE consumer_group=$1
+      GROUP BY status`,
+    [consumerGroup]
+  );
+  assert.equal(deliveryCounts.rows.find(row => row.status === 'processed')?.count, aggregateIds.length);
+
+  // A distinct consumer group gets its own durable copy of the same source events.
+  const secondGroup = `it.delivery.${randomUUID().replaceAll('-', '')}`;
+  t.after(async () => {
+    await pool.query('DELETE FROM outbox_consumer_groups WHERE consumer_group=$1', [secondGroup]).catch(() => {});
+  });
+  const secondWorker = createOutboxDeliveryWorker({
+    pool, consumerGroup: secondGroup, eventTypes: ['integration.delivery'], handler: async () => {},
+    batchSize: 50, dispatchBatchSize: 50
+  });
+  const secondResult = await secondWorker.runOnce();
+  assert.equal(secondResult.dispatched, aggregateIds.length);
+  const secondCount = await pool.query(
+    'SELECT count(*)::int AS count FROM outbox_deliveries WHERE consumer_group=$1 AND status=$2',
+    [secondGroup, 'processed']
+  );
+  assert.equal(secondCount.rows[0].count, aggregateIds.length);
+});
+
+test('PostgreSQL integration: per-aggregate ordering blocks behind dead events until replay', { skip: !enabled }, async t => {
+  const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '4' });
+  const consumerGroup = `it.order.${randomUUID().replaceAll('-', '')}`;
+  const aggregateId = randomUUID();
+  const versions = [];
+  let failFirstAttempt = true;
+  t.after(async () => {
+    await pool.query('DELETE FROM outbox_consumer_groups WHERE consumer_group=$1', [consumerGroup]).catch(() => {});
+    await pool.query("DELETE FROM outbox_events WHERE aggregate_type='integration-delivery-order' AND aggregate_id=$1", [aggregateId]).catch(() => {});
+    await pool.end();
+  });
+
+  const first = await pool.query(
+    `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload)
+     VALUES('integration-delivery-order',$1,1,'integration.delivery.order',$2::jsonb)
+     RETURNING id`,
+    [aggregateId, JSON.stringify({ version: 1 })]
+  );
+  await pool.query(
+    `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload)
+     VALUES('integration-delivery-order',$1,2,'integration.delivery.order',$2::jsonb)`,
+    [aggregateId, JSON.stringify({ version: 2 })]
+  );
+
+  const { createOutboxDeliveryWorker, replayOutboxDeliveries } = require('../../packages/db/src/outbox-delivery');
+  const worker = createOutboxDeliveryWorker({
+    pool, consumerGroup, eventTypes: ['integration.delivery.order'], maxAttempts: 1, batchSize: 10, dispatchBatchSize: 20,
+    handler: async ({ payload }) => {
+      versions.push(payload.version);
+      if (payload.version === 1 && failFirstAttempt) {
+        failFirstAttempt = false;
+        throw Object.assign(new Error('temporary poison fixture'), { code: 'ERR_TEST_ORDER_RETRY' });
+      }
+    }
+  });
+
+  const failed = await worker.runOnce();
+  assert.equal(failed.claimed, 1, 'version 2 must wait for version 1');
+  assert.equal(failed.results[0].dead, true);
+
+  const blocked = await worker.runOnce();
+  assert.equal(blocked.claimed, 0, 'a dead predecessor must block later aggregate versions');
+  const states = await pool.query(
+    `SELECT e.aggregate_version,d.status
+       FROM outbox_deliveries d JOIN outbox_events e ON e.id=d.event_id
+      WHERE d.consumer_group=$1 AND e.aggregate_id=$2
+      ORDER BY e.aggregate_version`,
+    [consumerGroup, aggregateId]
+  );
+  assert.deepEqual(states.rows.map(row => [row.aggregate_version, row.status]), [[1, 'dead'], [2, 'pending']]);
+
+  const replay = await replayOutboxDeliveries({ pool, consumerGroup, eventIds: [first.rows[0].id] });
+  assert.equal(replay.replayed, 1);
+  const replayedFirst = await worker.runOnce();
+  assert.equal(replayedFirst.results[0].ok, true);
+  const second = await worker.runOnce();
+  assert.equal(second.results[0].ok, true);
+  assert.deepEqual(versions, [1, 1, 2]);
+
+  const completed = await pool.query(
+    "SELECT count(*)::int AS count FROM outbox_deliveries WHERE consumer_group=$1 AND status='processed'",
+    [consumerGroup]
+  );
+  assert.equal(completed.rows[0].count, 2);
+});
+
+test('PostgreSQL integration: expired delivery leases are reclaimed after worker loss', { skip: !enabled }, async t => {
+  const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '4' });
+  const consumerGroup = `it.lease.${randomUUID().replaceAll('-', '')}`;
+  const aggregateId = randomUUID();
+  t.after(async () => {
+    await pool.query('DELETE FROM outbox_consumer_groups WHERE consumer_group=$1', [consumerGroup]).catch(() => {});
+    await pool.query("DELETE FROM outbox_events WHERE aggregate_type='integration-delivery-lease' AND aggregate_id=$1", [aggregateId]).catch(() => {});
+    await pool.end();
+  });
+
+  const inserted = await pool.query(
+    `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload)
+     VALUES('integration-delivery-lease',$1,1,'integration.delivery.lease',$2::jsonb)
+     RETURNING id`,
+    [aggregateId, JSON.stringify({ simulated: 'worker-crash' })]
+  );
+  await pool.query(
+    'INSERT INTO outbox_consumer_groups(consumer_group,event_types) VALUES($1,$2::text[])',
+    [consumerGroup, ['integration.delivery.lease']]
+  );
+  await pool.query(
+    `INSERT INTO outbox_deliveries(
+       event_id,consumer_group,status,attempts,locked_by,locked_at,lease_expires_at
+     ) VALUES($1,$2,'processing',1,'crashed-worker',now()-interval '2 minutes',now()-interval '1 minute')`,
+    [inserted.rows[0].id, consumerGroup]
+  );
+
+  const { createOutboxDeliveryWorker } = require('../../packages/db/src/outbox-delivery');
+  let handled = 0;
+  const worker = createOutboxDeliveryWorker({
+    pool, consumerGroup, eventTypes: ['integration.delivery.lease'], handler: async () => { handled++; }
+  });
+  const result = await worker.runOnce();
+  assert.equal(result.claimed, 1);
+  assert.equal(result.results[0].ok, true);
+  assert.equal(handled, 1);
+  const state = await pool.query(
+    'SELECT status,attempts,locked_by FROM outbox_deliveries WHERE event_id=$1 AND consumer_group=$2',
+    [inserted.rows[0].id, consumerGroup]
+  );
+  assert.deepEqual(state.rows[0], { status: 'processed', attempts: 2, locked_by: null });
 });

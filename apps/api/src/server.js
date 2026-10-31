@@ -29,6 +29,11 @@ const { validateMenuItems } = require('../../../packages/domain/src/navigation')
 const { validateContentTypeDefinition, validateRecordValues, NAME_RE: CONTENT_TYPE_NAME_RE } = require('../../../packages/domain/src/content-types');
 const { renderPageDocument, rendererInfo } = require('../../../packages/render/src');
 const { createRequestMetrics } = require('../../../packages/observability/src/metrics');
+const { createRealtimeHub } = require('../../../packages/realtime/src/event-hub');
+const { createMemoryPresenceAdapter, createPresenceService } = require('../../../packages/realtime/src/presence');
+const { createRedisPresenceService } = require('../../../packages/realtime/src/redis-presence');
+const { createRedisRealtimeBridge } = require('../../../packages/realtime/src/redis-realtime');
+const { createSseGateway } = require('../../../packages/realtime/src/sse-gateway');
 const { boundedInt } = require('../../../packages/ai/src/config');
 const SYSTEMFABRIC_VERSION = require('../../../package.json').version;
 
@@ -141,7 +146,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, logger = console } = {}) {
+function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, logger = console } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -179,6 +184,35 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   });
   const secureCookies = env.NODE_ENV === 'production' || env.SESSION_COOKIE_SECURE === 'true';
   const requestMetrics = createRequestMetrics();
+  const realtimeEnabled = env.SYSTEMFABRIC_REALTIME_ENABLED === 'true';
+  const configuredPresenceStore = String(env.SYSTEMFABRIC_PRESENCE_STORE || 'memory').toLowerCase();
+  if (!['memory', 'redis'].includes(configuredPresenceStore)) {
+    throw new Error('SYSTEMFABRIC_PRESENCE_STORE must be memory or redis.');
+  }
+  if (realtimeEnabled && env.NODE_ENV === 'production' && (!injectedRealtimeHub || !injectedPresenceService)) {
+    throw new Error('Real-time services in production require injected distributed event and presence adapters; the in-memory preview adapters are not production-safe.');
+  }
+  if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedPresenceService) {
+    throw new Error('The Redis presence store requires an asynchronously connected presenceService to be injected.');
+  }
+  if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedRealtimeBridge) {
+    throw new Error('The Redis presence store requires an attached cross-instance realtimeBridge for Pub/Sub fan-out.');
+  }
+  const realtimeHub = injectedRealtimeHub || (realtimeEnabled && env.NODE_ENV !== 'production'
+    ? createRealtimeHub({
+      authorizeSubscribe: async ({ principal, siteId, topic }) => {
+        if (topic !== 'presence') return false;
+        if (principal.isDeveloper) return env.NODE_ENV !== 'production';
+        return Boolean(identity && await identity.authorizeSite(principal.id, siteId, 'content:read'));
+      }
+    })
+    : null);
+  const presence = injectedPresenceService || (realtimeEnabled && env.NODE_ENV !== 'production' && configuredPresenceStore === 'memory'
+    ? createPresenceService({ adapter: createMemoryPresenceAdapter() })
+    : null);
+  const realtimeGateway = realtimeHub ? createSseGateway({ hub: realtimeHub }) : null;
+  const realtimeBridge = injectedRealtimeBridge || null;
+  const realtimeBridgeReady = realtimeBridge ? Promise.resolve().then(() => realtimeBridge.attach(realtimeHub)) : Promise.resolve();
 
   async function authenticate(req) {
     const cookies = parseCookies(req.headers.cookie || '');
@@ -673,6 +707,81 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       const auth = await authenticate(req);
       if (!auth) return sendJson(res, 401, { error: 'Authentication required.', code: 'ERR_SYSTEMFABRIC_UNAUTHORIZED', requestId });
       const actor = { ...auth, isDeveloper: auth.mode === 'development-token' };
+
+      const presenceMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/presence$/i);
+      const presenceHeartbeatMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/presence\/heartbeat$/i);
+      const realtimeEventsMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/realtime\/events$/i);
+
+      function presencePrincipal() {
+        const principalId = actor.user.id || (actor.isDeveloper ? 'local-developer' : null);
+        const sessionId = actor.sessionId || (actor.isDeveloper ? 'local-developer-session' : null);
+        if (!principalId || !sessionId) throw fail(401, 'ERR_SYSTEMFABRIC_PRESENCE_PRINCIPAL_REQUIRED', 'A persistent authenticated session is required.');
+        return { principalId, sessionId };
+      }
+
+      if (req.method === 'GET' && presenceMatch) {
+        if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_SYSTEMFABRIC_REALTIME_DISABLED', requestId });
+        const siteId = presenceMatch[1];
+        if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await requireCapability(actor, siteId, 'content:read');
+        const { principalId } = presencePrincipal();
+        const members = await presence.list({ siteId, viewerId: principalId });
+        return sendJson(res, 200, { presence: members, requestId });
+      }
+
+      if (req.method === 'POST' && presenceHeartbeatMatch) {
+        if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_SYSTEMFABRIC_REALTIME_DISABLED', requestId });
+        const siteId = presenceHeartbeatMatch[1];
+        if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await requireCapability(actor, siteId, 'content:read');
+        const { principalId, sessionId } = presencePrincipal();
+        const limit = allowRequest('realtime-presence:' + siteId + ':' + principalId);
+        if (!limit.allowed) {
+          res.setHeader('retry-after', String(limit.retryAfterSeconds));
+          return sendJson(res, 429, { error: 'Presence heartbeat rate limit exceeded.', code: 'ERR_SYSTEMFABRIC_REALTIME_RATE_LIMIT', requestId });
+        }
+        const body = await readJson(req, 8_192);
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'availability')) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_PRESENCE_BODY_INVALID', 'Only the availability field is accepted.');
+        }
+        const saved = await presence.heartbeat({ siteId, principalId, sessionId, availability: body.availability === undefined ? 'active' : body.availability });
+        if (realtimeBridge || realtimeHub) await (realtimeBridge || realtimeHub).publish({ siteId, topic: 'presence', payload: { kind: 'presence.refresh' } });
+        return sendJson(res, 200, { presence: saved, requestId });
+      }
+
+      if (req.method === 'DELETE' && presenceHeartbeatMatch) {
+        if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_SYSTEMFABRIC_REALTIME_DISABLED', requestId });
+        const siteId = presenceHeartbeatMatch[1];
+        if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await requireCapability(actor, siteId, 'content:read');
+        const { principalId, sessionId } = presencePrincipal();
+        await presence.leave({ siteId, principalId, sessionId });
+        if (realtimeBridge || realtimeHub) await (realtimeBridge || realtimeHub).publish({ siteId, topic: 'presence', payload: { kind: 'presence.refresh' } });
+        return sendJson(res, 200, { left: true, requestId });
+      }
+
+      if (req.method === 'GET' && realtimeEventsMatch) {
+        if (!realtimeGateway) return sendJson(res, 503, { error: 'Real-time event delivery is not configured.', code: 'ERR_SYSTEMFABRIC_REALTIME_DISABLED', requestId });
+        const siteId = realtimeEventsMatch[1];
+        if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await requireCapability(actor, siteId, 'content:read');
+        const requestedTopics = url.searchParams.getAll('topic');
+        if (requestedTopics.length > 1 || (requestedTopics.length === 1 && requestedTopics[0] !== 'presence')) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_REALTIME_TOPIC_INVALID', 'The initial real-time preview supports only the presence topic.');
+        }
+        const { principalId } = presencePrincipal();
+        const limit = allowRequest('realtime-connect:' + siteId + ':' + principalId);
+        if (!limit.allowed) {
+          res.setHeader('retry-after', String(limit.retryAfterSeconds));
+          return sendJson(res, 429, { error: 'Real-time connection rate limit exceeded.', code: 'ERR_SYSTEMFABRIC_REALTIME_RATE_LIMIT', requestId });
+        }
+        return await realtimeGateway.handle(req, res, {
+          principal: { id: principalId, isDeveloper: actor.isDeveloper },
+          siteId,
+          topic: 'presence'
+        });
+      }
+
       const platformHandled = await handlePlatformRoute({ req, res, url, actor, siteIdFor, requireCapability, readJson, sendJson, fail, requestId, localPool, libraryStore, firewall, env, identity, maxBody, maxLibraryBody, maxOptimizerBytes: maxLibraryFileBytes, store });
       if (platformHandled) return;
 
@@ -1031,7 +1140,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         await requireCapability(actor, siteId, 'content:create'); const validation = validateRecordValues(definition, body.values); if (!validation.valid) throw fail(422, 'ERR_SYSTEMFABRIC_CONTENT_VALUES_INVALID', 'Record values failed schema validation.', validation.errors);
         const title = String(body.title || body.values.title || body.values.name || slug).slice(0, 500); const recordSlug = normalizeSlug(body.slug || title); if (!recordSlug) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SLUG', 'A valid record slug is required.');
         const record = { schemaVersion: 1, documentType: `custom:${slug}`, fields: body.values };
-        const saved = await store.saveDraft({ siteId, title, slug: recordSlug, locale: typeof body.locale === 'string' ? body.locale : 'en', contentType: slug, document: record, authorId: actor.user.id });
+        const saved = await store.saveDraft({ siteId, title, slug: recordSlug, locale: typeof body.locale === 'string' ? body.locale : 'en', contentType: slug, document: record, authorId: actor.user.id, correlationId: requestId });
         return sendJson(res, 201, { status: 'draft', record: saved, requestId });
       }
       const cptRecordMatch = url.pathname.match(/^\/api\/v1\/content-types\/([a-z][a-z0-9_-]{0,62})\/records\/([0-9a-f-]{36})$/i);
@@ -1077,7 +1186,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const body = await readJson(req, maxBody); const safe = validateSaveDraftBody(body); const siteId = await siteIdFor({ req, url, body: safe, actor });
         if (safe.id) { const current = await store.getById({ siteId, id: safe.id }); await canEditContent(actor, siteId, current); }
         else await requireCapability(actor, siteId, 'content:create');
-        const saved = await store.saveDraft({ siteId, id: safe.id, title: safe.document.title, slug: safe.slug, locale: safe.locale, contentType: 'page', document: safe.document, authorId: actor.user.id, expectedVersion: safe.expectedVersion, note: safe.note });
+        const saved = await store.saveDraft({ siteId, id: safe.id, title: safe.document.title, slug: safe.slug, locale: safe.locale, contentType: 'page', document: safe.document, authorId: actor.user.id, expectedVersion: safe.expectedVersion, note: safe.note, correlationId: requestId });
         if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'content.draft_saved', targetType: 'content', targetId: saved.id, requestId, details: { version: saved.version } });
         return sendJson(res, 201, { status: 'draft', persisted: true, published: Boolean(saved.published_version), content: saved, requestId });
       }
@@ -1114,7 +1223,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const revision = await store.getRevision({ siteId, contentId: restoreMatch[1], version: Number(restoreMatch[2]) });
         if (!revision) return sendJson(res, 404, { error: 'Revision not found.', code: 'ERR_SYSTEMFABRIC_REVISION_NOT_FOUND', requestId });
         const snap = revision.snapshot;
-        const saved = await store.saveDraft({ siteId, id: restoreMatch[1], title: snap.title, slug: snap.slug, locale: snap.locale, contentType: snap.contentType || 'page', document: snap.document, authorId: actor.user.id, expectedVersion: body.expectedVersion, note: `Restored revision ${revision.version}` });
+        const saved = await store.saveDraft({ siteId, id: restoreMatch[1], title: snap.title, slug: snap.slug, locale: snap.locale, contentType: snap.contentType || 'page', document: snap.document, authorId: actor.user.id, expectedVersion: body.expectedVersion, note: `Restored revision ${revision.version}`, correlationId: requestId });
         return sendJson(res, 200, { status: 'draft', restoredFromVersion: revision.version, content: saved, requestId });
       }
 
@@ -1126,13 +1235,13 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const caps = { 'submit-review': 'content:submit-review', approve: 'content:approve', reject: 'content:approve', publish: 'content:publish', schedule: 'content:publish', archive: 'content:archive', unpublish: 'content:publish' };
         await requireCapability(actor, siteId, caps[action]);
         const operations = {
-          'submit-review': () => store.submitForReview({ siteId, id, actorId: actor.user.id, expectedVersion, note }),
-          approve: () => store.approve({ siteId, id, actorId: actor.user.id, expectedVersion, note }),
-          reject: () => store.rejectReview({ siteId, id, actorId: actor.user.id, expectedVersion, note }),
-          publish: () => store.publishContent({ siteId, id, actorId: actor.user.id, expectedVersion, note }),
-          schedule: () => store.scheduleContent({ siteId, id, actorId: actor.user.id, expectedVersion, scheduledAt: body.scheduledAt, note }),
-          archive: () => store.archiveContent({ siteId, id, actorId: actor.user.id, expectedVersion, note }),
-          unpublish: () => store.unpublishContent({ siteId, id, actorId: actor.user.id, expectedVersion, note })
+          'submit-review': () => store.submitForReview({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note }),
+          approve: () => store.approve({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note }),
+          reject: () => store.rejectReview({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note }),
+          publish: () => store.publishContent({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note }),
+          schedule: () => store.scheduleContent({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, scheduledAt: body.scheduledAt, note }),
+          archive: () => store.archiveContent({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note }),
+          unpublish: () => store.unpublishContent({ siteId, id, actorId: actor.user.id, correlationId: requestId, expectedVersion, note })
         };
         const result = await operations[action]();
         if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: `content.${action}`, targetType: 'content', targetId: id, requestId, details: { version: result.version, status: result.status } });
@@ -1259,15 +1368,82 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   const server = http.createServer((req, res) => { void handler(req, res); });
   server.systemfabric = {
     get contentStore() { return store; }, get pool() { return localPool; }, get identityService() { return identity; }, get libraryStore() { return libraryStore; }, get firewall() { return firewall; },
-    async close() { samlAuth?.close?.(); if (typeof libraryStorageAdapter?.close === 'function') await libraryStorageAdapter.close().catch(()=>{}); if (localPool && !pool) await localPool.end(); }
+    get realtimeHub() { return realtimeHub; }, get realtimeBridge() { return realtimeBridge; }, get presenceService() { return presence; },
+    ready() { return realtimeBridgeReady; },
+    get realtimeMode() {
+      if (injectedRealtimeHub && injectedPresenceService) return 'injected-adapters';
+      if (!realtimeEnabled) return 'disabled';
+      if (realtimeBridge) return 'redis-shared-presence-pubsub';
+      return configuredPresenceStore === 'redis' ? 'single-process-hub-shared-redis-presence' : 'single-process-preview';
+    },
+    get presenceStore() {
+      if (injectedPresenceService && configuredPresenceStore === 'redis') return 'redis';
+      return injectedPresenceService ? 'injected' : configuredPresenceStore;
+    },
+    async close() {
+      realtimeHub?.close?.();
+      if (realtimeBridge && typeof realtimeBridge.close === 'function') await Promise.resolve(realtimeBridge.close()).catch(() => {});
+      if (presence && typeof presence.close === 'function') await Promise.resolve(presence.close()).catch(() => {});
+      samlAuth?.close?.();
+      if (typeof libraryStorageAdapter?.close === 'function') await libraryStorageAdapter.close().catch(()=>{});
+      if (localPool && !pool) await localPool.end();
+    }
   };
   return server;
 }
 
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
-  const server = createApiServer(); const host = process.env.HOST || '127.0.0.1'; const port = Number(process.env.PORT || 8787);
-  server.listen(port, host, () => console.error(JSON.stringify({ type: 'systemfabric.api.started', host, port, version: SYSTEMFABRIC_VERSION, aiProvider: server.systemfabric ? 'configured' : 'unknown' })));
+  let presenceService = null;
+  let realtimeBridge = null;
+  const realtimeEnabled = process.env.SYSTEMFABRIC_REALTIME_ENABLED === 'true';
+  const presenceStore = String(process.env.SYSTEMFABRIC_PRESENCE_STORE || 'memory').toLowerCase();
+  if (!['memory', 'redis'].includes(presenceStore)) {
+    throw new Error('SYSTEMFABRIC_PRESENCE_STORE must be memory or redis.');
+  }
+  if (realtimeEnabled && process.env.NODE_ENV === 'production') {
+    throw new Error('The standalone API entry point does not yet provide a distributed event gateway. Inject both the distributed event hub and presence service through the production host bootstrap.');
+  }
+  if (realtimeEnabled && presenceStore === 'redis') {
+    try {
+      const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
+      realtimeBridge = await createRedisRealtimeBridge({
+        url: redisUrl,
+        onError: event => console.error(JSON.stringify({ type: 'systemfabric.realtime.redis_error', ...event }))
+      });
+    presenceService = await createRedisPresenceService({
+      url: redisUrl,
+      leaseMs: boundedInt(process.env.SYSTEMFABRIC_PRESENCE_LEASE_MS, 30_000, 5_000, 120_000, 'SYSTEMFABRIC_PRESENCE_LEASE_MS'),
+      maxEntriesPerSite: boundedInt(process.env.SYSTEMFABRIC_PRESENCE_MAX_SESSIONS_PER_SITE, 10_000, 1, 100_000, 'SYSTEMFABRIC_PRESENCE_MAX_SESSIONS_PER_SITE'),
+      expiryRetentionMs: boundedInt(process.env.SYSTEMFABRIC_PRESENCE_EXPIRY_RETENTION_MS, 30_000, 1_000, 300_000, 'SYSTEMFABRIC_PRESENCE_EXPIRY_RETENTION_MS'),
+      onError: event => console.error(JSON.stringify({ type: 'systemfabric.presence.redis_error', ...event })),
+      onExpired: event => {
+        console.error(JSON.stringify({ type: 'systemfabric.presence.lease_expired', siteId: event.siteId, expiredAtMs: event.expiredAtMs }));
+        return realtimeBridge.publish({ siteId: event.siteId, topic: 'presence', payload: { kind: 'presence.refresh' } })
+          .catch(() => console.error(JSON.stringify({ type: 'systemfabric.realtime.expiry_publish_failed', siteId: event.siteId })));
+      }
+      });
+    } catch (error) {
+      await Promise.all([
+        presenceService?.close?.().catch(() => {}),
+        realtimeBridge?.close?.().catch(() => {})
+      ]);
+      throw error;
+    }
+  }
+  let server;
+  try {
+    server = createApiServer({ presenceService, realtimeBridge });
+    await server.systemfabric.ready();
+  } catch (error) {
+    await Promise.all([
+      presenceService?.close?.().catch(() => {}),
+      realtimeBridge?.close?.().catch(() => {})
+    ]);
+    throw error;
+  }
+  const host = process.env.HOST || '127.0.0.1'; const port = Number(process.env.PORT || 8787);
+  server.listen(port, host, () => console.error(JSON.stringify({ type: 'systemfabric.api.started', host, port, version: SYSTEMFABRIC_VERSION, aiProvider: server.systemfabric ? 'configured' : 'unknown', realtimeMode: server.systemfabric.realtimeMode, presenceStore: server.systemfabric.presenceStore })));
   const shutdown = async () => { server.close(async () => { await server.systemfabric.close().catch(() => {}); process.exit(0); }); setTimeout(() => process.exit(1), 5000).unref(); };
   process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 }

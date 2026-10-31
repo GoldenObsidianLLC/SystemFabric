@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const { loadEnvFile } = require('./load-env');
 const { createPostgresPool } = require('../packages/db/src/postgres-store');
-const { createOutboxWorker } = require('../packages/db/src/outbox-worker');
+const { createGraphProjectionWorker } = require('../apps/worker/src/outbox-worker');
 const {
   createMemgraphDriver,
   createMemgraphProjector,
@@ -35,6 +35,23 @@ function docker(args) {
   }
 
   return result.stdout.trim();
+}
+
+function resolveContainerGraphUrl(containerId, currentUrl) {
+  // A test harness can pin a loopback host port so container restart keeps the
+  // same endpoint; dynamic mappings are re-resolved for other configurations.
+  if (process.env.MEMGRAPH_TEST_STATIC_PORT === 'true') return currentUrl;
+  const mappings = docker(['port', containerId, '7687/tcp']).split(/\r?\n/);
+  const mapping = mappings.find(value => value.trim().startsWith('127.0.0.1:'));
+  if (!mapping) {
+    throw new Error('The restarted Memgraph container has no loopback Bolt port mapping.');
+  }
+  const port = mapping.trim().slice(mapping.trim().lastIndexOf(':') + 1);
+  if (!Number.isInteger(Number(port)) || Number(port) < 1) {
+    throw new Error('The restarted Memgraph container returned an invalid Bolt port mapping.');
+  }
+  const parsed = new URL(currentUrl);
+  return `${parsed.protocol}//127.0.0.1:${port}`;
 }
 
 function isContainerRunning(containerId) {
@@ -79,7 +96,7 @@ async function waitForGraph(driver, label, timeoutMs = 60_000) {
 
 async function main() {
   const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-  const graphUrl =
+  let graphUrl =
     process.env.MEMGRAPH_TEST_URL || process.env.MEMGRAPH_URL;
   const containerId = process.env.MEMGRAPH_TEST_CONTAINER_ID;
 
@@ -152,6 +169,7 @@ async function main() {
   let eventId;
   let contentId;
   let siteId;
+  const consumerGroup = `it.graph.outage.${randomUUID().replaceAll('-', '')}`;
   let cleanupError;
 
   try {
@@ -177,7 +195,25 @@ async function main() {
     );
 
     contentId = randomUUID();
-    siteId = randomUUID();
+    const site = await pool.query(
+      'INSERT INTO sites(slug,name) VALUES($1,$2) RETURNING id',
+      [`graph-outage-${randomUUID().slice(0, 10)}`, 'Graph Outage Integration Site']
+    );
+    siteId = site.rows[0].id;
+
+    // Establish a clean replay baseline for this one-off consumer group so the
+    // outage test exercises only the event inserted below, not prior history.
+    const { GRAPH_PROJECTION_EVENT_TYPES } = require('../apps/worker/src/outbox-worker');
+    await pool.query(
+      'INSERT INTO outbox_consumer_groups(consumer_group,event_types) VALUES($1,$2::text[])',
+      [consumerGroup, GRAPH_PROJECTION_EVENT_TYPES]
+    );
+    await pool.query(
+      `INSERT INTO outbox_deliveries(event_id,consumer_group,status,processed_at)
+       SELECT id,$1,'processed',now() FROM outbox_events
+       ON CONFLICT (event_id,consumer_group) DO NOTHING`,
+      [consumerGroup]
+    );
 
     const payload = {
       id: contentId,
@@ -196,31 +232,37 @@ async function main() {
          aggregate_id,
          aggregate_version,
          event_type,
-         payload
+         payload,
+         schema_version,
+         site_id,
+         classification
        )
        VALUES (
-         'integration-memgraph-outage',
+         'content',
          $1,
          1,
          'content.upsert',
-         $2::jsonb
+         $2::jsonb,
+         1,
+         $3,
+         'site-private'
        )
        RETURNING id`,
-      [contentId, JSON.stringify(payload)]
+      [contentId, JSON.stringify(payload), siteId]
     );
 
     eventId = inserted.rows[0].id;
 
-    const createWorker = currentProjector => createOutboxWorker({
+    const createWorker = currentProjector => createGraphProjectionWorker({
       pool,
       projector: currentProjector,
+      consumerGroup,
       workerId: `it-outage-${randomUUID()}`,
       batchSize: 1,
+      dispatchBatchSize: 10,
       maxAttempts: 3,
       onError: error => {
-        console.log(
-          `Projection attempt failed: ${error.errorCode}`
-        );
+        console.log(`Projection attempt failed: ${error.errorCode}`);
       },
     });
 
@@ -244,15 +286,15 @@ async function main() {
 
     assert.equal(first.claimed, 1);
     assert.equal(first.results.length, 1);
-    assert.equal(first.results[0].id, eventId);
+    assert.equal(first.results[0].eventId, eventId);
     assert.equal(first.results[0].ok, false);
     assert.equal(first.results[0].dead, false);
 
     const failed = await pool.query(
       `SELECT status, attempts, last_error_code, locked_by, lease_expires_at
-         FROM outbox_events
-        WHERE id = $1`,
-      [eventId]
+         FROM outbox_deliveries
+        WHERE event_id = $1 AND consumer_group = $2`,
+      [eventId, consumerGroup]
     );
 
     assert.equal(failed.rows[0].status, 'pending');
@@ -269,24 +311,26 @@ async function main() {
 
     docker(['start', containerId]);
 
-    await waitForGraph(driver, 'Memgraph recovery');
+    // Docker may assign a new host port when a stopped container used an
+    // ephemeral loopback mapping. Refresh the endpoint before opening a new driver.
+    graphUrl = resolveContainerGraphUrl(containerId, graphUrl);
 
-    // Create a fresh driver after the outage, simulating a worker process
-    // establishing a new connection after its graph dependency recovers.
+    // Establish a fresh driver after the graph restart, as a recovered worker
+    // process would do when reconnecting to its dependency.
     await driver.close();
     driver = null;
     projector = null;
 
     ({ driver, projector } = createGraphConnection(graphUrl));
 
-    await waitForGraph(driver, 'Fresh graph connection');
+    await waitForGraph(driver, 'Memgraph recovery');
 
     const retryReady = await pool.query(
-      `UPDATE outbox_events
+      `UPDATE outbox_deliveries
           SET available_at = now() - interval '1 second'
-        WHERE id = $1 AND status = 'pending'
-        RETURNING id`,
-      [eventId]
+        WHERE event_id = $1 AND consumer_group = $2 AND status = 'pending'
+        RETURNING event_id`,
+      [eventId, consumerGroup]
     );
 
     assert.equal(retryReady.rowCount, 1);
@@ -295,14 +339,14 @@ async function main() {
     const second = await recoveryWorker.runOnce();
 
     assert.equal(second.claimed, 1);
-    assert.equal(second.results[0].id, eventId);
+    assert.equal(second.results[0].eventId, eventId);
     assert.equal(second.results[0].ok, true);
 
     const recovered = await pool.query(
       `SELECT status, attempts, last_error_code, processed_at, locked_by
-         FROM outbox_events
-        WHERE id = $1`,
-      [eventId]
+         FROM outbox_deliveries
+        WHERE event_id = $1 AND consumer_group = $2`,
+      [eventId, consumerGroup]
     );
 
     assert.equal(recovered.rows[0].status, 'processed');
@@ -369,6 +413,16 @@ async function main() {
       }
     }
 
+    if (pool && consumerGroup) {
+      await pool.query(
+        'DELETE FROM outbox_consumer_groups WHERE consumer_group = $1',
+        [consumerGroup]
+      ).catch(error => {
+        cleanupError ||= error;
+        console.error(`Consumer group cleanup failed: ${error.message}`);
+      });
+    }
+
     if (pool && eventId) {
       await pool.query(
         'DELETE FROM outbox_events WHERE id = $1',
@@ -376,6 +430,13 @@ async function main() {
       ).catch(error => {
         cleanupError ||= error;
         console.error(`Outbox fixture cleanup failed: ${error.message}`);
+      });
+    }
+
+    if (pool && siteId) {
+      await pool.query('DELETE FROM sites WHERE id=$1', [siteId]).catch(error => {
+        cleanupError ||= error;
+        console.error(`Site fixture cleanup failed: ${error.message}`);
       });
     }
 
@@ -397,7 +458,15 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(`REAL MEMGRAPH OUTAGE TEST FAILED: ${error.stack || error.message}`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(`REAL MEMGRAPH OUTAGE TEST FAILED: ${error.stack || error.message}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  main,
+  resolveContainerGraphUrl,
+  isContainerRunning
+};

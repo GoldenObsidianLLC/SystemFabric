@@ -4,7 +4,7 @@
 
 # SystemFabric
 
-**A modular Node.js platform foundation for content workflows, commerce, identity, community, and extensible application services.**
+**A modular Node.js application platform designed to augment human capability through secure, governed human-AI collaboration.**
 
 [![SystemFabric CI](https://github.com/GoldenObsidianLLC/SystemFabric/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GoldenObsidianLLC/SystemFabric/actions/workflows/ci.yml)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/License-GPL--2.0--or--later-blue.svg)](LICENSE)
@@ -37,6 +37,8 @@
 SystemFabric is organized as a modular Node.js repository. Its application layer includes API, administration, MCP, plugin-runner, and worker applications. Shared packages provide domain validation, rendering, identity and authentication helpers, AI-provider adapters, data stores, commerce and checkout workflows, community operations, media and cloud adapters, security controls, and related platform services.
 
 The repository aims to make platform behaviors explicit and testable: validate inputs before side effects, bound resource use, fail closed when security-sensitive configuration is missing, keep transactional state in PostgreSQL, and use graph projections for relationship-oriented queries. Provider integrations and operational controls have different maturity levels; consult the test matrix and release-readiness document before relying on any integration in production.
+
+SystemFabric is guided by the [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md): AI should amplify human capability, preserve creative dignity and meaningful participation, and remain subject to clear human agency and accountable governance. These are product and engineering principles, not promises of employment, income or macroeconomic outcomes. See [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) for the technical interpretation.
 
 ## Capabilities
 
@@ -158,6 +160,9 @@ Start at **[the documentation index](docs/README.md)**.
 | Document | Purpose |
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | Application/package map, data flow, and boundaries. |
+| [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md) | Project mission and human-AI symbiosis vision. |
+| [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) | Human agency, consent, accountability and engineering constraints. |
+| [Real-Time Foundation 1](docs/REALTIME-FOUNDATION-F1.md) | Developer-preview presence and event streaming foundation, with limitations. |
 | [Development](docs/DEVELOPMENT.md) | Local setup, configuration, and contributor workflow. |
 | [Testing](docs/TESTING.md) | Test commands, prerequisites, scope, and validation caveats. |
 | [Security](docs/SECURITY.md) | Threat assumptions, secret handling, and security-sensitive controls. |

@@ -42,7 +42,7 @@ async function readCanonicalSnapshot(pool, maxRows) {
     // Read sequentially on the same client and repeatable-read snapshot.
     const contentResult = await client.query(`
       SELECT id, site_id, content_type, slug, locale, title,
-             status, version, deleted_at
+             status, version, lock_version, deleted_at
         FROM content_items
        ORDER BY id
     `);
@@ -180,6 +180,7 @@ async function rebuildGraphProjection({
         title: row.title,
         status: row.status,
         version: row.version,
+        projectionVersion: row.lock_version,
       },
     });
 
