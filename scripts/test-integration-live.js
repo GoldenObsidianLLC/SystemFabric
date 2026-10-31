@@ -138,7 +138,11 @@ async function main() {
     if (!['redis:', 'rediss:'].includes(parsedRedis.protocol) || !allowedRedisHosts.has(parsedRedis.hostname.toLowerCase())) {
       throw new Error('Safety stop: Redis integration is restricted to a local Redis/Memurai test service.');
     }
+    // Reuse the one explicitly approved loopback Redis endpoint for both
+    // presence and document Pub/Sub integration suites. Those suites require
+    // SYSTEMFABRIC_TEST_REDIS_URL and must never guess a Redis target.
     env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION = 'true';
+    env.SYSTEMFABRIC_TEST_REDIS_URL = redisUrl;
   } else {
     delete env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION;
   }
