@@ -124,6 +124,29 @@ test(
       headers: authHeaders,
     });
     assert.equal(ordinaryForbidden.status, 403, 'site A must reject an actor who belongs only to site B');
+    const ordinaryForbiddenBody = await ordinaryForbidden.json();
+    assert.equal(ordinaryForbiddenBody.code, 'ERR_SYSTEMFABRIC_TENANT_FORBIDDEN');
+    assert.doesNotMatch(JSON.stringify(ordinaryForbiddenBody), new RegExp(privateMarker));
+
+    // Duplicate selectors are rejected even when both values happen to agree.
+    // This prevents callers and intermediaries from interpreting repeated query keys differently.
+    const repeatedQuery = await fetch(
+      `${base}/api/v1/sites/${siteB}/community/feed?siteId=${siteB}&siteId=${siteB}`,
+      { headers: authHeaders }
+    );
+    assert.equal(repeatedQuery.status, 400);
+    const repeatedQueryBody = await repeatedQuery.json();
+    assert.equal(repeatedQueryBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.doesNotMatch(JSON.stringify(repeatedQueryBody), new RegExp(privateMarker));
+
+    // A malformed standalone selector must fail validation before any site lookup.
+    const malformedQuery = await fetch(`${base}/api/v1/content-types?siteId=not-a-uuid`, {
+      headers: authHeaders,
+    });
+    assert.equal(malformedQuery.status, 400);
+    const malformedQueryBody = await malformedQuery.json();
+    assert.equal(malformedQueryBody.code, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID');
+    assert.doesNotMatch(JSON.stringify(malformedQueryBody), new RegExp(privateMarker));
 
     const headerMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
       headers: { ...authHeaders, 'x-systemfabric-site-id': siteB },
@@ -137,7 +160,9 @@ test(
       headers: authHeaders,
     });
     assert.equal(queryMismatch.status, 400, 'a site B query selector must not authorize a site A route');
-    assert.equal((await queryMismatch.json()).code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    const queryMismatchBody = await queryMismatch.json();
+    assert.equal(queryMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.doesNotMatch(JSON.stringify(queryMismatchBody), new RegExp(privateMarker));
 
     const bodyMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
       method: 'POST',
@@ -145,7 +170,9 @@ test(
       body: JSON.stringify({ siteId: siteB, body: writeMarker, visibility: 'members' }),
     });
     assert.equal(bodyMismatch.status, 400, 'a site B body selector must not authorize writes to a site A route');
-    assert.equal((await bodyMismatch.json()).code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    const bodyMismatchBody = await bodyMismatch.json();
+    assert.equal(bodyMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.doesNotMatch(JSON.stringify(bodyMismatchBody), new RegExp(privateMarker));
 
     const writeMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
       method: 'POST',
@@ -153,7 +180,19 @@ test(
       body: JSON.stringify({ body: writeMarker, visibility: 'members' }),
     });
     assert.equal(writeMismatch.status, 400, 'a site B header must not authorize writes to a site A route');
-    assert.equal((await writeMismatch.json()).code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    const writeMismatchBody = await writeMismatch.json();
+    assert.equal(writeMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.doesNotMatch(JSON.stringify(writeMismatchBody), new RegExp(privateMarker));
+
+    const malformedBodySelector = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({ siteId: 42, body: writeMarker, visibility: 'members' }),
+    });
+    assert.equal(malformedBodySelector.status, 400);
+    const malformedBodySelectorBody = await malformedBodySelector.json();
+    assert.equal(malformedBodySelectorBody.code, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID');
+    assert.doesNotMatch(JSON.stringify(malformedBodySelectorBody), new RegExp(privateMarker));
 
     const writtenAcrossSites = await pool.query(
       'SELECT id FROM social_activities WHERE site_id = $1 AND body = $2',
@@ -167,5 +206,13 @@ test(
     assert.equal(ownSite.status, 200, 'valid requests scoped to the actor\'s own site should still work');
     const ownSiteBody = await ownSite.json();
     assert.doesNotMatch(JSON.stringify(ownSiteBody), new RegExp(privateMarker));
+
+    const matchingSelectors = await fetch(
+      `${base}/api/v1/sites/${siteB}/community/feed?siteId=${siteB}`,
+      { headers: { ...authHeaders, 'x-systemfabric-site-id': siteB } }
+    );
+    assert.equal(matchingSelectors.status, 200, 'matching route, header, and query selectors should be accepted');
+    const matchingSelectorsBody = await matchingSelectors.json();
+    assert.doesNotMatch(JSON.stringify(matchingSelectorsBody), new RegExp(privateMarker));
   }
 );
