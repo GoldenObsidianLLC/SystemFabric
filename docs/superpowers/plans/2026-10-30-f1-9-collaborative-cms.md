@@ -1,6 +1,6 @@
 # F1.9 Collaborative CMS Implementation Proof — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ] ) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [x] ) syntax for tracking.
 
 **Goal:** Build a draft-only server-authoritative semantic OT proof with durable PostgreSQL sequencing, bounded reconnect and two independent browser sessions.
 
@@ -43,12 +43,12 @@
 - applyCollaborationOperation(document, operation) -> { document, appliedOperation, changed }
 - Use exported TYPE_PROPS, CONTAINER_TYPES and validatePageDocument.
 
-- [ ] Write tests for envelope validation and title/property/insert/delete/move operations.
-- [ ] Add stale same-anchor insert ordering, independent/same-property writes and delete-vs-edit tests.
-- [ ] Add text transform tests for concurrent same-offset insert, overlapping delete and emoji/surrogate-safe code-point offsets.
-- [ ] Run node --test test/collaboration.test.js and observe expected missing-module failures.
-- [ ] Implement the smallest pure transform/apply engine that passes the conflict matrix; return typed conflicts and validate the final page tree.
-- [ ] Run the focused test file and syntax checks.
+- [x] Write tests for envelope validation and title/property/insert/delete/move operations.
+- [x] Add stale same-anchor insert ordering, independent/same-property writes and delete-vs-edit tests.
+- [x] Add text transform tests for concurrent same-offset insert, overlapping delete and emoji/surrogate-safe code-point offsets.
+- [x] Run node --test test/collaboration.test.js and observe expected missing-module failures.
+- [x] Implement the smallest pure transform/apply engine that passes the conflict matrix; return typed conflicts and validate the final page tree.
+- [x] Run the focused test file and syntax checks.
 
 ### Task 2: Durable PostgreSQL operation sequencing
 
