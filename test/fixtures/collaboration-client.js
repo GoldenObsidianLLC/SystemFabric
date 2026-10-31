@@ -5,6 +5,8 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
   return page.evaluate(async config => {
     const messages = [];
     const waiters = [];
+    const pendingOperations = new Map();
+    let lastSequence = Number(config.afterSequence) || 0;
     const applyOperation = operation => {
       const payload = operation?.payload || {};
       if (operation?.type === 'document.set_title') {
@@ -30,7 +32,10 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
       socket: null,
       messages,
       waitFor(type, timeoutMs = 3_000) {
-        const index = messages.findIndex(message => message.type === type);
+        const matches = message => type === 'document.operation.any'
+          ? ['document.operation', 'document.sync.operation'].includes(message.type)
+          : message.type === type;
+        const index = messages.findIndex(matches);
         if (index >= 0) return Promise.resolve(messages.splice(index, 1)[0]);
         return new Promise((resolve, reject) => {
           const waiter = { type, resolve, timer: null };
@@ -65,11 +70,24 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
     client.socket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
       if (message.type === 'document.operation' || message.type === 'document.sync.operation' || message.type === 'document.operation.ack') {
-        applyOperation(message.operation);
+        const sequence = Number(message.sequence);
+        if (Number.isSafeInteger(sequence) && sequence > lastSequence && message.operation) {
+          if (!pendingOperations.has(sequence)) pendingOperations.set(sequence, message.operation);
+          while (pendingOperations.has(lastSequence + 1)) {
+            const nextSequence = lastSequence + 1;
+            applyOperation(pendingOperations.get(nextSequence));
+            pendingOperations.delete(nextSequence);
+            lastSequence = nextSequence;
+          }
+        }
       } else if (message.type === 'document.reload') {
         client.document = structuredClone(message.document);
+        lastSequence = Number(message.sequence) || lastSequence;
+        pendingOperations.clear();
       }
-      const waiterIndex = waiters.findIndex(waiter => waiter.type === message.type);
+      const waiterIndex = waiters.findIndex(waiter => waiter.type === 'document.operation.any'
+        ? ['document.operation', 'document.sync.operation'].includes(message.type)
+        : waiter.type === message.type);
       if (waiterIndex >= 0) {
         const [waiter] = waiters.splice(waiterIndex, 1);
         clearTimeout(waiter.timer);
@@ -102,6 +120,10 @@ async function waitForCollaborationMessage(page, type, timeoutMs = 3_000) {
   ), { expectedType: type, waitMs: timeoutMs });
 }
 
+async function waitForAnyCollaborationMessage(page, timeoutMs = 3_000) {
+  return waitForCollaborationMessage(page, 'document.operation.any', timeoutMs);
+}
+
 async function readCollaborativeDocument(page) {
   return page.evaluate(() => window.__systemfabricCollaboration.snapshot());
 }
@@ -114,6 +136,7 @@ module.exports = {
   connectCollaborationClient,
   sendCollaborationCommand,
   waitForCollaborationMessage,
+  waitForAnyCollaborationMessage,
   readCollaborativeDocument,
   closeCollaborationClient
 };

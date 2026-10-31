@@ -195,7 +195,7 @@ git commit -m "feat(collaboration): reconcile document sequences on heartbeat"
 - Consumes: Task 1 bridge `publishDocumentOperation`, Task 2 API injection and Task 3 heartbeat reconciliation.
 - Produces: repeatable two-instance test fixtures and evidence for 2/5/10 concurrent editor sessions.
 
-- [ ] **Step 1: Write failing real-Redis integration tests**
+- [x] **Step 1: Add real-Redis integration tests**
 
 Add a test gated by `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true` and `SYSTEMFABRIC_TEST_REDIS_URL`. Validate that the URL uses an explicitly approved local endpoint before connecting. Use a unique channel prefix per test run; do not print URL credentials.
 
@@ -204,23 +204,23 @@ Test two independent bridge clients/hubs for:
 - No cross-site or cross-document event delivery.
 - Publisher self-echo suppression and recipient sequence preservation.
 - Redis publish failure returns degraded after local delivery.
-- Reordered, duplicate and dropped hints are repaired from PostgreSQL sequence sync.
+- Reordered, duplicate and dropped hints are repaired from PostgreSQL sequence sync (covered in the two-instance Playwright proof and gateway regression tests; the standalone real-Redis integration test is limited to Pub/Sub routing and local-first degraded publication).
 
-- [ ] **Step 2: Run integration tests to verify they fail**
+- [x] **Step 2: Validate test gate and live Redis behavior**
 
 Run: `node --test test/integration/redis-collaboration.integration.test.js`
-Expected: FAIL with the current bridge rejecting document publication.
+Expected: the original RED expectation was superseded because Task 1 had already implemented the document bridge before Task 4 added its real-Redis harness. A first environment invocation accidentally included trailing whitespace in the URL and skipped both tests; the corrected explicit-loopback invocation then passed 2/2 with zero skips. Reordered/duplicate/dropped hint recovery is asserted in the Playwright API-multi-instance proof.
 
-- [ ] **Step 3: Implement the real-Redis integration harness**
+- [x] **Step 3: Implement the real-Redis integration harness**
 
 Use `createRedisRealtimeBridge` with two independent client pairs and two local hubs. The real Redis test validates only Pub/Sub routing and independent clients; use the in-memory store for operation sequence/recovery. Give each test a random `systemfabric:test:f1-10:<uuid>` channel prefix and close hubs/bridges in `t.after` cleanup. Do not change Redis databases, flush keys or inspect any application database.
 
-- [ ] **Step 4: Run the explicit local Redis integration test**
+- [x] **Step 4: Run the explicit local Redis integration test**
 
 Run: `set SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true && set SYSTEMFABRIC_TEST_REDIS_URL=redis://127.0.0.1:6379 && node --test test/integration/redis-collaboration.integration.test.js`
 Expected: test PASS with no skips; fixture validates the endpoint is loopback and the test opens no application database. Use the configured local Redis-compatible endpoint only; never print credentials.
 
-- [ ] **Step 5: Write failing multi-instance browser tests**
+- [x] **Step 5: Write multi-instance browser tests first**
 
 Start two independent `createApiServer` instances on ephemeral loopback ports, each with its own realtime hub/Redis bridge/limiter and a shared in-memory collaboration store/identity adapter. Use two isolated browser contexts and separate sessions.
 
@@ -231,12 +231,12 @@ Prove:
 - Closing one API instance and reconnecting the client to the surviving instance replays the durable operation sequence.
 - A 2/5/10-editor matrix spread over the two instances delivers no duplicate or missing sequence after reconciliation, with bounded queues and no unhandled errors. Record p50/p95/p99 delivery and reconciliation latency; do not claim production capacity certification.
 
-- [ ] **Step 6: Run the multi-instance browser tests**
+- [x] **Step 6: Run the multi-instance browser tests**
 
 Run: `node node_modules/@playwright/test/cli.js test test/e2e/collaboration-multinode.spec.js --reporter=line`
 Expected: all tests PASS using the approved local Redis endpoint; test servers/bridges start and stop and all browser contexts close in cleanup.
 
-- [ ] **Step 7: Commit the multi-instance proof**
+- [x] **Step 7: Commit the multi-instance proof**
 
 ```bash
 git add test/integration/redis-collaboration.integration.test.js test/e2e/collaboration-multinode.spec.js test/fixtures/collaboration-multinode.js package.json
