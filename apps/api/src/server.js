@@ -1321,6 +1321,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
                 payload: {
                   kind: 'document.operation',
                   sequence: result.sequence,
+                  originConnectionId: null,
                   operation: result.operation
                 }
               });

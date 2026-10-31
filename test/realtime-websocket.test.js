@@ -361,6 +361,7 @@ test('two WebSocket sessions join the same draft, receive committed operations, 
   const ack = await nextMessage(first);
   assert.equal(ack.type, 'document.operation.ack');
   assert.equal(ack.sequence, 1);
+  assert.equal(ack.operation.payload.title, 'Shared title', 'the acknowledgement carries the committed transformed operation');
   const event = await nextMessage(second);
   assert.equal(event.type, 'document.operation');
   assert.equal(event.contentId, contentId);
@@ -594,7 +595,7 @@ test('WebSocket join replays accepted operations and isolates delivery by docume
 
   first.send(JSON.stringify({ type: 'document.operation', contentId: firstId, operation: submittedOperation }));
   assert.equal((await nextMessage(first)).type, 'document.operation.ack');
-  assert.equal((await nextMessage(first)).type, 'document.operation');
+  await assert.rejects(nextMessage(first, 100), /Timed out waiting for WebSocket message/);
   await assert.rejects(
     nextMessage(second, 100),
     /Timed out waiting for WebSocket message/

@@ -102,6 +102,7 @@ test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and
     });
     assert.equal(retry.sequence, 1);
     assert.equal(retry.duplicate, true);
+    assert.equal(retry.operation.payload.key, 'level', 'a retained duplicate returns the exact server-applied operation');
 
     await assert.rejects(
       store.applyCollaborationOperation({
@@ -166,8 +167,10 @@ test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and
     const prunedRetry = await store.applyCollaborationOperation({
       siteId: siteA, contentId: saved.id, actorId: authorId, operation: firstOperation
     });
-    assert.equal(prunedRetry.sequence, 1);
+    assert.equal(prunedRetry.sequence, 1001);
+    assert.equal(prunedRetry.reloadRequired, true, 'a pruned idempotency tombstone requires canonical reload instead of a partial acknowledgement');
     assert.equal(prunedRetry.duplicate, true, 'idempotency keys must outlive pruned replay operations');
+    assert.equal(prunedRetry.document.title, 'After compaction');
     const retained = await pool.query(
       'SELECT count(*)::int AS count,min(sequence)::int AS min,max(sequence)::int AS max FROM content_collaboration_operations WHERE content_id=$1',
       [saved.id]

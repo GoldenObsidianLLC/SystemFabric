@@ -1,5 +1,6 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const { realtimeError } = require('./event-hub');
 const { createConnectionReadyPayload } = require('./realtime-protocol');
@@ -107,6 +108,7 @@ function createWebSocketGateway({
           clients.add(ws);
           incrementMetric(metrics, 'websocket_connections_opened_total');
           setGauge(metrics, 'active_websocket_connections', clients.size);
+          const connectionId = randomUUID();
           let cleaned = false;
           let cleanupPromise = null;
           let alive = true;
@@ -243,6 +245,10 @@ function createWebSocketGateway({
                     await deliverDocumentSync(contentId, entry, sync);
                   }
                   if (eventSequence <= entry.lastSequence || documentSubscriptions.get(contentId) !== entry) continue;
+                  if (event.payload.originConnectionId === connectionId) {
+                    entry.lastSequence = eventSequence;
+                    continue;
+                  }
                   sendDocumentOperation(
                     contentId,
                     entry,
@@ -359,6 +365,7 @@ function createWebSocketGateway({
                   payload: {
                     kind: 'document.operation',
                     sequence: result.sequence,
+                    originConnectionId: connectionId,
                     operation: result.operation
                   }
                 });
@@ -370,6 +377,7 @@ function createWebSocketGateway({
               type: 'document.operation.ack',
               contentId,
               operationId: command.operation?.opId || null,
+              operation: result.operation,
               sequence: result.sequence,
               version: result.version,
               lockVersion: result.lockVersion,

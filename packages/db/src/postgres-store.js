@@ -248,8 +248,33 @@ function createPostgresStore({ pool }) {
           if (!sameActor || !sameClient || !samePayload) {
             throw conflict('The collaboration opId was already used by a different actor, client, or payload.', 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE');
           }
+          const replayed = await client.query(
+            'SELECT applied_operation FROM content_collaboration_operations WHERE content_id=$1 AND op_id=$2',
+            [contentId, operation.opId]
+          );
+          if (!replayed.rows[0]) {
+            // The idempotency tombstone outlives the bounded replay record. Do
+            // not pretend the original transformed operation is still replayable:
+            // force the caller to install the canonical current document.
+            await client.query('COMMIT');
+            return {
+              reloadRequired: true,
+              duplicate: true,
+              sequence,
+              oldestReplaySequence,
+              document: row.body,
+              title: row.title,
+              version: row.version,
+              lockVersion: row.lock_version
+            };
+          }
           await client.query('COMMIT');
-          return { ...accepted.result, duplicate: true };
+          return {
+            ...accepted.result,
+            operation: replayed.rows[0].applied_operation,
+            appliedOperation: replayed.rows[0].applied_operation,
+            duplicate: true
+          };
         }
 
         if (row.status !== 'draft') {

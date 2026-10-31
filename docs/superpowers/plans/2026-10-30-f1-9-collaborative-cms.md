@@ -79,7 +79,7 @@
 
 - [x] Add REST operation and sync routes with site/document checks, content:edit/owner authorization, draft-only behavior and bounded bodies.
 - [x] Extend hub authorization for a UUID-scoped document topic; require a live session and content:edit or own-content edit capability.
-- [x] Add document.join/operation/leave commands, per-document subscriptions, snapshot/replay join response, committed acknowledgements and document-scoped local fan-out.
+- [x] Add document.join/operation/leave commands, per-document subscriptions, snapshot/replay join response, committed acknowledgements carrying the server-transformed op, unique server-connection origin-echo suppression and sequence-gap recovery before suppression.
 - [x] Raise only the WebSocket frame ceiling to 16 KiB, cap operation payload at 12 KiB, keep 60 messages/minute and 1 MiB backpressure.
 - [x] Test wrong-site access, insufficient capability, cross-document delivery isolation, operation rejection, disconnect cleanup, authorization revocation and replay join.
 - [x] Run focused API/WebSocket tests (22/22 pass).
@@ -91,11 +91,11 @@
 - Create: test/fixtures/collaboration-client.js (only the minimal browser test driver; no production editor UI).
 - Test: test/e2e/collaboration.spec.js
 
-- [ ] Start an isolated in-test API server with fake session authentication and the semantic collaboration store adapter; never open the primary database.
-- [ ] Use two separate browser contexts/cookie sessions and real WebSocket connections to join the same draft.
-- [ ] Exercise concurrent different-property edits from base sequence 0 and assert both browser clients receive one converged canonical result.
-- [ ] Exercise lost-ack retry and reconnect by sequence; expired sequence must install the canonical reload snapshot.
-- [ ] Run the dedicated Playwright test and record browser/version evidence.
+- [x] Start an isolated in-test API server with fake session authentication and the semantic collaboration store adapter; never open the primary database.
+- [x] Use two separate browser contexts/cookie sessions and real WebSocket connections to join the same draft.
+- [x] Exercise concurrent different-property edits from base sequence 0 and assert both browser clients receive one converged canonical result.
+- [x] Exercise lost-ack retry and reconnect by sequence; expired sequence must install the canonical reload snapshot.
+- [x] Run the dedicated Playwright test and record browser/version evidence (Chrome channel 156.0.8078.48, 1/1 pass).
 
 ### Task 5: Documentation and release gates
 
@@ -106,6 +106,6 @@
 - Modify: docs/ARCHITECTURE-DECISIONS.md
 - Modify: CHANGELOG.md
 
-- [ ] Document operation envelope, transform rules, durable sequence, retention/reload, WebSocket commands and explicit limits.
-- [ ] Record ADR/provisional status; mark only test-proven F1.9 scope complete and retain load/soak/security/accessibility/multi-instance notifications as open.
-- [ ] Run focused tests, isolated PostgreSQL integration, browser proof, npm run check, git diff --check and final review.
+- [x] Document operation envelope, transform rules, durable sequence, retention/reload, WebSocket commands and explicit limits.
+- [x] Record ADR/provisional status; only test-proven F1.9 scope is complete and load/soak/security/accessibility/multi-instance notifications remain open.
+- [x] Run final focused tests (34/34), isolated PostgreSQL integration (8/8), browser proof (Chrome 156.0.8078.48; 1/1), npm run check (198/198; 141 required paths and 135 JS syntax checks), git diff --check and final self-review on the completed branch.

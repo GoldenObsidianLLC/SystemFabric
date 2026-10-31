@@ -1,11 +1,11 @@
-# Real-Time Foundation 1: Presence Preview
+# Real-Time Foundation 1: Presence and Collaboration Previews
 
-**Status:** Implemented developer-preview foundation; not production-certified
-**Working branch:** `fix/serialize-live-integration-tests`
+**Status:** Implemented developer-preview foundation and F1.9 collaborative CMS correctness proof; not production-certified
+**Working branch:** `feat/f1-9-collaborative-cms`
 **Baseline:** SystemFabric 0.5.1
-**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery.
+**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery; Foundation 1.9 draft-only semantic OT, PostgreSQL operation sequencing, authenticated document REST/WebSocket protocol and two-session browser proof.
 
-This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh plus authorization invalidation; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. This is not a durable event broker, collaborative editing protocol or production-certified multi-replica gateway.
+This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source and the canonical sequencer for collaborative draft operations. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh plus authorization invalidation; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. F1.9 adds a process-local live document notification path plus durable PostgreSQL reconnect/sync, but not cross-instance live document fan-out or production certification.
 
 ## 1. Implemented components
 
@@ -69,7 +69,7 @@ Content-Type: application/json
 - **Session separation:** multiple devices/sessions are aggregated for user presence; leaving one session does not mark the user offline if another remains active.
 - **Privacy:** hidden users are omitted from other viewers' presence lists; users can still see their own hidden state.
 - **Preview hub only:** the in-memory event hub is best-effort and has no replay cursor or persistent queue. The separate PostgreSQL consumer-group ledger provides durable handler delivery but is not the SSE transport.
-- **No document collaboration:** presence is not a CRDT/OT editing protocol and must not be used as one.
+- **Presence is not document collaboration:** presence hints and leases do not carry document edits. F1.9 adds a separate authenticated semantic-OT document protocol; the full Studio collaborative editing experience remains a later product milestone.
 - **No production claim:** this milestone does not establish horizontal scalability, high availability, production security certification, or disaster recovery.
 
 ## 5. Durable Domain Event Contract (F1.1)
@@ -399,3 +399,49 @@ Production remains NO-GO. No database migration or primary-database operation wa
 - Recovery contract: PASS at protocol level — connection.ready advertises an 8-attempt full-jitter exponential reconnect policy and snapshot-refresh mode with eventReplay=false. Clients must fetch the authoritative REST presence snapshot after reconnect; no event replay is implemented.
 - Remaining F1.8 gates: multi-instance load and partition recovery, Redis Cluster failover/lease-expiry stress, browser/proxy reconnect soak, external security review and production runbooks remain open. The production gate stays NO-GO.
 - Live Redis-compatible quota checks: PASS — a local Redis-compatible service accepted/rejected/renewed/released leases, reclaimed a slot after TTL expiry, and preserved a replacement lease when a stale lease released. Two independent Redis clients raced for a global limit of one and exactly one acquisition succeeded. Each check used a unique temporary key prefix and released its leases; this is not a Redis Cluster or multi-API-replica stress result.
+
+
+## 9. Collaborative CMS operation proof (F1.9)
+
+F1.9 implements a draft-only server-authoritative semantic OT path over the existing page-document v1 tree. PostgreSQL owns the accepted sequence and materialized draft; Redis is not used as an operation log or document-data relay.
+
+| Component | Location | Responsibility |
+|---|---|---|
+| Semantic OT engine | `packages/collaboration/src/semantic-ot.js` | Validates the bounded operation vocabulary, transforms stale edits and applies them to a cloned page tree followed by full document validation |
+| Collaboration tables | `database/migrations/0014_collaborative_document_operations.sql` | Per-document sequence/replay floor, accepted operation history and compact idempotency tombstones |
+| PostgreSQL store | `packages/db/src/postgres-store.js` | Transactional document row lock, sequencing, transformation, materialization, revision/workflow/outbox update, idempotency and replay |
+| REST protocol | `apps/api/src/server.js` | Authenticated operation submission and reconnect/sync |
+| WebSocket protocol | `packages/realtime/src/websocket-gateway.js` | Document join/operation/leave, bounded notifications, replay delivery and per-subscription authorization |
+| Browser proof | `test/e2e/collaboration.spec.js`, `test/fixtures/collaboration-client.js` | Two isolated cookie sessions using real browser WebSockets against an in-memory store adapter |
+
+### Semantic and persistence rules
+
+- The versioned page-document JSON tree remains canonical. There is no CRDT state or transport metadata stored in the published document.
+- Supported operations are `document.set_title`, `node.insert`, `node.delete`, `node.move`, `node.set_prop`, `text.insert` and `text.delete`. Structural edits use stable node, parent and sibling IDs; moves reject cycles. Property writes are restricted by the existing widget `TYPE_PROPS` allow-list.
+- Text operations address existing plain-string widget properties using Unicode code-point offsets. The semantic engine validates the full resulting page document before the store can commit it.
+- PostgreSQL locks the site-scoped content row and the collaboration sequence. One transaction applies the operation and writes materialized content, an editorial revision, workflow evidence, the content outbox event, accepted operation history and the acknowledgement/idempotency result.
+- Collaboration sequence, editorial `content_items.version` and aggregate `lock_version` are separate counters. Published snapshots are not mutated by draft operations.
+- Accepted-operation replay is bounded to 1,000 operations per document. Compact payload-hash idempotency tombstones survive history pruning so a retry of an already committed operation is never applied twice. While its applied operation remains in the replay window, the retry returns the exact transformed acknowledgement; after pruning, the server returns the canonical current document for reload instead of an incomplete acknowledgement. A whole-document save or new draft editing generation establishes a fresh checkpoint.
+- Whole-document draft saves and transitions back to draft invalidate the old operation replay generation. Operations are refused outside draft status. A cursor older than the replay floor receives a canonical reload snapshot rather than an attempted speculative transform.
+
+### Document routes and WebSocket commands
+
+| Transport | Method / command | Contract |
+|---|---|---|
+| REST | `POST /api/v1/pages/:id/collaboration/operations` | Body contains only `operation`; returns the committed sequence/version acknowledgement |
+| REST | `GET /api/v1/pages/:id/collaboration/sync?afterSequence=N` | Returns accepted operations after N, or a canonical reload snapshot when history expired |
+| WebSocket | `document.join` | Subscribe to one draft and reconcile from `afterSequence`; subscribes before reading sync to close the join/snapshot race |
+| WebSocket | `document.operation` | Submit one operation for a joined document; acknowledgement follows the durable commit |
+| WebSocket | `document.leave` | Close only the selected document subscription |
+
+Document access requires the site's `content:edit` capability or ownership plus `content:edit:own`, a current authenticated session and a draft page. Site/principal/actor identity is derived from the authenticated session. The WebSocket gateway rechecks authorization on commands and on its heartbeat; disconnect and leave release document subscriptions. Each server connection has an unguessable origin ID so the submitting socket does not receive its own operation notification; the post-commit acknowledgement includes the transformed operation so that the sender can reconcile exactly what the server accepted. Sequence-gap recovery runs before origin-echo suppression. Frames are capped at 16 KiB and individual operation envelopes at 12 KiB. Existing message-rate and outbound-buffer limits remain in force.
+
+WebSocket document notifications are process-local in F1.9. An operation committed through REST or WebSocket is durable regardless of fan-out status; other API replicas do not receive a live document notification in this milestone. All replicas can recover accepted operations from PostgreSQL on reconnect/sync. Redis Pub/Sub remains presence/authorization-only.
+
+### F1.9 validation evidence recorded on 2026-10-30
+
+- Semantic operation tests cover envelope validation, approved widget properties, insert/move/delete, cycle and deleted-target rejection, concurrent sibling insert order, property merge/last-write behavior, text range transformation, Unicode code points, overlapping delete conflicts and final document validation.
+- Live PostgreSQL test-database integration validates sequencing, stale-base convergence, idempotent retry and opId misuse, tombstone behavior after replay pruning, 1,000-operation history pruning, canonical reload, site isolation, draft-only enforcement, whole-document save/restore checkpointing and revision/workflow/outbox integration.
+- REST/WebSocket tests cover site/draft/capability boundaries, session-derived actor identity, 12 KiB operation and 16 KiB frame boundaries, document-topic isolation, replay-on-join, reload snapshots, authorization revocation and disconnect cleanup.
+- A Playwright test with two separate cookie-authenticated Chromium contexts and actual browser WebSockets proves concurrent property edits converge; it also proves an unacknowledged accepted op can be replayed and safely retried, and that an expired replay cursor installs a canonical snapshot. The browser proof uses an in-memory store and does not access PostgreSQL.
+- F1.9 remains a developer-preview correctness proof. The 2/5/10-editor load matrix, multi-instance live document fan-out/recovery under node loss, browser/proxy reconnect soak, independent security review, accessibility review, retention/backup runbooks and production operational ownership remain open. Production remains NO-GO.

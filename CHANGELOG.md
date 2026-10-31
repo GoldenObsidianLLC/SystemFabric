@@ -54,6 +54,16 @@ All notable project-level changes should be recorded here. This changelog does n
 - Add failure-injection and API tests for origin/auth rejection, authorization rechecks, command/frame limits, shared quota behavior, disconnect cleanup, relay interruption and local authorization revocation.
 - Production remains NO-GO pending multi-instance/Redis Cluster load and failover tests, browser/proxy reconnect soak, independent security review and operations runbooks.
 
+### Collaborative CMS correctness proof (F1.9)
+
+- Add a bounded server-authoritative semantic-OT engine for typed page-document title, node, property and plain-text operations, including stable-ID tree edits, deterministic stale-operation transforms, Unicode code-point text ranges and full materialized-document validation.
+- Add migration 0014 and transactional PostgreSQL collaboration sequencing with accepted-operation history, 1,000-operation replay window, canonical reload responses and idempotency tombstones that survive replay pruning.
+- Commit accepted collaborative edits atomically with the draft body, editorial revision, workflow evidence and content outbox event; preserve separation between collaboration sequence, editorial version and aggregate lock_version, and never mutate published snapshots.
+- Add site-scoped draft-only REST submit/sync endpoints and authenticated WebSocket document join/operation/leave commands with session-derived identity, edit/owner authorization, periodic revocation checks, replay, acknowledgements and local per-document notifications.
+- Keep document notification fan-out process-local; PostgreSQL remains the durable operation and reconnect source. Redis Pub/Sub is not used for document operations and no cross-instance live document delivery is claimed.
+- Prove concurrent edits, convergence, lost-ack idempotent retry, reconnect replay and expired-history reload using two separate cookie-authenticated browser contexts and real Chromium WebSocket connections.
+- Production remains NO-GO pending multi-instance fan-out/recovery, the 2/5/10-editor load matrix, reconnect soak, independent security/accessibility review, backup/retention runbooks and operational ownership.
+
 ### Release engineering and local validation
 
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.

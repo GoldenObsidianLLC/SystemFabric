@@ -98,7 +98,7 @@ This track establishes reusable infrastructure before individual screens and fea
 ### Collaborative CMS and writing assistant (P1)
 
 - [x] Evaluate CRDT and operational-transformation approaches against SystemFabric's structured document model; record the provisional semantic-OT direction and trade-offs in [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019.
-- [ ] Implement a two-client semantic-OT prototype with durable operation sequencing, typed conflict handling, reconnect/replay and persisted revision integration before production claims.
+- [x] Implement a two-client semantic-OT proof with durable PostgreSQL operation sequencing, typed conflict handling, authenticated document REST/WebSocket transport, reconnect/replay, persisted revision/workflow/outbox integration and a two-context Playwright convergence proof (F1.9; production gates remain open).
 - [ ] Implement collaborative document sessions, presence, cursors/selections, conflict handling, recovery and integration with persisted revisions.
 - [ ] Add comments and review threads with tenant-scoped authorization and immutable audit context.
 - [ ] Integrate the writing assistant for grammar, spelling, clarity, coherence, rewriting, autocomplete and context-aware suggestions.
