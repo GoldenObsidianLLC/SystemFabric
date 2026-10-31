@@ -47,7 +47,8 @@ Add repeatable tests for the resilience gaps left open by F1.10: a failed Redis 
 - [x] Run the browser-backed F1.10 2/5/10 editor matrix independently: **1/1 passed**; 153 delivery samples, p50/p95/p99 1,613/3,123/3,189 ms.
 - [x] Run F1.11 ten-session reconnect-storm WebSocket test independently: **1/1 passed**.
 - [x] Run full `npm run check`: **206/206 tests passed**; artifact verification covered 141 required paths and syntax-checked 139 JavaScript files.
-- [ ] Complete the entire multi-case F1.10 Playwright file in a clean CI runner. Combined/local reruns on this Windows host encountered Chrome `ERR_INSUFFICIENT_RESOURCES` and a page crash; the 2/5/10 matrix passed when run alone, the reconnect-storm test passed using direct WebSocket clients, and the F1.9 browser proof passed. Treat the complete browser suite as a pre-release CI gate.
+- [x] Re-run the entire multi-case F1.10 `test/e2e/collaboration-multinode.spec.js` file locally with one worker: **4/4 passed**. The 2/5/10 matrix recorded 153 samples (p50/p95/p99 1,270/2,508/2,545 ms); heartbeat repair completed in 3,625 ms; the ten-editor reconnect storm replayed 240 operations in 396 ms and accepted sequence 25 after recovery. This resolves the local page-crash failure for this isolated run.
+- [ ] Run the same full browser file in a clean hosted CI runner before release. This branch remains local-only; no push, PR, merge or deployment was performed.
 - [x] Run `git diff --check` and review the branch diff for safety, boundedness, cleanup and claims.
 
 ### Task 5 — Document and commit
