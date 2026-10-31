@@ -1,6 +1,11 @@
 'use strict';
 
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
+const {
+  validateCollaborationOperation,
+  transformCollaborationOperation,
+  applyCollaborationOperation: applyDocumentOperation
+} = require('../../collaboration/src');
 
 function createPostgresPool(env = process.env) {
   if (!env.DATABASE_URL) return null;
@@ -31,6 +36,18 @@ function conflict(message, code = 'ERR_SYSTEMFABRIC_CONFLICT') {
   const error = new Error(message); error.statusCode = 409; error.code = code; return error;
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function collaborationOperationHash(operation) {
+  return createHash('sha256').update(stableJson(operation)).digest('hex');
+}
+
 function createPostgresStore({ pool }) {
   if (!pool) throw new TypeError('A PostgreSQL pool is required.');
 
@@ -52,6 +69,35 @@ function createPostgresStore({ pool }) {
        ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`,
       [id, aggregateVersion, eventType, JSON.stringify({ id, siteId, version, ...payload }), siteId, actorId || null, correlationId || null, causationId || null]
     );
+  }
+
+  async function checkpointCollaboration(client, contentId, { initial = false } = {}) {
+    const existing = await client.query(
+      'SELECT sequence FROM content_collaboration_documents WHERE content_id=$1 FOR UPDATE',
+      [contentId]
+    );
+    if (!existing.rows[0]) {
+      const sequence = initial ? 0 : 1;
+      await client.query(
+        'INSERT INTO content_collaboration_documents(content_id,sequence,oldest_replay_sequence) VALUES($1,$2,$2) ON CONFLICT(content_id) DO NOTHING',
+        [contentId, sequence]
+      );
+      return;
+    }
+    const updated = await client.query(
+      `UPDATE content_collaboration_documents
+          SET sequence=sequence+1,
+              oldest_replay_sequence=sequence+1,
+              updated_at=now()
+        WHERE content_id=$1
+        RETURNING sequence`,
+      [contentId]
+    );
+    await client.query(
+      'DELETE FROM content_collaboration_operations WHERE content_id=$1 AND sequence<=$2',
+      [contentId, updated.rows[0].sequence]
+    );
+    await client.query('DELETE FROM content_collaboration_operation_keys WHERE content_id=$1', [contentId]);
   }
 
   async function transition({ siteId, id, actorId, correlationId = null, action, fromStatuses, toStatus, expectedVersion, note, scheduledAt, publish = false, clearPublished = false }) {
@@ -83,6 +129,7 @@ function createPostgresStore({ pool }) {
          RETURNING id,site_id,title,slug,locale,content_type,status,version,lock_version,scheduled_at,published_at,published_version,updated_at`,
         [id, siteId, toStatus, scheduledAt || null, clearPublished, publish, JSON.stringify(snapshot), row.title, extractPageText(row.body), action === 'approved', actorId || null]
       );
+      if (toStatus === 'draft' && row.status !== 'draft') await checkpointCollaboration(client, id);
       await writeWorkflow(client, { siteId, id, version: row.version, action, fromStatus: row.status, toStatus, actorId, scheduledAt, note });
       await writeOutbox(client, { id, siteId, version: row.version, aggregateVersion: updated.rows[0].lock_version, eventType: publish ? 'content.publish' : clearPublished ? 'content.unpublish' : `content.${action}`, payload: { slug: row.slug, locale: row.locale, status: toStatus, action }, actorId, correlationId });
       await client.query('COMMIT');
@@ -121,6 +168,7 @@ function createPostgresStore({ pool }) {
           );
           committedRow = result.rows[0];
         }
+        await checkpointCollaboration(client, committedRow.id, { initial: !old });
         await client.query(
           'INSERT INTO content_revisions(content_id,version,snapshot,author_id,change_summary) VALUES($1,$2,$3::jsonb,$4,$5)',
           [committedRow.id, version, JSON.stringify({ title, slug, locale, contentType, status: 'draft', document }), authorId, typeof note === 'string' && note ? note.slice(0, 2000) : (old ? 'Draft updated' : 'Draft created')]
@@ -130,6 +178,313 @@ function createPostgresStore({ pool }) {
         await client.query('COMMIT'); return committedRow;
       } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('That content route is already in use.', 'ERR_SYSTEMFABRIC_ROUTE_CONFLICT'); throw error; }
       finally { client.release(); }
+    },
+
+    async applyCollaborationOperation({ siteId, contentId, actorId = null, operation, correlationId = null }) {
+      const validation = validateCollaborationOperation(operation);
+      if (!validation.valid) {
+        const error = new Error(validation.errors.join('; '));
+        error.statusCode = 400;
+        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+        error.details = validation.errors;
+        throw error;
+      }
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidPattern.test(String(siteId || '')) || !uuidPattern.test(String(contentId || ''))) {
+        const error = new Error('siteId and contentId must be UUIDs.');
+        error.statusCode = 400;
+        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SCOPE';
+        throw error;
+      }
+      if (actorId !== null && !uuidPattern.test(String(actorId))) {
+        const error = new Error('actorId must be a UUID or null.');
+        error.statusCode = 400;
+        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_ACTOR';
+        throw error;
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const selected = await client.query(
+          `SELECT id,site_id,title,slug,locale,content_type,status,body,version,lock_version,published_snapshot
+             FROM content_items
+            WHERE id=$1 AND site_id=$2 AND deleted_at IS NULL
+            FOR UPDATE`,
+          [contentId, siteId]
+        );
+        const row = selected.rows[0];
+        if (!row) {
+          const error = new Error('Content not found.');
+          error.statusCode = 404;
+          error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+          throw error;
+        }
+
+        await client.query(
+          `INSERT INTO content_collaboration_documents(content_id,sequence,oldest_replay_sequence)
+           VALUES($1,0,0) ON CONFLICT(content_id) DO NOTHING`,
+          [contentId]
+        );
+        const collaborationResult = await client.query(
+          'SELECT sequence,oldest_replay_sequence FROM content_collaboration_documents WHERE content_id=$1 FOR UPDATE',
+          [contentId]
+        );
+        const collaboration = collaborationResult.rows[0];
+        const sequence = Number(collaboration.sequence);
+        const oldestReplaySequence = Number(collaboration.oldest_replay_sequence);
+
+        const existing = await client.query(
+          `SELECT operation_hash,result,actor_id,client_id
+             FROM content_collaboration_operation_keys
+            WHERE content_id=$1 AND op_id=$2`,
+          [contentId, operation.opId]
+        );
+        if (existing.rows[0]) {
+          const accepted = existing.rows[0];
+          const sameActor = String(accepted.actor_id || '').toLowerCase() === String(actorId || '').toLowerCase();
+          const sameClient = accepted.client_id === operation.clientId;
+          const samePayload = accepted.operation_hash === collaborationOperationHash(operation);
+          if (!sameActor || !sameClient || !samePayload) {
+            throw conflict('The collaboration opId was already used by a different actor, client, or payload.', 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE');
+          }
+          const replayed = await client.query(
+            'SELECT applied_operation FROM content_collaboration_operations WHERE content_id=$1 AND op_id=$2',
+            [contentId, operation.opId]
+          );
+          if (!replayed.rows[0]) {
+            // The idempotency tombstone outlives the bounded replay record. Do
+            // not pretend the original transformed operation is still replayable:
+            // force the caller to install the canonical current document.
+            await client.query('COMMIT');
+            return {
+              reloadRequired: true,
+              duplicate: true,
+              sequence,
+              oldestReplaySequence,
+              document: row.body,
+              title: row.title,
+              version: row.version,
+              lockVersion: row.lock_version
+            };
+          }
+          await client.query('COMMIT');
+          return {
+            ...accepted.result,
+            operation: replayed.rows[0].applied_operation,
+            appliedOperation: replayed.rows[0].applied_operation,
+            duplicate: true
+          };
+        }
+
+        if (row.status !== 'draft') {
+          throw conflict('Collaborative editing is available only while content is a draft.', 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT');
+        }
+        if (operation.baseSequence > sequence) {
+          throw conflict('The collaboration base sequence is ahead of the server.', 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE');
+        }
+        if (operation.baseSequence < oldestReplaySequence) {
+          await client.query('COMMIT');
+          return {
+            reloadRequired: true,
+            sequence,
+            oldestReplaySequence,
+            document: row.body,
+            title: row.title,
+            version: row.version,
+            lockVersion: row.lock_version
+          };
+        }
+
+        const acceptedHistory = await client.query(
+          `SELECT sequence,original_operation,applied_operation
+             FROM content_collaboration_operations
+            WHERE content_id=$1 AND sequence>$2
+            ORDER BY sequence ASC`,
+          [contentId, operation.baseSequence]
+        );
+        const history = acceptedHistory.rows.map(item => ({
+          sequence: Number(item.sequence),
+          operation: item.original_operation,
+          appliedOperation: item.applied_operation
+        }));
+        const transformed = transformCollaborationOperation(operation, history);
+        const applied = applyDocumentOperation(row.body, transformed);
+        const nextVersion = Number(row.version) + 1;
+        const nextSequence = sequence + 1;
+        const nextReplayFloor = Math.max(oldestReplaySequence, Math.max(0, nextSequence - 1000));
+        const updated = await client.query(
+          `UPDATE content_items
+              SET title=$3,
+                  body=$4::jsonb,
+                  version=$5,
+                  updated_by=$6,
+                  updated_at=now(),
+                  search_vector=to_tsvector('simple',$3 || ' ' || $7),
+                  lock_version=lock_version+1
+            WHERE id=$1 AND site_id=$2
+            RETURNING id,site_id,title,slug,locale,content_type,status,version,lock_version,body,published_version,updated_at`,
+          [
+            contentId,
+            siteId,
+            applied.document.title,
+            JSON.stringify(applied.document),
+            nextVersion,
+            actorId,
+            extractPageText(applied.document)
+          ]
+        );
+        const committed = updated.rows[0];
+        const snapshot = {
+          title: committed.title,
+          slug: row.slug,
+          locale: row.locale,
+          contentType: row.content_type,
+          status: 'draft',
+          document: applied.document
+        };
+        await client.query(
+          'INSERT INTO content_revisions(content_id,version,snapshot,author_id,change_summary) VALUES($1,$2,$3::jsonb,$4,$5)',
+          [contentId, nextVersion, JSON.stringify(snapshot), actorId, `Collaborative operation: ${operation.type}`]
+        );
+        await writeWorkflow(client, {
+          siteId,
+          id: contentId,
+          version: nextVersion,
+          action: 'collaboration_operation',
+          fromStatus: 'draft',
+          toStatus: 'draft',
+          actorId,
+          note: `Collaborative operation ${operation.opId}`
+        });
+        await writeOutbox(client, {
+          id: contentId,
+          siteId,
+          version: nextVersion,
+          aggregateVersion: committed.lock_version,
+          eventType: 'content.upsert',
+          payload: { contentType: row.content_type, slug: row.slug, locale: row.locale, status: 'draft', title: committed.title },
+          actorId,
+          correlationId
+        });
+
+        const result = {
+          sequence: nextSequence,
+          oldestReplaySequence: nextReplayFloor,
+          version: nextVersion,
+          lockVersion: committed.lock_version,
+          title: committed.title
+        };
+        await client.query(
+          `INSERT INTO content_collaboration_operations(
+             content_id,sequence,op_id,actor_id,client_id,original_operation,applied_operation,result
+           ) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb)`,
+          [
+            contentId,
+            nextSequence,
+            operation.opId,
+            actorId,
+            operation.clientId,
+            JSON.stringify(operation),
+            JSON.stringify(transformed),
+            JSON.stringify(result)
+          ]
+        );
+        await client.query(
+          `INSERT INTO content_collaboration_operation_keys(
+             content_id,op_id,actor_id,client_id,operation_hash,result
+           ) VALUES($1,$2,$3,$4,$5,$6::jsonb)`,
+          [contentId, operation.opId, actorId, operation.clientId, collaborationOperationHash(operation), JSON.stringify(result)]
+        );
+        await client.query(
+          `UPDATE content_collaboration_documents
+              SET sequence=$2,oldest_replay_sequence=$3,updated_at=now()
+            WHERE content_id=$1`,
+          [contentId, nextSequence, nextReplayFloor]
+        );
+        await client.query(
+          'DELETE FROM content_collaboration_operations WHERE content_id=$1 AND sequence<=$2',
+          [contentId, nextReplayFloor]
+        );
+        await client.query('COMMIT');
+        return {
+          ...result,
+          operation: transformed,
+          appliedOperation: transformed,
+          duplicate: false
+        };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error.code === '23505') throw conflict('The collaboration operation conflicts with an existing operation.', 'ERR_SYSTEMFABRIC_COLLABORATION_CONFLICT');
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+
+    async getCollaborationSync({ siteId, contentId, afterSequence }) {
+      if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
+        const error = new Error('afterSequence must be a non-negative safe integer.');
+        error.statusCode = 400;
+        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SEQUENCE';
+        throw error;
+      }
+      const selected = await pool.query(
+        `SELECT c.id,c.site_id,c.title,c.slug,c.locale,c.content_type,c.status,c.body,c.version,c.lock_version,
+                COALESCE(d.sequence,0)::text AS collaboration_sequence,
+                COALESCE(d.oldest_replay_sequence,0)::text AS oldest_replay_sequence,
+                COALESCE((
+                  SELECT jsonb_agg(
+                    jsonb_build_object(
+                      'sequence',o.sequence,
+                      'operation',o.original_operation,
+                      'appliedOperation',o.applied_operation
+                    ) ORDER BY o.sequence ASC
+                  )
+                    FROM content_collaboration_operations o
+                   WHERE o.content_id=c.id AND o.sequence>$3
+                ), '[]'::jsonb) AS operations
+           FROM content_items c
+           LEFT JOIN content_collaboration_documents d ON d.content_id=c.id
+          WHERE c.id=$1 AND c.site_id=$2 AND c.deleted_at IS NULL`,
+        [contentId, siteId, afterSequence]
+      );
+      const row = selected.rows[0];
+      if (!row) {
+        const error = new Error('Content not found.');
+        error.statusCode = 404;
+        error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+        throw error;
+      }
+      if (row.status !== 'draft') {
+        throw conflict('Collaborative sync is available only while content is a draft.', 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT');
+      }
+      const sequence = Number(row.collaboration_sequence);
+      const oldestReplaySequence = Number(row.oldest_replay_sequence);
+      if (afterSequence > sequence) {
+        throw conflict('The requested collaboration sequence is ahead of the server.', 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE');
+      }
+      if (afterSequence < oldestReplaySequence) {
+        return {
+          reloadRequired: true,
+          sequence,
+          oldestReplaySequence,
+          document: row.body,
+          title: row.title,
+          version: row.version,
+          lockVersion: row.lock_version
+        };
+      }
+      return {
+        reloadRequired: false,
+        sequence,
+        oldestReplaySequence,
+        operations: (row.operations || []).map(item => ({
+          sequence: Number(item.sequence),
+          operation: item.operation,
+          appliedOperation: item.appliedOperation
+        }))
+      };
     },
 
     async getPublishedBySlug({ siteId, slug, locale = 'en' }) {

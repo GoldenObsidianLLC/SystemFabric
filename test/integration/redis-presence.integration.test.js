@@ -4,6 +4,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { createRedisPresenceService } = require('../../packages/realtime/src/redis-presence');
+const { createRedisRealtimeConnectionLimiter } = require('../../packages/realtime/src/connection-quota');
+
+async function createQuotaPair(url, keyPrefix) {
+  const options = { url, keyPrefix, leaseMs: 10_000 };
+  return Promise.all([
+    createRedisRealtimeConnectionLimiter(options),
+    createRedisRealtimeConnectionLimiter(options)
+  ]);
+}
 
 const enabled = process.env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION === 'true' &&
   Boolean(process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL);
@@ -86,6 +95,10 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
   };
   const presenceA = await createRedisPresenceService(options);
   const presenceB = await createRedisPresenceService(options);
+  const [quotaA, quotaB] = await createQuotaPair(
+    options.url,
+    `systemfabric:realtime:quota:presence-api-it:${randomUUID().replaceAll('-', '')}`
+  );
   const { createRedisRealtimeBridge } = require('../../packages/realtime/src/redis-realtime');
   const bridgePrefix = 'systemfabric:realtime:api-snapshot-it:' + randomUUID().replaceAll('-', '');
   const bridgeA = await createRedisRealtimeBridge({ url: options.url, channelPrefix: bridgePrefix });
@@ -104,12 +117,14 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
     env: sharedEnv,
     presenceService: presenceA,
     realtimeBridge: bridgeA,
+    realtimeConnectionLimiter: quotaA,
     logger: { error() {} }
   });
   const serverB = createApiServer({
     env: sharedEnv,
     presenceService: presenceB,
     realtimeBridge: bridgeB,
+    realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
   await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
@@ -185,6 +200,10 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
     leaseMs: 5_000,
     now: () => now
   });
+  const [quotaA, quotaB] = await createQuotaPair(
+    redisUrl,
+    `systemfabric:realtime:quota:presence-sse-it:${suffix}`
+  );
   const { createApiServer } = require('../../apps/api/src/server');
   const sharedEnv = {
     NODE_ENV: 'test',
@@ -199,12 +218,14 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
     env: sharedEnv,
     presenceService: presenceA,
     realtimeBridge: bridgeA,
+    realtimeConnectionLimiter: quotaA,
     logger: { error() {} }
   });
   const serverB = createApiServer({
     env: sharedEnv,
     presenceService: presenceB,
     realtimeBridge: bridgeB,
+    realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
   await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
@@ -292,5 +313,104 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
       serverA.systemfabric.close(),
       serverB.systemfabric.close()
     ]);
+  }
+});
+
+
+test('Redis authorization integration: membership and session invalidations close only matching cross-instance SSE streams', {
+  skip: !enabled
+}, async t => {
+  const suffix = randomUUID().replaceAll('-', '');
+  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
+  const channelPrefix = 'systemfabric:realtime:authz-it:' + suffix;
+  const bridgeA = await require('../../packages/realtime/src/redis-realtime').createRedisRealtimeBridge({
+    url: redisUrl,
+    channelPrefix
+  });
+  const bridgeB = await require('../../packages/realtime/src/redis-realtime').createRedisRealtimeBridge({
+    url: redisUrl,
+    channelPrefix
+  });
+  const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const sessionId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const identityService = {
+    async authenticate(token) {
+      return token === 'authorization-integration-session' ? {
+        sessionId,
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: userId, email: 'user@example.test', displayName: 'User', status: 'active' },
+        memberships: [{ siteId: SITE_A, capabilities: ['content:read'] }, { siteId: SITE_B, capabilities: ['content:read'] }]
+      } : null;
+    },
+    async isSessionActive() { return true; },
+    async authorizeSite() { return true; }
+  };
+  const presenceService = { async heartbeat() {}, async leave() {}, async close() {} };
+  const [quotaA, quotaB] = await createQuotaPair(
+    redisUrl,
+    `systemfabric:realtime:quota:authz-it:${suffix}`
+  );
+  const sharedEnv = {
+    NODE_ENV: 'test',
+    SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+    SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+    AI_PROVIDER: 'mock',
+    MAX_REQUEST_BYTES: '16384',
+    RATE_LIMIT_MAX_REQUESTS: '100'
+  };
+  const { createApiServer } = require('../../apps/api/src/server');
+  const serverA = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeA, realtimeConnectionLimiter: quotaA, logger: { error() {} } });
+  const serverB = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeB, realtimeConnectionLimiter: quotaB, logger: { error() {} } });
+  await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
+  await Promise.all([
+    new Promise(resolve => serverA.listen(0, '127.0.0.1', resolve)),
+    new Promise(resolve => serverB.listen(0, '127.0.0.1', resolve))
+  ]);
+  const controllerA = new AbortController();
+  const controllerB = new AbortController();
+  const headers = { authorization: 'Bearer authorization-integration-session' };
+
+  async function openStream(siteId, controller) {
+    const response = await fetch('http://127.0.0.1:' + serverB.address().port + '/api/v1/sites/' + siteId + '/realtime/events?topic=presence', {
+      headers, signal: controller.signal
+    });
+    assert.equal(response.status, 200);
+    const reader = response.body.getReader();
+    const ready = await reader.read();
+    assert.match(new TextDecoder().decode(ready.value), /connected/);
+    return reader;
+  }
+
+  try {
+    const siteAReader = await openStream(SITE_A, controllerA);
+    const siteBReader = await openStream(SITE_B, controllerB);
+
+    await bridgeA.invalidateAuthorization({ siteId: SITE_A, principalId: userId });
+    const siteAClosed = await Promise.race([
+      siteAReader.read(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Site-scoped authorization invalidation did not close the remote SSE stream.')), 2_000))
+    ]);
+    assert.equal(siteAClosed.done, true);
+
+    const siteBState = await Promise.race([
+      siteBReader.read().then(result => result.done ? 'closed' : 'data'),
+      new Promise(resolve => setTimeout(() => resolve('still-open'), 100))
+    ]);
+    assert.equal(siteBState, 'still-open', 'site-scoped invalidation must not close another site stream');
+
+    await bridgeA.invalidateAuthorization({ sessionId });
+    const siteBClosed = await Promise.race([
+      siteBReader.read(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Session invalidation did not close the remaining remote SSE stream.')), 2_000))
+    ]);
+    assert.equal(siteBClosed.done, true);
+  } finally {
+    controllerA.abort();
+    controllerB.abort();
+    await Promise.all([
+      new Promise(resolve => serverA.close(resolve)),
+      new Promise(resolve => serverB.close(resolve))
+    ]);
+    await Promise.all([serverA.systemfabric.close(), serverB.systemfabric.close()]);
   }
 });

@@ -23,3 +23,6 @@ var/
 /playwright-report/
 /test-results/
 /coverage/
+
+# Isolated feature worktrees
+.worktrees/

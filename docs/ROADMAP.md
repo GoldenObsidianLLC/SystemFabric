@@ -60,17 +60,18 @@ Apply these checks to every AI-enabled product track:
 
 This track establishes reusable infrastructure before individual screens and features independently implement real-time behavior.
 
-**Foundation 1 progress (developer preview):** the first process-local event hub, lease-based presence service, authenticated site-scoped SSE presence stream, bounded queues and authorization rechecks exist on the `feature/realtime-foundation-f1` development branch. **Foundation 1.1** added the v1 PostgreSQL outbox envelope and explicit event metadata. **Foundation 1.2** added durable consumer-group deliveries, concurrent claims, leases, per-aggregate ordering, retry/dead-letter, bounded replay and explicit event-type subscriptions; the Memgraph projector now uses `graph.projection.v1`. Content workflow transitions use the monotonic `lock_version` aggregate sequence. **Foundation 1.3** adds Redis/Memurai-compatible TTL presence leases, atomic per-site capacity, session aggregation and lazy expiry callbacks; two independent Redis clients are verified against the same shared state. Foundation 1.4 adds Redis Pub/Sub fan-out of bounded presence-refresh invalidations to connected SSE clients on other API instances, with site isolation and authorization rechecks in receiving hubs. Live Redis integration verifies heartbeat fan-out and lazy expiry propagation across two API servers; Pub/Sub remains ephemeral/best-effort, not the durable event source. See [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) and migrations `0010`–`0013`. Do not mark the multi-instance exit condition complete based on this preview.
+**Foundation 1 progress (developer preview):** the Foundation 1 implementation lineage (`feat/f1-10-cross-instance-collaboration` and follow-on `feat/f1-11-collaboration-resilience`) contains the event hub, lease-based presence, authenticated SSE/WebSocket transport, Redis/Memurai shared presence and ephemeral Pub/Sub, session-bound authorization invalidation, bounded realtime metrics, and F1.9/F1.10 collaborative-document proofs. **F1.7** records the provisional server-authoritative semantic-OT direction in [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019. **F1.8** adds authenticated presence WebSockets, shared global/site/principal connection quotas and bounded snapshot-refresh guidance. **F1.9** adds draft-only semantic OT and PostgreSQL operation sequencing. **F1.10** adds bounded cross-instance Redis document hints and PostgreSQL gap/heartbeat repair; live loopback Redis and two-API-instance browser tests prove A↔B delivery, dropped/reordered/duplicate hint recovery, reconnect after node loss and 2/5/10 editor convergence. Pub/Sub is still ephemeral and PostgreSQL remains authoritative. F1.11 adds a loopback-Redis transient-publish recovery check, a 10-subscriber × 2,000-operation sustained relay check, and a 10-session reconnect storm after local API-node loss; these are bounded local-harness observations, not production capacity certification. This remains a developer-preview correctness/load baseline, not durable client-event replay or production certification. See [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) and migrations `0010`–`0014`.
 
 - [x] Publish and review the real-time event contract: v1 event identity/schema, site scope, actor, correlation, classification, aggregate-version idempotency and payload bounds. See [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md). A distinct tenantId is not yet modeled.
-- [ ] Design an authenticated real-time gateway with WebSocket delivery and an appropriate server-sent-event or polling fallback where useful.
+- [x] Implement an authenticated, same-origin presence WebSocket preview with the existing SSE fallback, site capability checks, command allow-list and periodic reauthorization. Durable collaboration operations and durable event replay remain separate work.
 - [x] Implement PostgreSQL consumer-group delivery records, explicit event-type subscriptions, at-least-once claims, lease recovery, per-aggregate ordering, retry/dead-letter and bounded replay by event ID; migrate the Memgraph projector to `graph.projection.v1` and validate content workflow projection ordering.
-- [ ] Select and validate durable event fan-out beyond the PostgreSQL delivery ledger only after measuring deployment topology, throughput, ordering and operational cost; the F1.4 Redis Pub/Sub bridge is ephemeral presence invalidation only.
+- [ ] Select and validate durable event fan-out beyond the PostgreSQL delivery ledger only after measuring deployment topology, throughput, ordering and operational cost; F1.4/F1.10 Redis Pub/Sub carries only ephemeral presence/authorization/document hints and is not a durable delivery log.
 - [x] Implement a Redis-protocol-compatible shared presence lease adapter with TTL expiry, multi-session aggregation, hidden-state filtering, per-site capacity and expiry callbacks. Live tests verify two independent clients share the same site snapshot.
-- [x] Add Redis Pub/Sub expiry and presence-refresh invalidation propagation to connected SSE clients, with site-scoped channels and authorization rechecks in each receiving hub. WebSocket delivery remains open.
-- [ ] Add backpressure, per-tenant quotas, connection limits, rate limiting and graceful degradation.
-- [ ] Add metrics, traces, logs and operational runbooks for the event gateway, relay and presence subsystem.
-- [ ] Validate cross-tenant subscription and delivery isolation with adversarial integration tests.
+- [x] Add Redis Pub/Sub expiry and presence-refresh invalidation propagation to SSE and WebSocket presence subscribers, with site-scoped channels and authorization rechecks. Relay failure preserves local presence refresh; remote delivery remains best-effort and no Pub/Sub replay is claimed.
+- [x] Add bounded backpressure, shared global/site/principal connection quota leases for SSE and WebSocket, connection-rate controls, and local-first presence degradation when Redis relay publication fails. Redis quotas fail closed when the shared store is unavailable.
+- [x] Add bounded low-cardinality realtime metrics for connections, fan-out, authorization, presence and Redis operations; define production scrape/alert ownership separately.
+- [ ] Add distributed traces, centralized logs and operational runbooks for the event gateway, relay and presence subsystem.
+- [x] Validate cross-site/document subscription and delivery isolation with adversarial integration tests; no separate tenantId is modeled yet.
 
 **Exit condition:** a reproducible multi-instance test demonstrates authenticated, tenant-isolated delivery, reconnect, duplicate handling, stale-presence expiry and recovery from relay or broker interruption.
 
@@ -96,12 +97,13 @@ This track establishes reusable infrastructure before individual screens and fea
 
 ### Collaborative CMS and writing assistant (P1)
 
-- [ ] Evaluate CRDT and operational-transformation approaches against SystemFabric's structured document model; document the decision and trade-offs before selecting one.
+- [x] Evaluate CRDT and operational-transformation approaches against SystemFabric's structured document model; record the provisional semantic-OT direction and trade-offs in [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019.
+- [x] Implement a two-client semantic-OT proof with durable PostgreSQL operation sequencing, typed conflict handling, authenticated document REST/WebSocket transport, reconnect/replay, persisted revision/workflow/outbox integration and a two-context Playwright convergence proof (F1.9; production gates remain open).
 - [ ] Implement collaborative document sessions, presence, cursors/selections, conflict handling, recovery and integration with persisted revisions.
 - [ ] Add comments and review threads with tenant-scoped authorization and immutable audit context.
 - [ ] Integrate the writing assistant for grammar, spelling, clarity, coherence, rewriting, autocomplete and context-aware suggestions.
 - [ ] Stream suggestions without silently changing saved content; support accept, reject, undo, attribution and user preferences.
-- [ ] Validate collaboration across multiple users, devices and application instances, including reconnect and concurrent edits.
+- [x] Validate collaboration across multiple users and API instances, including reconnect, concurrent edits, cross-scope isolation and 2/5/10 editor sequence convergence (F1.10 local correctness proof; production load/failover gates remain open).
 
 ### Collaborative administration and user environments (P2)
 
@@ -143,7 +145,7 @@ This track establishes reusable infrastructure before individual screens and fea
 
 - What consistency guarantees should apply to collaborative documents, presence and durable events?
 - Which event transport and fan-out design fits the expected single-node and multi-node deployments?
-- Which CRDT/OT model best matches structured page documents, rich text, comments and concurrent property edits?
+- Does the provisional semantic-OT model pass the two-client conflict/recovery prototype, or do offline-first requirements justify reopening the CRDT evaluation?
 - How should AI context be assembled so that permissions are enforced before retrieval and again before actions?
 - Which model/provider evaluation methods are appropriate for writing, moderation, search, security triage and workflow generation?
 - How should live presence and operational telemetry be minimized, retained, exported and deleted?

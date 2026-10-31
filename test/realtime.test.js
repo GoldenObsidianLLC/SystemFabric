@@ -68,6 +68,49 @@ test('real-time subscriptions fail closed and authorization is rechecked before 
   hub.close();
 });
 
+test('authorization invalidation revokes only the matching site, principal, or session streams', async () => {
+  const hub = createRealtimeHub({ authorizeSubscribe: async () => true });
+  const userASiteA1 = await hub.subscribe({ principal: { id: 'user-a' }, sessionId: 'session-a1', siteId: SITE_A, topic: 'presence' });
+  const userASiteA2 = await hub.subscribe({ principal: { id: 'user-a' }, sessionId: 'session-a2', siteId: SITE_A, topic: 'presence' });
+  const userASiteB = await hub.subscribe({ principal: { id: 'user-a' }, sessionId: 'session-b1', siteId: SITE_B, topic: 'presence' });
+  const userBSiteA = await hub.subscribe({ principal: { id: 'user-b' }, sessionId: 'session-a3', siteId: SITE_A, topic: 'presence' });
+
+  assert.deepEqual(hub.invalidateAuthorization({ siteId: SITE_A, principalId: 'user-a' }), { revoked: 2 });
+  assert.equal(hub.subscriberCount, 2);
+  assert.deepEqual(hub.invalidateAuthorization({ sessionId: 'session-b1' }), { revoked: 1 });
+  assert.equal(hub.subscriberCount, 1);
+  assert.deepEqual(hub.invalidateAuthorization({ principalId: 'user-b' }), { revoked: 1 });
+  assert.equal(hub.subscriberCount, 0);
+  const uuidPrincipal = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const uuidSession = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  await hub.subscribe({ principal: { id: uuidPrincipal }, sessionId: uuidSession, siteId: SITE_A, topic: 'presence' });
+  assert.deepEqual(hub.invalidateAuthorization({ siteId: SITE_A.toUpperCase(), principalId: uuidPrincipal.toUpperCase(), sessionId: uuidSession.toUpperCase() }), { revoked: 1 });
+  for (const subscription of [userASiteA1, userASiteA2, userASiteB, userBSiteA]) subscription.close();
+  assert.throws(() => hub.invalidateAuthorization({}), { code: 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE' });
+  hub.close();
+});
+
+test('long-lived subscriptions close when the session expires or authorization is lost', async () => {
+  let now = 1_000;
+  let allowed = true;
+  const hub = createRealtimeHub({ authorizeSubscribe: async () => allowed, now: () => now });
+  const subscription = await hub.subscribe({
+    principal: { id: 'user-a' }, sessionId: 'session-a', siteId: SITE_A, topic: 'presence', expiresAt: new Date(2_000)
+  });
+  assert.equal(await hub.reauthorize(subscription), true);
+  allowed = false;
+  assert.equal(await hub.reauthorize(subscription), false);
+  assert.equal(hub.subscriberCount, 0);
+
+  const expiredHub = createRealtimeHub({ authorizeSubscribe: async () => true, now: () => now });
+  const expired = await expiredHub.subscribe({ principal: { id: 'user-b' }, sessionId: 'session-b', siteId: SITE_A, topic: 'presence', expiresAt: new Date(2_000) });
+  now = 2_000;
+  assert.equal(await expiredHub.reauthorize(expired), false);
+  assert.equal(expiredHub.subscriberCount, 0);
+  hub.close();
+  expiredHub.close();
+});
+
 test('real-time hub disconnects slow consumers rather than growing an unbounded queue', async () => {
   const hub = createRealtimeHub({ authorizeSubscribe: async () => true, maxQueueSize: 1 });
   const subscription = await hub.subscribe({ principal: { id: 'user-a' }, siteId: SITE_A, topic: 'presence' });
@@ -167,6 +210,8 @@ test('API exposes authenticated presence and a site-scoped SSE presence stream i
     const reader = stream.body.getReader();
     const ready = await reader.read();
     assert.match(new TextDecoder().decode(ready.value), /connected/);
+    assert.match(new TextDecoder().decode(ready.value), /event: connection\.ready/);
+    assert.match(new TextDecoder().decode(ready.value), /snapshot-refresh/);
 
     const idle = await fetch(heartbeatUrl, {
       method: 'POST',
@@ -230,6 +275,37 @@ test('API enforces site capability checks for authenticated non-developer presen
   }
 });
 
+test('API refuses long-lived real-time streams when the backing session is no longer active', async () => {
+  const identityService = {
+    async authenticate(token) {
+      return token === 'session-token' ? {
+        sessionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'user@example.test', displayName: 'User', status: 'active' },
+        memberships: [{ siteId: SITE_A, capabilities: ['content:read'] }]
+      } : null;
+    },
+    async authorizeSite() { return true; },
+    async isSessionActive() { return false; }
+  };
+  const server = createApiServer({
+    env: { NODE_ENV: 'test', SYSTEMFABRIC_REALTIME_ENABLED: 'true', AI_PROVIDER: 'mock', RATE_LIMIT_MAX_REQUESTS: '100' },
+    identityService,
+    logger: { error() {} }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const response = await fetch('http://127.0.0.1:' + server.address().port + '/api/v1/sites/' + SITE_A + '/realtime/events', {
+      headers: { authorization: 'Bearer session-token' }
+    });
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await server.systemfabric.close();
+  }
+});
+
 test('API does not enable presence implicitly when the preview adapter is disabled', async () => {
   const server = createApiServer({
     env: { NODE_ENV: 'test', SYSTEMFABRIC_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock' },
@@ -273,7 +349,13 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
   const realtimeBridge = {
     async attach() {},
     async publish() { return { delivered: 0 }; },
+    async publishDocumentOperation() { return { delivered: 0, relayPublished: true, degraded: false }; },
     async close() { bridgeClosed = true; }
+  };
+  let quotaClosed = false;
+  const realtimeConnectionLimiter = {
+    async acquire() { return { async renew() { return true; }, async release() {} }; },
+    async close() { quotaClosed = true; }
   };
   const server = createApiServer({
     env: {
@@ -284,13 +366,15 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
     },
     presenceService,
     realtimeBridge,
+    realtimeConnectionLimiter,
     logger: { error() {} }
   });
   await server.systemfabric.ready();
   assert.equal(server.systemfabric.presenceService, presenceService);
   assert.equal(server.systemfabric.presenceStore, 'redis');
-  assert.equal(server.systemfabric.realtimeMode, 'redis-shared-presence-pubsub');
+  assert.equal(server.systemfabric.realtimeMode, 'redis-shared-realtime-pubsub');
   await server.systemfabric.close();
   assert.equal(closed, true);
   assert.equal(bridgeClosed, true);
+  assert.equal(quotaClosed, true);
 });

@@ -3,7 +3,7 @@
 const { randomUUID } = require('node:crypto');
 
 const SITE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const TOPIC_RE = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
+const TOPIC_RE = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
 
 function realtimeError(statusCode, code, message) {
   const error = new Error(message);
@@ -70,7 +70,8 @@ function createRealtimeHub({
   maxSubscriptionsPerPrincipal = 4,
   maxQueueSize = 64,
   maxEventBytes = 16_384,
-  now = Date.now
+  now = Date.now,
+  metrics = null
 } = {}) {
   if (typeof authorizeSubscribe !== 'function') {
     throw new TypeError('authorizeSubscribe is required; subscriptions must fail closed.');
@@ -89,6 +90,13 @@ function createRealtimeHub({
   const principalCounts = new Map();
   let closed = false;
 
+  function incrementMetric(name, amount = 1) {
+    try { metrics?.increment?.(name, amount); } catch {}
+  }
+  function setGauge(name, value) {
+    try { metrics?.setGauge?.(name, value); } catch {}
+  }
+
   function validateScope({ principal, siteId, topic }) {
     const principalId = typeof principal?.id === 'string' ? principal.id.trim() : '';
     if (!principalId || principalId.length > 128) {
@@ -103,20 +111,34 @@ function createRealtimeHub({
     return { principalId, siteId: siteId.toLowerCase(), topic };
   }
 
-  async function subscribe({ principal, siteId, topic }) {
+  async function subscribe({ principal, siteId, topic, sessionId = null, expiresAt = null }) {
     if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_CLOSED', 'The real-time hub is shutting down.');
     const scope = validateScope({ principal, siteId, topic });
+    if (sessionId !== null && (typeof sessionId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId))) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_INVALID', 'sessionId must be a safe identifier.');
+    }
+    const expiresAtMs = expiresAt === null ? null : new Date(expiresAt).getTime();
+    if (expiresAt !== null && !Number.isFinite(expiresAtMs)) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRY_INVALID', 'expiresAt must be a valid timestamp.');
+    }
+    if (expiresAtMs !== null && expiresAtMs <= now()) {
+      throw realtimeError(401, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRED', 'The authenticated session has expired.');
+    }
     const safePrincipal = Object.freeze({ id: scope.principalId, isDeveloper: principal.isDeveloper === true });
     let authorized = false;
     try {
-      authorized = await authorizeSubscribe({ principal: safePrincipal, siteId: scope.siteId, topic: scope.topic });
+      authorized = await authorizeSubscribe({ principal: safePrincipal, sessionId, expiresAt: expiresAtMs === null ? null : new Date(expiresAtMs).toISOString(), siteId: scope.siteId, topic: scope.topic });
     } catch {
       authorized = false;
     }
-    if (!authorized) throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN', 'The principal cannot subscribe to this site topic.');
+    if (!authorized) {
+      incrementMetric('authorization_denials_total');
+      throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN', 'The principal cannot subscribe to this site topic.');
+    }
 
     const count = principalCounts.get(scope.principalId) || 0;
     if (count >= maxSubscriptionsPerPrincipal) {
+      incrementMetric('connection_limit_rejections_total');
       throw realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT', 'The principal has reached the real-time subscription limit.');
     }
 
@@ -126,6 +148,8 @@ function createRealtimeHub({
     const subscription = {
       id,
       principal: safePrincipal,
+      sessionId,
+      expiresAtMs,
       siteId: scope.siteId,
       topic: scope.topic,
       enqueue: event => queue.push(event),
@@ -137,6 +161,8 @@ function createRealtimeHub({
         const remaining = (principalCounts.get(scope.principalId) || 1) - 1;
         if (remaining > 0) principalCounts.set(scope.principalId, remaining);
         else principalCounts.delete(scope.principalId);
+        incrementMetric('subscriptions_closed_total');
+        setGauge('active_subscriptions', subscriptions.size);
       },
       events: {
         [Symbol.asyncIterator]() {
@@ -153,7 +179,66 @@ function createRealtimeHub({
 
     subscriptions.set(id, subscription);
     principalCounts.set(scope.principalId, count + 1);
+    incrementMetric('subscriptions_opened_total');
+    setGauge('active_subscriptions', subscriptions.size);
     return subscription;
+  }
+
+  async function reauthorize(subscription) {
+    if (closed || !subscription || !subscriptions.has(subscription.id)) return false;
+    if (subscription.expiresAtMs !== null && subscription.expiresAtMs <= now()) {
+      incrementMetric('session_expirations_total');
+      incrementMetric('authorization_revocations_total');
+      subscription.close();
+      return false;
+    }
+    let authorized = false;
+    try {
+      authorized = await authorizeSubscribe({
+        principal: subscription.principal,
+        sessionId: subscription.sessionId,
+        expiresAt: subscription.expiresAtMs === null ? null : new Date(subscription.expiresAtMs).toISOString(),
+        siteId: subscription.siteId,
+        topic: subscription.topic
+      });
+    } catch {
+      authorized = false;
+    }
+    if (!authorized) {
+      incrementMetric('authorization_denials_total');
+      incrementMetric('authorization_revocations_total');
+      subscription.close();
+      return false;
+    }
+    return subscriptions.has(subscription.id);
+  }
+
+  function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
+    if (closed) return { revoked: 0 };
+    if (siteId !== null && (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId))) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'siteId must be a valid UUID.');
+    }
+    for (const [label, value] of [['principalId', principalId], ['sessionId', sessionId]]) {
+      if (value !== null && (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value))) {
+        throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', `${label} must be a safe identifier.`);
+      }
+    }
+    if (siteId === null && principalId === null && sessionId === null) {
+      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'At least one authorization invalidation selector is required.');
+    }
+    const normalizedSiteId = siteId === null ? null : siteId.toLowerCase();
+    const normalizedPrincipalId = principalId !== null && SITE_ID_RE.test(principalId) ? principalId.toLowerCase() : principalId;
+    const normalizedSessionId = sessionId !== null && SITE_ID_RE.test(sessionId) ? sessionId.toLowerCase() : sessionId;
+    let revoked = 0;
+    for (const subscription of [...subscriptions.values()]) {
+      if (normalizedSiteId !== null && subscription.siteId !== normalizedSiteId) continue;
+      if (normalizedPrincipalId !== null && subscription.principal.id !== normalizedPrincipalId) continue;
+      if (normalizedSessionId !== null && subscription.sessionId !== normalizedSessionId) continue;
+      subscription.close();
+      revoked += 1;
+    }
+    incrementMetric('authorization_revocations_total', revoked);
+    return { revoked };
   }
 
   async function publish({ siteId, topic, payload, eventId = randomUUID(), occurredAt = new Date(now()).toISOString() }) {
@@ -179,36 +264,35 @@ function createRealtimeHub({
       payload: JSON.parse(serialized)
     });
 
+    const fanoutStartedAt = now();
     let delivered = 0;
     let revoked = 0;
     let dropped = 0;
     const targets = [...subscriptions.values()].filter(item => item.siteId === scope.siteId && item.topic === scope.topic);
+    incrementMetric('events_published_total');
+    incrementMetric('fanout_targets_total', targets.length);
+    try {
+      metrics?.observe?.('fanout_targets_per_event', targets.length);
+      metrics?.observe?.('event_lag_milliseconds', Math.max(0, now() - Date.parse(event.occurredAt)));
+    } catch {}
 
     for (const subscription of targets) {
-      let authorized = false;
-      try {
-        authorized = await authorizeSubscribe({
-          principal: subscription.principal,
-          siteId: subscription.siteId,
-          topic: subscription.topic
-        });
-      } catch {
-        authorized = false;
-      }
-      if (!authorized) {
-        subscription.close();
+      if (!(await reauthorize(subscription))) {
         revoked += 1;
         continue;
       }
-      if (!subscriptions.has(subscription.id)) continue;
       if (!subscription.enqueue(event)) {
         subscription.close(realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_SLOW_CONSUMER', 'The subscription fell behind and must reconnect.'));
+        incrementMetric('queue_overflows_total');
         dropped += 1;
       } else {
+        incrementMetric('events_delivered_total');
         delivered += 1;
       }
     }
 
+    incrementMetric('events_revoked_total', revoked);
+    try { metrics?.observe?.('fanout_duration_milliseconds', Math.max(0, now() - fanoutStartedAt)); } catch {}
     return { delivered, revoked, dropped, eventId: event.eventId };
   }
 
@@ -221,6 +305,8 @@ function createRealtimeHub({
   return Object.freeze({
     subscribe,
     publish,
+    reauthorize,
+    invalidateAuthorization,
     close,
     get subscriberCount() { return subscriptions.size; }
   });

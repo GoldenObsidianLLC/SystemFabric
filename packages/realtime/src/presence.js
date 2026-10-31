@@ -25,12 +25,16 @@ function validatePresenceScope({ siteId, principalId, sessionId }) {
  * Process-local lease adapter for tests and single-instance developer preview.
  * It is deliberately not suitable for multi-process or production deployments.
  */
-function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000 } = {}) {
+function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000, metrics = null } = {}) {
   if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > 100_000) {
     throw new RangeError('maxEntries must be between 1 and 100000.');
   }
   const entries = new Map();
   let closed = false;
+
+  function setLeaseGauge() {
+    try { metrics?.setGauge?.('presence_memory_active_leases', entries.size); } catch {}
+  }
 
   function keyOf({ siteId, principalId, sessionId }) {
     return [siteId, principalId, sessionId].join('\u0000');
@@ -41,6 +45,7 @@ function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000 } = {
     for (const [key, record] of entries) {
       if (record.expiresAtMs <= timestamp) entries.delete(key);
     }
+    setLeaseGauge();
   }
 
   return Object.freeze({
@@ -52,9 +57,11 @@ function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000 } = {
         throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY', 'The local presence store has reached its capacity.');
       }
       entries.set(key, { ...record });
+      setLeaseGauge();
     },
     async remove(scope) {
       entries.delete(keyOf(scope));
+      setLeaseGauge();
     },
     async listBySite({ siteId }) {
       if (closed) return [];
@@ -66,12 +73,13 @@ function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000 } = {
     async close() {
       closed = true;
       entries.clear();
+      setLeaseGauge();
     },
     get size() { return entries.size; }
   });
 }
 
-function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now } = {}) {
+function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now, metrics = null } = {}) {
   if (!adapter || typeof adapter.upsert !== 'function' || typeof adapter.remove !== 'function' || typeof adapter.listBySite !== 'function') {
     throw new TypeError('A presence adapter with upsert, remove and listBySite methods is required.');
   }
@@ -95,6 +103,7 @@ function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now } = {
       expiresAtMs: timestamp + leaseMs
     };
     await adapter.upsert(record);
+    try { metrics?.increment?.('presence_heartbeats_total'); } catch {}
     return {
       siteId: record.siteId,
       userId: principalId,
@@ -106,6 +115,7 @@ function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now } = {
   async function leave({ siteId, principalId, sessionId }) {
     validatePresenceScope({ siteId, principalId, sessionId });
     await adapter.remove({ siteId: siteId.toLowerCase(), principalId, sessionId });
+    try { metrics?.increment?.('presence_leaves_total'); } catch {}
     return { siteId: siteId.toLowerCase(), userId: principalId, left: true };
   }
 
@@ -119,6 +129,7 @@ function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now } = {
 
     const timestamp = now();
     const records = await adapter.listBySite({ siteId: siteId.toLowerCase() });
+    try { metrics?.observe?.('presence_snapshot_lease_count', records.length); } catch {}
     const grouped = new Map();
 
     for (const record of records) {
