@@ -1,0 +1,3 @@
+npm audit --audit-level=high: found 0 vulnerabilities.
+npm audit --omit=dev --audit-level=high: found 0 vulnerabilities.
+Executed on 2026-10-31. Manual dependency review and provenance/attestation remain separate release requirements.

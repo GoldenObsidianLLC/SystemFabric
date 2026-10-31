@@ -42,7 +42,7 @@ Every path under `artifacts` must be relative to the repository root and point t
 
 | Evidence file | Required proof |
 |---|---|
-| `postgres-memgraph-live.json` | Migrations 0001–0009 on fresh and upgrade fixtures; transaction rollback; concurrency; outbox replay/dead-letter; graph outage/rebuild/reconciliation. |
+| `postgres-memgraph-live.json` | Migrations 0001–0014 on a fresh database and the supported v0008 upgrade fixture through the latest schema; transaction rollback; concurrency; outbox replay/dead-letter; graph outage/rebuild/reconciliation. |
 | `tenant-isolation-review.json` | Role/capability matrix and adversarial cross-site tests, with independent authorization review. |
 | `identity-provider-e2e.json` | Real isolated OIDC/SAML/email/MFA recovery flows, replay/rotation/logout/outage handling. |
 | `clamav-corpus.json` | Live scanner behavior including known test signatures, timeout/unavailable states, false positives and legacy asset quarantine. |
