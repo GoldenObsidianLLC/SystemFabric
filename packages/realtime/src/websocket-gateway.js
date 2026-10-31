@@ -10,6 +10,7 @@ const MAX_BUFFERED_BYTES = 1_048_576;
 const MAX_MESSAGES_PER_MINUTE = 60;
 const ALLOWED_AVAILABILITY = new Set(['active', 'idle', 'away', 'hidden']);
 const DOCUMENT_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_LOCAL_OPERATION_IDS = 1_000;
 
 function incrementMetric(metrics, name, amount = 1) {
   try { metrics?.increment?.(name, amount); } catch {}
@@ -196,6 +197,17 @@ function createWebSocketGateway({
             return sent;
           }
 
+          function rememberLocalOperation(entry, operationId) {
+            if (typeof operationId !== 'string' || !DOCUMENT_ID_PATTERN.test(operationId)) return;
+            const normalized = operationId.toLowerCase();
+            if (entry.localOperationIds.has(normalized)) return;
+            entry.localOperationIds.add(normalized);
+            entry.localOperationOrder.push(normalized);
+            while (entry.localOperationOrder.length > MAX_LOCAL_OPERATION_IDS) {
+              entry.localOperationIds.delete(entry.localOperationOrder.shift());
+            }
+          }
+
           function sendDocumentReload(contentId, sync) {
             const snapshot = {
               type: 'document.reload',
@@ -229,6 +241,12 @@ function createWebSocketGateway({
             for (const item of sync.operations || []) {
               if (documentSubscriptions.get(contentId) !== entry || cleaned) return recoveredOperations;
               const operation = item.appliedOperation || item.operation;
+              if (typeof operation?.opId === 'string' && entry.localOperationIds.has(operation.opId.toLowerCase())) {
+                // This socket already received the matching post-commit ack.
+                // Advance across its own operation without echoing it again.
+                entry.lastSequence = Math.max(entry.lastSequence, Number(item.sequence));
+                continue;
+              }
               if (sendDocumentOperation(contentId, entry, operation, item.sequence)) recoveredOperations += 1;
             }
             if (recoveredOperations > 0) {
@@ -347,7 +365,7 @@ function createWebSocketGateway({
                 sessionId,
                 expiresAt
               });
-              const entry = { subscription: documentSubscription, lastSequence: command.afterSequence, pump: null };
+              const entry = { subscription: documentSubscription, lastSequence: command.afterSequence, pump: null, reconcilePromise: null, syncDegradedNotified: false, localOperationIds: new Set(), localOperationOrder: [] };
               documentSubscriptions.set(contentId, entry);
               const sync = await store.getCollaborationSync({
                 siteId,
@@ -410,6 +428,9 @@ function createWebSocketGateway({
               sendDocumentReload(contentId, result);
               return;
             }
+            // Mark before fan-out: another instance's higher-sequence hint can
+            // race the local publish and trigger a PostgreSQL replay of this op.
+            rememberLocalOperation(entry, result.operation?.opId || command.operation?.opId);
             let fanoutDegraded = false;
             if (!result.duplicate) {
               try {

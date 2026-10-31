@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const WebSocket = require('ws');
 const { createApiServer } = require('../apps/api/src/server');
+const { createRealtimeHub } = require('../packages/realtime/src/event-hub');
 const { createMemoryRealtimeConnectionLimiter } = require('../packages/realtime/src/connection-quota');
 
 const SITE_ID = '11111111-1111-4111-8111-111111111111';
@@ -817,4 +818,93 @@ test('document heartbeat reconciles a lost final notification and shares single-
   assert.equal(counters.document_sync_failures_total, 1);
   assert.equal(counters.document_sync_reconciliations_total, 2);
   assert.equal(counters.document_sync_recovered_operations_total, 2);
+});
+
+test('sequence-gap reconciliation does not replay the socket own acknowledged operation', async t => {
+  const contentId = '22222222-2222-4222-8222-222222222222';
+  const operations = [];
+  let sequence = 0;
+  const store = {
+    async getById({ siteId, id }) {
+      return siteId === SITE_ID && id === contentId
+        ? { id, site_id: SITE_ID, content_type: 'page', status: 'draft', created_by: null }
+        : null;
+    },
+    async applyCollaborationOperation({ operation }) {
+      sequence += 1;
+      const accepted = {
+        sequence,
+        operation: structuredClone(operation),
+        appliedOperation: structuredClone(operation)
+      };
+      operations.push(accepted);
+      return {
+        sequence,
+        version: sequence + 1,
+        lockVersion: sequence + 1,
+        operation: accepted.appliedOperation,
+        duplicate: false
+      };
+    },
+    async getCollaborationSync({ afterSequence }) {
+      return {
+        reloadRequired: false,
+        sequence,
+        oldestReplaySequence: 0,
+        operations: operations.filter(item => item.sequence > afterSequence)
+      };
+    }
+  };
+  const hub = createRealtimeHub({ authorizeSubscribe: async () => true });
+  const { url, origin } = await createServer(t, {
+    contentStore: store,
+    realtimeHub: hub,
+    publishDocumentOperation: async () => ({ relayPublished: false, degraded: true })
+  });
+  const socket = await connect(url, { authorization: 'Bearer ' + TOKEN, origin });
+  t.after(() => socket.close());
+  await nextMessage(socket);
+
+  socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
+  assert.equal((await nextMessage(socket)).type, 'document.joined');
+
+  const ownOperation = {
+    schemaVersion: 1,
+    opId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    clientId: 'same-browser',
+    baseSequence: 0,
+    type: 'document.set_title',
+    payload: { title: 'Already acknowledged to this socket' }
+  };
+  socket.send(JSON.stringify({ type: 'document.operation', contentId, operation: ownOperation }));
+  const acknowledgement = await nextMessage(socket);
+  assert.equal(acknowledgement.type, 'document.operation.ack');
+  assert.equal(acknowledgement.operation.opId, ownOperation.opId);
+  assert.equal(acknowledgement.sequence, 1);
+
+  const remoteOperation = {
+    schemaVersion: 1,
+    opId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    clientId: 'other-browser',
+    baseSequence: 1,
+    type: 'document.set_title',
+    payload: { title: 'Remote operation after the gap' }
+  };
+  await store.applyCollaborationOperation({ operation: remoteOperation });
+  await hub.publish({
+    siteId: SITE_ID,
+    topic: 'document:' + contentId,
+    payload: {
+      kind: 'document.operation',
+      sequence: 2,
+      originConnectionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      operation: remoteOperation
+    }
+  });
+
+  const recovered = await nextMessage(socket);
+  assert.equal(recovered.type, 'document.sync.operation');
+  assert.equal(recovered.sequence, 2);
+  assert.equal(recovered.operation.opId, remoteOperation.opId);
+  await assert.rejects(nextMessage(socket, 150), /Timed out waiting for WebSocket message/);
 });
