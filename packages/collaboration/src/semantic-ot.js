@@ -33,6 +33,20 @@ function isPlainObject(value) {
   return prototype === Object.prototype || prototype === null;
 }
 
+function isJsonValue(value, stack = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || stack.has(value)) return false;
+  if (!Array.isArray(value) && !isPlainObject(value)) return false;
+  if (Object.getOwnPropertySymbols(value).length > 0) return false;
+  stack.add(value);
+  const valid = Array.isArray(value)
+    ? value.every(item => isJsonValue(item, stack))
+    : Object.keys(value).every(key => isJsonValue(value[key], stack));
+  stack.delete(value);
+  return valid;
+}
+
 function ownKeysMatch(value, allowed) {
   return Object.keys(value).every(key => allowed.includes(key));
 }
@@ -104,10 +118,14 @@ function validateCollaborationOperation(operation) {
         errors.push('type is not supported');
     }
 
-    try {
-      if (Buffer.byteLength(JSON.stringify(operation), 'utf8') > MAX_OPERATION_BYTES) errors.push('operation exceeds the 12 KiB envelope limit');
-    } catch {
-      errors.push('operation must be JSON serializable');
+    if (!isJsonValue(operation)) {
+      errors.push('operation must contain only finite JSON values');
+    } else {
+      try {
+        if (Buffer.byteLength(JSON.stringify(operation), 'utf8') > MAX_OPERATION_BYTES) errors.push('operation exceeds the 12 KiB envelope limit');
+      } catch {
+        errors.push('operation must be JSON serializable');
+      }
     }
   }
 

@@ -7,6 +7,7 @@ const {
   transformCollaborationOperation,
   applyCollaborationOperation
 } = require('../packages/collaboration/src');
+const { createPostgresStore } = require('../packages/db/src/postgres-store');
 
 function fixture() {
   return {
@@ -178,4 +179,34 @@ test('rejects missing or non-sibling anchors and invalid final documents', () =>
     })),
     error => error.code === 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT'
   );
+});
+
+test('PostgreSQL store rejects invalid collaboration envelopes before acquiring a client', async () => {
+  let acquired = false;
+  const store = createPostgresStore({
+    pool: {
+      async connect() { acquired = true; throw new Error('connection should not be acquired'); }
+    }
+  });
+  await assert.rejects(
+    store.applyCollaborationOperation({
+      siteId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      contentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      actorId: null,
+      operation: op('document.set_title', { title: '' })
+    }),
+    error => error.code === 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION'
+  );
+  assert.equal(acquired, false);
+});
+
+test('rejects collaboration payload values that cannot round-trip through JSON', () => {
+  const undefinedValue = op('node.set_prop', {
+    nodeId: 'heading-1', key: 'text', value: undefined
+  });
+  const bigintValue = op('node.set_prop', {
+    nodeId: 'heading-1', key: 'text', value: 1n
+  });
+  assert.equal(validateCollaborationOperation(undefinedValue).valid, false);
+  assert.equal(validateCollaborationOperation(bigintValue).valid, false);
 });
