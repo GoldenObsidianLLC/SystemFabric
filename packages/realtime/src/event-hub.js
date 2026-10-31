@@ -264,6 +264,7 @@ function createRealtimeHub({
       payload: JSON.parse(serialized)
     });
 
+    const fanoutStartedAt = now();
     let delivered = 0;
     let revoked = 0;
     let dropped = 0;
@@ -291,6 +292,7 @@ function createRealtimeHub({
     }
 
     incrementMetric('events_revoked_total', revoked);
+    try { metrics?.observe?.('fanout_duration_milliseconds', Math.max(0, now() - fanoutStartedAt)); } catch {}
     return { delivered, revoked, dropped, eventId: event.eventId };
   }
 

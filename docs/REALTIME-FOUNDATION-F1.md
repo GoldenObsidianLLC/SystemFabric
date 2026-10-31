@@ -3,7 +3,7 @@
 **Status:** Implemented developer-preview foundation; not production-certified
 **Working branch:** `fix/serialize-live-integration-tests`
 **Baseline:** SystemFabric 0.5.1
-**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability.
+**Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery.
 
 This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh plus authorization invalidation; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. This is not a durable event broker, collaborative editing protocol or production-certified multi-replica gateway.
 
@@ -13,10 +13,13 @@ This developer-preview track creates reusable seams for SystemFabric while keepi
 |---|---|---|
 | Event hub | `packages/realtime/src/event-hub.js` | Site/topic-scoped fan-out, async subscriptions, bounded queues, authorization checks and targeted subscription invalidation |
 | Presence service | `packages/realtime/src/presence.js` | Session leases, heartbeat renewal, multi-session aggregation, hidden-state filtering |
-| SSE gateway | `packages/realtime/src/sse-gateway.js` | SSE framing, keepalive, periodic session/capability reauthorization, backpressure handling and disconnect cleanup |
+| SSE gateway | `packages/realtime/src/sse-gateway.js` | SSE fallback, shared connection quota leases, periodic session/capability reauthorization, backpressure handling and snapshot-refresh recovery |
+| WebSocket gateway | `packages/realtime/src/websocket-gateway.js` | Authenticated presence commands, periodic reauthorization, ping/pong liveness, bounded frames/rates/buffers and cleanup |
+| Connection quota | `packages/realtime/src/connection-quota.js` | Global/site/principal leases with memory preview and atomic Redis Lua adapter; lease expiry reclaims crashed connections |
+| Transport protocol | `packages/realtime/src/realtime-protocol.js` | Versioned ready/reconnect contract with explicit snapshot-refresh semantics |
 | Package exports | `packages/realtime/src/index.js` | Stable module entry point |
 | API integration | `apps/api/src/server.js` | Authenticated site-scoped preview endpoints |
-| Tests | `test/realtime.test.js` | Isolation, authorization revocation, queue limits, lease expiry and API/SSE behavior |
+| Tests | `test/realtime.test.js`, `test/realtime-websocket.test.js`, `test/realtime-controls.test.js`, `test/redis-realtime.test.js` | Authorization, transports, shared quotas, relay fault injection, cleanup and bounded recovery behavior |
 
 ## 2. Enable the preview
 
@@ -26,9 +29,9 @@ Set this in a local development environment only:
 SYSTEMFABRIC_REALTIME_ENABLED=true
 ```
 
-The default is `false`. The current built-in event hub and presence adapter are process-local and lose all state when the API process exits. They do not coordinate multiple API instances.
+The default is `false`. The built-in event hub and memory presence/quota adapters are process-local and lose state when the API exits. Redis presence mode requires injected shared presence, Pub/Sub bridge and distributed connection-quota adapters. Redis Pub/Sub carries ephemeral presence/authorization hints only; it is not a durable event log.
 
-**Do not enable the built-in preview adapter in production.** When `NODE_ENV=production` and the flag is enabled, the API requires both a caller-injected event hub and presence service. Production use still requires independently reviewed distributed adapters, shared authorization semantics, capacity controls, telemetry, and operational testing.
+**Do not enable the built-in preview adapters in production.** When `NODE_ENV=production` and the flag is enabled, the API requires caller-injected distributed event, presence and connection-quota adapters. Production use still requires independently reviewed adapters, multi-instance load/failover evidence, shared authorization semantics, operational runbooks and security review.
 
 ## 3. Preview API
 
@@ -39,11 +42,12 @@ All routes require the existing bearer-token or authenticated-session mechanism 
 | `POST` | `/api/v1/sites/:siteId/presence/heartbeat` | Renew the current authenticated session's lease |
 | `DELETE` | `/api/v1/sites/:siteId/presence/heartbeat` | Remove the current session's lease |
 | `GET` | `/api/v1/sites/:siteId/presence` | List visible site presence |
-| `GET` | `/api/v1/sites/:siteId/realtime/events?topic=presence` | Subscribe to presence refresh events over SSE |
+| `GET` | `/api/v1/sites/:siteId/realtime/events?topic=presence` | Subscribe to presence refresh events over SSE (fallback) |
+| `GET` | `/api/v1/sites/:siteId/realtime/ws` | Authenticated bidirectional presence WebSocket preview |
 
 Heartbeat accepts only a JSON object containing optional `availability`: `active`, `idle`, `away`, or `hidden`. The server derives principal and session identifiers from authentication; clients cannot choose another user's identity or session.
 
-SSE events intentionally carry only a `presence.refresh` hint. Clients fetch the authorized presence snapshot over the REST endpoint rather than receiving a broadcast of user/session details. This keeps ephemeral presence payloads small and reduces unnecessary disclosure.
+SSE and WebSocket events intentionally carry only a `presence.refresh` hint. Clients fetch the authorized presence snapshot over the REST endpoint rather than receiving a broadcast of user/session details. The WebSocket command allow-list is `ping`, `presence.heartbeat` and `presence.leave`; site, principal and session identity are derived server-side. The SSE endpoint remains available as a one-way fallback.
 
 Example heartbeat:
 
@@ -289,6 +293,9 @@ node --check packages/observability/src/metrics.js
 node --check packages/realtime/src/event-hub.js
 node --check packages/realtime/src/presence.js
 node --check packages/realtime/src/sse-gateway.js
+node --check packages/realtime/src/connection-quota.js
+node --check packages/realtime/src/realtime-protocol.js
+node --check packages/realtime/src/websocket-gateway.js
 node --check packages/realtime/src/event-contract.js
 node --check packages/realtime/src/redis-presence.js
 node --check packages/realtime/src/redis-realtime.js
@@ -297,7 +304,7 @@ node --check packages/db/src/outbox-delivery.js
 node --check packages/graph/src/memgraph-store.js
 node --check apps/worker/src/outbox-worker.js
 node --check apps/api/src/server.js
-node --test test/realtime-observability.test.js test/auth-security.test.js test/outbox-contract.test.js test/outbox-delivery.test.js test/graph-projection-worker.test.js test/memgraph-projector.test.js test/redis-presence.test.js test/redis-realtime.test.js test/realtime.test.js test/api.test.js
+node --test test/realtime-controls.test.js test/realtime-websocket.test.js test/realtime-observability.test.js test/auth-security.test.js test/outbox-contract.test.js test/outbox-delivery.test.js test/graph-projection-worker.test.js test/memgraph-projector.test.js test/redis-presence.test.js test/redis-realtime.test.js test/realtime.test.js test/api.test.js
 npm run check
 ```
 
@@ -326,13 +333,69 @@ node --test test/integration/redis-presence.integration.test.js
 - Playwright E2E: PASS — **4 passed, 0 failed** across accessibility and editor workflows.
 - `git diff --check`: PASS. Git reported expected LF-to-CRLF working-copy conversion warnings; no whitespace errors were found.
 
-These results are local development evidence, not a production rollout. Migrations 0010–0013 have **not** been applied to the primary `DATABASE_URL` database. Before deploying the new worker code to any environment, stop existing graph workers, apply and verify all four migrations against that environment, then start the new worker version. Durable external broker selection, WebSocket delivery, reconnect/replay cursors, distributed connection quotas, load/soak and production security validation remain outstanding. Presence and authorization Pub/Sub are best-effort; session/capability reauthorization provides the fallback for missed authorization messages.
+The bullets above are historical local evidence recorded before the F1.8 implementation update; they are not a production rollout. Migrations 0010–0013 have **not** been applied to the primary `DATABASE_URL` database. Before deploying the new worker code to any environment, stop existing graph workers, apply and verify all four migrations against that environment, then start the new worker version. Durable client-event replay, external durable broker selection, multi-instance WebSocket load/soak and independent production security validation remain outstanding. Presence and authorization Pub/Sub are best-effort; periodic session/capability reauthorization is the fallback for missed authorization messages.
 
 ## 13. Next engineering slices
 
-1. **F1.8 — Distributed controls and recovery:** bidirectional transport, connection quotas, relay failure drills, fan-out telemetry and bounded reconnect/resume behavior.
-2. **F1.9 — Collaborative CMS implementation proof:** build the selected semantic OT prototype with durable operation sequencing, a two-client browser workflow, conflict handling and reconnect/replay evidence.
-3. **Projection operations:** validate consumer-group lag, dead letters, replay and recovery under the target deployment topology.
+1. **F1.9 — Collaborative CMS implementation proof:** build the selected semantic OT prototype with durable operation sequencing, a two-client browser workflow, conflict handling and reconnect/replay evidence.
+2. **Projection operations:** validate consumer-group lag, dead letters, replay and recovery under the target deployment topology.
 
 
 Do not promote the preview adapter to production or mark collaborative CMS as implemented until the relevant distributed, security, recovery and browser evidence exists.
+
+## 14. F1.8 Implementation Update — Distributed Controls and Recovery
+
+F1.8 adds a developer-preview duplex presence transport and shared connection controls. This is a bounded transport foundation, not a durable event replay system or production certification.
+
+### Transport contract
+
+| Surface | Behavior |
+|---|---|
+| WebSocket | GET /api/v1/sites/:siteId/realtime/ws; the existing HTTP server owns the upgrade, same-origin check, firewall, authenticated session/development-token flow and content:read capability check. |
+| SSE fallback | The existing /realtime/events?topic=presence endpoint remains available for one-way refresh notifications and uses the same connection limiter. |
+| Commands | ping, presence.heartbeat and presence.leave only. The server derives site, principal and session from authenticated request context. |
+| Ready frame | connection.ready, protocol v1, heartbeat interval and reconnect contract. |
+| Payload and rate bounds | 4 KiB maximum message, 60 commands/minute/connection, 1 MiB maximum outbound buffering; binary and unknown commands are rejected, WebSocket compression is disabled. |
+| Slow/failed connections | Backpressure and liveness failures close with retryable WebSocket status; authorization failures close the stream. Cleanup releases the subscription and quota lease. |
+
+### Connection quota leases
+
+The shared quota interface is implemented by packages/realtime/src/connection-quota.js. The in-memory adapter is for local preview/tests only. The Redis adapter uses Lua scripts to atomically update global, site and hashed-principal sorted-set leases; the three keys share a Redis Cluster hash slot. Leases expire after process crashes and are renewed while the connection remains healthy.
+
+| Limit | Default | Configuration |
+|---|---:|---|
+| Global connections | 10,000 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS |
+| Connections per site | 500 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE |
+| Connections per principal | 4 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL |
+| Lease duration | 45 seconds | SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS |
+
+SSE and WebSocket use the same limiter. New Redis-quota acquisitions fail closed when the quota store is unavailable. The Redis presence mode and production API path require an injected distributed connection-quota adapter; they do not silently fall back to process-local quota accounting.
+
+### Recovery and relay behavior
+
+- The reconnect policy is full-jitter exponential backoff with a 1-second minimum, 30-second maximum and at most 8 attempts. It is guidance in the ready frame; a client implementation must still honor application/network policy.
+- Recovery mode is explicitly snapshot-refresh, with eventReplay false. After reconnect, clients fetch the current authorized presence snapshot through REST. No replay cursor or durable history is implied.
+- Redis Pub/Sub remains ephemeral. Presence refresh is delivered to the local hub before relay publication. A relay outage therefore does not suppress local subscribers; publish results and bounded metrics record degraded remote fan-out.
+- Authorization invalidation revokes local subscriptions before publishing the remote invalidation. A relay failure is reported as unavailable and remote replicas rely on periodic reauthorization. Do not interpret this as instantaneous cluster-wide revocation during a broker partition.
+- Metrics include connection quota outcomes, WebSocket lifecycle and rejection/backpressure/reconnect counters, active WebSocket count, Redis bridge ready/degraded gauges, fan-out duration, Redis publish duration and connection duration. Metrics remain fixed-name/low-cardinality and use the existing protected scrape route.
+
+### Verification and remaining gates
+
+F1.8 unit/API evidence covers authenticated same-origin upgrade, unauthenticated/cross-origin rejection, site capability delegation, allow-listed presence commands, authorization rechecks, frame/rate bounds, SSE/WebSocket shared principal quotas, lease release, local-first relay failure handling and API shutdown cleanup. Redis Lua execution is covered with a fake Redis protocol contract; a live Redis cluster/replica quota stress run has not yet been recorded.
+
+Still required before production:
+- Multi-instance and Redis Cluster quota correctness/load tests, including node loss, lease expiry and Redis partition/recovery.
+- Browser/proxy compatibility and reconnect soak tests with multiple API replicas.
+- External WebSocket, origin/CSWSH, rate-limit and resource-exhaustion security review.
+- Operational runbooks and alert ownership for relay degradation, quota exhaustion and reconnect storms.
+- Durable event replay is a separate future design. Presence refresh hints are transient and cannot replace the PostgreSQL outbox consumer-group ledger.
+
+Production remains NO-GO. No database migration or primary-database operation was performed for F1.8.
+
+### F1.8 validation evidence recorded on 2026-10-30
+
+- Focused realtime API/transport/quota/relay tests: PASS — the expanded F1.8 tests cover authenticated same-origin WebSocket upgrades, rejection of unauthenticated and cross-origin upgrades, presence heartbeat/leave, per-command authorization, binary/oversized/malformed command rejection, per-principal quotas shared across SSE and WebSocket, quota release on disconnect, Redis relay failure and local-first authorization invalidation.
+- Redis quota Lua behavior: PASS against the fake Redis protocol client for atomic acquire/reject/renew/release and fail-closed store errors. The Redis key layout uses a shared Cluster hash tag so the multi-key script targets one slot. No live Redis Cluster quota stress test is claimed.
+- Recovery contract: PASS at protocol level — connection.ready advertises an 8-attempt full-jitter exponential reconnect policy and snapshot-refresh mode with eventReplay=false. Clients must fetch the authoritative REST presence snapshot after reconnect; no event replay is implemented.
+- Remaining F1.8 gates: multi-instance load and partition recovery, Redis Cluster failover/lease-expiry stress, browser/proxy reconnect soak, external security review and production runbooks remain open. The production gate stays NO-GO.
+- Live Redis-compatible quota checks: PASS — a local Redis-compatible service accepted/rejected/renewed/released leases, reclaimed a slot after TTL expiry, and preserved a replacement lease when a stale lease released. Two independent Redis clients raced for a global limit of one and exactly one acquisition succeeded. Each check used a unique temporary key prefix and released its leases; this is not a Redis Cluster or multi-API-replica stress result.

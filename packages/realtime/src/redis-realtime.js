@@ -131,16 +131,32 @@ async function createRedisRealtimeBridge({
   function setQueueGauge() {
     try { metrics?.setGauge?.('redis_inbound_queue_size', inbound.length); } catch {}
   }
+  function setRelayState(ready) {
+    const clientsReady = Boolean(publisher.isReady ?? publisher.isOpen) && Boolean(subscriber.isReady ?? subscriber.isOpen);
+    const isReady = ready === true && clientsReady;
+    try {
+      metrics?.setGauge?.('redis_bridge_ready', isReady ? 1 : 0);
+      metrics?.setGauge?.('redis_bridge_degraded', isReady ? 0 : 1);
+    } catch {}
+  }
   function reportError(error) {
     incrementMetric('redis_errors_total');
+    setRelayState(false);
     try { onError({ errorCode: safeErrorCode(error) }); } catch {}
   }
 
+  setRelayState(false);
   publisher.on?.('error', reportError);
   subscriber.on?.('error', reportError);
+  for (const client of [publisher, subscriber]) {
+    client.on?.('ready', () => setRelayState(true));
+    client.on?.('reconnecting', () => setRelayState(false));
+    client.on?.('end', () => setRelayState(false));
+  }
 
   try {
     await Promise.all([publisher.connect(), subscriber.connect()]);
+    setRelayState(true);
   } catch (error) {
     for (const client of [publisher, subscriber]) {
       try {
@@ -269,22 +285,30 @@ async function createRedisRealtimeBridge({
     if (Buffer.byteLength(serialized) > maxMessageBytes) {
       throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Presence invalidation exceeds the configured size limit.');
     }
-    try {
-      await publisher.publish(channelFor(envelope.siteId), serialized);
-      incrementMetric('redis_pubsub_publishes_total');
-    } catch {
-      incrementMetric('redis_publish_failures_total');
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis real-time bridge is unavailable.');
-    }
-    // The publisher does not receive its own Redis Pub/Sub message, so deliver
-    // locally after the broker accepts the invalidation.
-    return hub.publish({
+    // Deliver locally first: ephemeral relay failure must never suppress the
+    // publisher instance's own presence refresh. Remote replicas recover by
+    // their periodic authorization check and by fetching presence snapshots.
+    const startedAt = now();
+    const local = await hub.publish({
       siteId: envelope.siteId,
       topic: envelope.topic,
       payload: envelope.payload,
       eventId: envelope.eventId,
       occurredAt: envelope.occurredAt
     });
+    try {
+      await publisher.publish(channelFor(envelope.siteId), serialized);
+      incrementMetric('redis_pubsub_publishes_total');
+      setRelayState(true);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - startedAt)); } catch {}
+      return { ...local, relayPublished: true, degraded: false };
+    } catch (error) {
+      incrementMetric('redis_publish_failures_total');
+      incrementMetric('fanout_failures_total');
+      reportError(error);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - startedAt)); } catch {}
+      return { ...local, relayPublished: false, degraded: true };
+    }
   }
 
   async function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
@@ -311,11 +335,17 @@ async function createRedisRealtimeBridge({
     // Revoke local streams even if Redis is unavailable; other replicas also
     // revalidate sessions on each SSE heartbeat as a bounded fallback.
     const local = hub.invalidateAuthorization({ siteId, principalId, sessionId });
+    const relayStartedAt = now();
     try {
       await publisher.publish(authorizationPattern, serialized);
       incrementMetric('redis_pubsub_publishes_total');
-    } catch {
+      setRelayState(true);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - relayStartedAt)); } catch {}
+    } catch (error) {
       incrementMetric('redis_publish_failures_total');
+      incrementMetric('fanout_failures_total');
+      reportError(error);
+      try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - relayStartedAt)); } catch {}
       throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis authorization invalidation bridge is unavailable.');
     }
     return { ...local, eventId: envelope.eventId };
@@ -324,6 +354,7 @@ async function createRedisRealtimeBridge({
   async function close() {
     if (closed) return;
     closed = true;
+    setRelayState(false);
     inbound.length = 0;
     setQueueGauge();
     const results = await Promise.allSettled([publisher, subscriber].map(async client => {
@@ -346,7 +377,7 @@ async function createRedisRealtimeBridge({
     close,
     get instanceId() { return instanceId; },
     get inboundQueueSize() { return inbound.length; },
-    get isReady() { return attached && !closed; }
+    get isReady() { return attached && !closed && Boolean(publisher.isReady ?? publisher.isOpen) && Boolean(subscriber.isReady ?? subscriber.isOpen); }
   });
 }
 

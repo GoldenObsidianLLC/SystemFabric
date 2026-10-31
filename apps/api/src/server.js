@@ -34,6 +34,8 @@ const { createMemoryPresenceAdapter, createPresenceService } = require('../../..
 const { createRedisPresenceService } = require('../../../packages/realtime/src/redis-presence');
 const { createRedisRealtimeBridge } = require('../../../packages/realtime/src/redis-realtime');
 const { createSseGateway } = require('../../../packages/realtime/src/sse-gateway');
+const { createWebSocketGateway } = require('../../../packages/realtime/src/websocket-gateway');
+const { createMemoryRealtimeConnectionLimiter, createRedisRealtimeConnectionLimiter } = require('../../../packages/realtime/src/connection-quota');
 const { boundedInt } = require('../../../packages/ai/src/config');
 const SYSTEMFABRIC_VERSION = require('../../../package.json').version;
 
@@ -146,7 +148,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, logger = console } = {}) {
+function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, logger = console } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -204,14 +206,17 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   if (!['memory', 'redis'].includes(configuredPresenceStore)) {
     throw new Error('SYSTEMFABRIC_PRESENCE_STORE must be memory or redis.');
   }
-  if (realtimeEnabled && env.NODE_ENV === 'production' && (!injectedRealtimeHub || typeof injectedRealtimeHub.invalidateAuthorization !== 'function' || !injectedPresenceService)) {
-    throw new Error('Real-time services in production require distributed event and presence adapters with authorization invalidation support; the in-memory preview adapters are not production-safe.');
+  if (realtimeEnabled && env.NODE_ENV === 'production' && (!injectedRealtimeHub || typeof injectedRealtimeHub.invalidateAuthorization !== 'function' || !injectedPresenceService || !injectedRealtimeConnectionLimiter)) {
+    throw new Error('Real-time services in production require injected distributed event, presence and connection-quota adapters with authorization invalidation support; in-memory preview adapters are not production-safe.');
   }
   if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedPresenceService) {
     throw new Error('The Redis presence store requires an asynchronously connected presenceService to be injected.');
   }
   if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedRealtimeBridge) {
     throw new Error('The Redis presence store requires an attached cross-instance realtimeBridge for Pub/Sub fan-out.');
+  }
+  if (realtimeEnabled && configuredPresenceStore === 'redis' && !injectedRealtimeConnectionLimiter) {
+    throw new Error('Redis-backed real-time requires a distributed connection-quota adapter; memory quotas are not valid for multi-instance mode.');
   }
   realtimeHub = injectedRealtimeHub || (realtimeEnabled && env.NODE_ENV !== 'production'
     ? createRealtimeHub({
@@ -231,7 +236,24 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       metrics: realtimeMetrics
     })
     : null);
-  const realtimeGateway = realtimeHub ? createSseGateway({ hub: realtimeHub, metrics: realtimeMetrics }) : null;
+  const realtimeConnectionLimiter = injectedRealtimeConnectionLimiter || (realtimeEnabled && env.NODE_ENV !== 'production'
+    ? createMemoryRealtimeConnectionLimiter({
+      limits: {
+        maxGlobal: boundedInt(env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS, 10_000, 1, 100_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS'),
+        maxPerSite: boundedInt(env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE, 500, 1, 100_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE'),
+        maxPerPrincipal: boundedInt(env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL, 4, 1, 1_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL')
+      },
+      leaseMs: boundedInt(env.SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS, 45_000, 5_000, 300_000, 'SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS'),
+      metrics: realtimeMetrics
+    }) : null);
+  const realtimeGateway = realtimeHub ? createSseGateway({ hub: realtimeHub, metrics: realtimeMetrics, connectionLimiter: realtimeConnectionLimiter }) : null;
+  const realtimeWebSocketGateway = realtimeHub && presence ? createWebSocketGateway({
+    hub: realtimeHub,
+    presence,
+    connectionLimiter: realtimeConnectionLimiter,
+    publishPresence: realtimeBridge ? input => realtimeBridge.publish(input) : input => realtimeHub.publish(input),
+    metrics: realtimeMetrics
+  }) : null;
   const realtimeBridgeReady = realtimeBridge ? Promise.resolve().then(() => realtimeBridge.attach(realtimeHub)) : Promise.resolve();
 
   async function authenticate(req) {
@@ -1405,9 +1427,83 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   }
 
   const server = http.createServer((req, res) => { void handler(req, res); });
+
+  function rejectWebSocketUpgrade(socket, error) {
+    if (!socket || socket.destroyed) return;
+    const status = Number.isInteger(error?.statusCode) && error.statusCode >= 400 && error.statusCode <= 599 ? error.statusCode : 500;
+    const statusText = ({ 400: 'Bad Request', 401: 'Unauthorized', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 429: 'Too Many Requests', 503: 'Service Unavailable' })[status] || 'Internal Server Error';
+    const payload = Buffer.from(JSON.stringify({
+      error: status >= 500 ? 'Real-time connection is unavailable.' : String(error?.message || 'WebSocket upgrade rejected.'),
+      code: String(error?.code || 'ERR_SYSTEMFABRIC_REALTIME_UPGRADE').slice(0, 100)
+    }));
+    try {
+      socket.end('HTTP/1.1 ' + status + ' ' + statusText + '\r\n' +
+        'Connection: close\r\n' +
+        'Content-Type: application/json; charset=utf-8\r\n' +
+        'Content-Length: ' + payload.length + '\r\n' +
+        (error?.retryAfterSeconds ? 'Retry-After: ' + error.retryAfterSeconds + '\r\n' : '') +
+        'Cache-Control: no-store\r\n\r\n' + payload);
+    } catch { socket.destroy(); }
+  }
+
+  server.on('upgrade', (req, socket, head) => {
+    void (async () => {
+      const url = new URL(req.url || '/', 'http://localhost');
+      const match = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/realtime\/ws$/i);
+      if (!match) throw fail(404, 'ERR_SYSTEMFABRIC_NOT_FOUND', 'The WebSocket route was not found.');
+      if (req.method !== 'GET') throw fail(405, 'ERR_SYSTEMFABRIC_METHOD_NOT_ALLOWED', 'WebSocket upgrades require GET.');
+      if (!realtimeWebSocketGateway) throw fail(503, 'ERR_SYSTEMFABRIC_REALTIME_DISABLED', 'The real-time WebSocket gateway is not configured.');
+      const siteId = match[1];
+      if (!ID_RE.test(siteId)) throw fail(400, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+
+      const origin = req.headers.origin;
+      const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
+      if (typeof origin !== 'string' || origin !== expectedOrigin) {
+        throw fail(403, 'ERR_SYSTEMFABRIC_REALTIME_ORIGIN_FORBIDDEN', 'A same-origin WebSocket request is required.');
+      }
+
+      const firewallResult = await firewall.evaluate({
+        ip: req.socket.remoteAddress || 'unknown',
+        path: url.pathname,
+        userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
+        siteId
+      });
+      if (firewallResult.action === 'deny' || firewallResult.action === 'challenge') {
+        throw fail(403, 'ERR_SYSTEMFABRIC_FIREWALL_DENY', 'The WebSocket request is blocked by site security policy.');
+      }
+      if (firewallResult.action === 'rate_limit') {
+        throw fail(429, 'ERR_SYSTEMFABRIC_FIREWALL_RATE_LIMIT', 'The WebSocket request exceeded the firewall rate limit.');
+      }
+
+      const auth = await authenticate(req);
+      if (!auth) throw fail(401, 'ERR_SYSTEMFABRIC_UNAUTHORIZED', 'Authentication is required for WebSocket connections.');
+      const actor = { ...auth, isDeveloper: auth.mode === 'development-token' };
+      await requireRealtimeCapability(actor, siteId);
+      const principalId = actor.user.id || (actor.isDeveloper ? 'local-developer' : null);
+      const sessionId = actor.sessionId || (actor.isDeveloper ? 'local-developer-session' : null);
+      if (!principalId || !sessionId) throw fail(401, 'ERR_SYSTEMFABRIC_REALTIME_PRINCIPAL_REQUIRED', 'A persistent authenticated session is required.');
+
+      const limit = allowRequest('realtime-connect:' + siteId + ':' + principalId);
+      if (!limit.allowed) {
+        const error = fail(429, 'ERR_SYSTEMFABRIC_REALTIME_RATE_LIMIT', 'Real-time connection rate limit exceeded.');
+        error.retryAfterSeconds = limit.retryAfterSeconds;
+        throw error;
+      }
+
+      await realtimeWebSocketGateway.handleUpgrade(req, socket, head, {
+        principal: { id: principalId, isDeveloper: actor.isDeveloper },
+        principalId,
+        sessionId,
+        expiresAt: actor.expiresAt || null,
+        siteId,
+        topic: 'presence'
+      });
+    })().catch(error => rejectWebSocketUpgrade(socket, error));
+  });
+
   server.systemfabric = {
     get contentStore() { return store; }, get pool() { return localPool; }, get identityService() { return identity; }, get libraryStore() { return libraryStore; }, get firewall() { return firewall; },
-    get realtimeHub() { return realtimeHub; }, get realtimeBridge() { return realtimeBridge; }, get presenceService() { return presence; }, get realtimeMetrics() { return realtimeMetrics.snapshot(); },
+    get realtimeHub() { return realtimeHub; }, get realtimeBridge() { return realtimeBridge; }, get presenceService() { return presence; }, get realtimeConnectionLimiter() { return realtimeConnectionLimiter; }, get realtimeMetrics() { return realtimeMetrics.snapshot(); },
     ready() { return realtimeBridgeReady; },
     get realtimeMode() {
       if (injectedRealtimeHub && injectedPresenceService) return 'injected-adapters';
@@ -1420,9 +1516,12 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       return injectedPresenceService ? 'injected' : configuredPresenceStore;
     },
     async close() {
+      await realtimeGateway?.close?.().catch(() => {});
+      await realtimeWebSocketGateway?.close?.().catch(() => {});
       realtimeHub?.close?.();
       if (realtimeBridge && typeof realtimeBridge.close === 'function') await Promise.resolve(realtimeBridge.close()).catch(() => {});
       if (presence && typeof presence.close === 'function') await Promise.resolve(presence.close()).catch(() => {});
+      if (realtimeConnectionLimiter && typeof realtimeConnectionLimiter.close === 'function') await Promise.resolve(realtimeConnectionLimiter.close()).catch(() => {});
       samlAuth?.close?.();
       if (typeof libraryStorageAdapter?.close === 'function') await libraryStorageAdapter.close().catch(()=>{});
       if (localPool && !pool) await localPool.end();
@@ -1435,6 +1534,7 @@ async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
   let presenceService = null;
   let realtimeBridge = null;
+  let realtimeConnectionLimiter = null;
   const realtimeEnabled = process.env.SYSTEMFABRIC_REALTIME_ENABLED === 'true';
   const realtimeMetrics = createRealtimeMetrics();
   const presenceStore = String(process.env.SYSTEMFABRIC_PRESENCE_STORE || 'memory').toLowerCase();
@@ -1442,11 +1542,21 @@ async function main() {
     throw new Error('SYSTEMFABRIC_PRESENCE_STORE must be memory or redis.');
   }
   if (realtimeEnabled && process.env.NODE_ENV === 'production') {
-    throw new Error('The standalone API entry point does not yet provide a distributed event gateway. Inject both the distributed event hub and presence service through the production host bootstrap.');
+    throw new Error('The standalone API entry point does not yet provide distributed event, presence and connection-quota adapters. Inject all three through the production host bootstrap.');
   }
   if (realtimeEnabled && presenceStore === 'redis') {
     try {
       const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
+      realtimeConnectionLimiter = await createRedisRealtimeConnectionLimiter({
+        url: redisUrl,
+        limits: {
+          maxGlobal: boundedInt(process.env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS, 10_000, 1, 100_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS'),
+          maxPerSite: boundedInt(process.env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE, 500, 1, 100_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE'),
+          maxPerPrincipal: boundedInt(process.env.SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL, 4, 1, 1_000, 'SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL')
+        },
+        leaseMs: boundedInt(process.env.SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS, 45_000, 5_000, 300_000, 'SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS'),
+        metrics: realtimeMetrics
+      });
       realtimeBridge = await createRedisRealtimeBridge({
         url: redisUrl,
         metrics: realtimeMetrics,
@@ -1468,19 +1578,21 @@ async function main() {
     } catch (error) {
       await Promise.all([
         presenceService?.close?.().catch(() => {}),
-        realtimeBridge?.close?.().catch(() => {})
+        realtimeBridge?.close?.().catch(() => {}),
+        realtimeConnectionLimiter?.close?.().catch(() => {})
       ]);
       throw error;
     }
   }
   let server;
   try {
-    server = createApiServer({ presenceService, realtimeBridge, realtimeMetrics });
+    server = createApiServer({ presenceService, realtimeBridge, realtimeMetrics, realtimeConnectionLimiter });
     await server.systemfabric.ready();
   } catch (error) {
     await Promise.all([
       presenceService?.close?.().catch(() => {}),
-      realtimeBridge?.close?.().catch(() => {})
+      realtimeBridge?.close?.().catch(() => {}),
+      realtimeConnectionLimiter?.close?.().catch(() => {})
     ]);
     throw error;
   }

@@ -210,6 +210,8 @@ test('API exposes authenticated presence and a site-scoped SSE presence stream i
     const reader = stream.body.getReader();
     const ready = await reader.read();
     assert.match(new TextDecoder().decode(ready.value), /connected/);
+    assert.match(new TextDecoder().decode(ready.value), /event: connection\.ready/);
+    assert.match(new TextDecoder().decode(ready.value), /snapshot-refresh/);
 
     const idle = await fetch(heartbeatUrl, {
       method: 'POST',
@@ -349,6 +351,11 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
     async publish() { return { delivered: 0 }; },
     async close() { bridgeClosed = true; }
   };
+  let quotaClosed = false;
+  const realtimeConnectionLimiter = {
+    async acquire() { return { async renew() { return true; }, async release() {} }; },
+    async close() { quotaClosed = true; }
+  };
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
@@ -358,6 +365,7 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
     },
     presenceService,
     realtimeBridge,
+    realtimeConnectionLimiter,
     logger: { error() {} }
   });
   await server.systemfabric.ready();
@@ -367,4 +375,5 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
   await server.systemfabric.close();
   assert.equal(closed, true);
   assert.equal(bridgeClosed, true);
+  assert.equal(quotaClosed, true);
 });

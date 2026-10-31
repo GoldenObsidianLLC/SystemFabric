@@ -147,7 +147,7 @@ Requirements:
 - The state change and its outbox record are committed atomically in PostgreSQL where the operation is transactional.
 - Events have stable IDs and schema versions; consumers are idempotent.
 - Delivery is at-least-once unless a stronger, specifically demonstrated guarantee is documented. Consumers must tolerate duplicates.
-- Retry, dead-letter, replay and reconciliation behavior is defined and observable. The current PostgreSQL ledger stores per-consumer-group delivery state; replay is available by bounded, explicit event ID selection. Operational observability is not implemented yet.
+- Retry, dead-letter, replay and reconciliation behavior is defined and observable. The current PostgreSQL ledger stores per-consumer-group delivery state; replay is available by bounded, explicit event ID selection. F1.6 provides bounded local metrics and a protected Prometheus scrape endpoint for the real-time subsystem. Durable metrics retention, alerting ownership and centralized tracing remain deployment-level work.
 - Event payloads contain the minimum necessary data. Prefer resource identifiers and authorized follow-up reads over copying sensitive records into broadcasts.
 - Ordering is defined only within a documented key or aggregate where required; do not imply global ordering.
 
@@ -204,11 +204,11 @@ Responsibilities:
 - Authorize channel/topic subscriptions and re-check or invalidate them when access changes.
 - Enforce per-user, per-tenant and per-connection quotas, message size limits and rate limits.
 - Apply backpressure and disconnect or degrade abusive/overloaded consumers safely.
-- Support reconnect with bounded resume cursors for durable events where retention permits.
+- Support bounded reconnect with durable resume cursors only for event streams that actually have a retained durable log. Ephemeral presence refresh reconnects by fetching an authorized current-state snapshot; it has no replay cursor.
 - Avoid sending a tenant-wide event to every client and relying on frontend filtering.
 - Emit connection, authorization-denial, delivery-lag and saturation telemetry.
 
-Evaluate WebSockets for bidirectional collaboration and server-sent events for one-way event streams. A polling fallback may be appropriate for unsupported networks or low-frequency interfaces. The transport choice should be tested against expected deployment topology, proxy behavior, browser support, reconnect semantics and operational complexity.
+F1.8 implements an authenticated, same-origin WebSocket preview for the narrow presence command set while retaining SSE for one-way presence refresh. Both transports share global/site/principal quota leases and bounded recovery guidance. The protocol explicitly uses snapshot refresh rather than event replay. This does not yet implement collaborative document operations or a durable browser event stream. Proxy/browser compatibility, multi-instance failover, load/soak, operational runbooks and independent security review remain open before production.
 
 The gateway must not become a second authorization system. It delegates to the canonical identity, tenant and capability model.
 
@@ -490,3 +490,11 @@ Each step requires an architecture decision record where a technology or consist
 - [Security model and review boundaries](SECURITY.md)
 - [Release readiness](RELEASE_READINESS.md)
 - [Research and collaboration](../RESEARCH_COLLABORATION.md)
+
+## Implementation status: F1.8 presence transport preview
+
+The current implementation adds a site-scoped presence-only WebSocket route and keeps the authenticated SSE route as a fallback. The WebSocket gateway accepts ping, presence heartbeat and presence leave commands, with identity derived from the authenticated context. Same-origin validation, site capability checks, periodic reauthorization, message/frame limits and bounded outbound buffering are applied before and during the connection.
+
+A shared connection-quota interface applies to both transports. The local memory implementation is limited to development/test use; Redis Lua leases enforce global, per-site and per-principal limits with crash expiry. Redis-backed/production operation requires an injected distributed limiter. The connection-ready protocol describes bounded full-jitter reconnect attempts and an authoritative snapshot refresh. It does not claim replay of ephemeral Pub/Sub events.
+
+F1.8 is a preview proof, not a production certification or CMS collaboration implementation. Redis presence/authorization messages remain ephemeral; durable domain events continue to use the PostgreSQL outbox and consumer-group delivery ledger. Multi-instance WebSocket load/failover, Redis Cluster quota stress, browser/proxy soak, external security review and operations runbooks remain release gates.

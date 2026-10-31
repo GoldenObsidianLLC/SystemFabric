@@ -85,19 +85,40 @@ const REALTIME_COUNTERS = Object.freeze([
   'redis_inbound_queue_overflows_total',
   'redis_reconnect_attempts_total',
   'redis_errors_total',
-  'redis_invalid_messages_total'
+  'redis_invalid_messages_total',
+  'connection_quota_acquires_total',
+  'connection_quota_rejections_total',
+  'connection_quota_releases_total',
+  'connection_quota_renewals_total',
+  'connection_quota_expirations_total',
+  'connection_quota_store_errors_total',
+  'websocket_connections_opened_total',
+  'websocket_connections_closed_total',
+  'websocket_messages_received_total',
+  'websocket_message_rejections_total',
+  'websocket_backpressure_closes_total',
+  'websocket_pings_sent_total',
+  'websocket_reconnect_required_total',
+  'fanout_failures_total',
+  'realtime_reconnects_advised_total'
 ]);
 const REALTIME_GAUGES = Object.freeze([
   'active_subscriptions',
   'active_sse_connections',
   'presence_memory_active_leases',
   'presence_redis_last_site_lease_count',
-  'redis_inbound_queue_size'
+  'redis_inbound_queue_size',
+  'active_websocket_connections',
+  'redis_bridge_ready',
+  'redis_bridge_degraded'
 ]);
 const REALTIME_HISTOGRAMS = Object.freeze({
   event_lag_milliseconds: Object.freeze([1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]),
   fanout_targets_per_event: Object.freeze([0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000]),
-  presence_snapshot_lease_count: Object.freeze([0, 1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000])
+  presence_snapshot_lease_count: Object.freeze([0, 1, 5, 10, 25, 50, 100, 500, 1000, 5000, 10000]),
+  fanout_duration_milliseconds: Object.freeze([1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]),
+  redis_publish_duration_milliseconds: Object.freeze([1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]),
+  realtime_connection_duration_milliseconds: Object.freeze([1000, 5000, 15000, 30000, 60000, 300000, 900000, 1800000])
 });
 
 function createRealtimeMetrics() {

@@ -20,14 +20,14 @@ All notable project-level changes should be recorded here. This changelog does n
 ### Real-time and durable event foundation
 
 - Add the bounded process-local event hub, lease-based presence service and authenticated SSE presence preview.
-- Define a validated v1 durable event envelope for PostgreSQL outbox events, add migrations `0010_outbox_event_contract.sql` and `0011_outbox_legacy_classification_backfill.sql`, and carry site, actor, correlation, causation and classification metadata with stable event identity.
-- Add migration `0012_durable_consumer_group_deliveries.sql` and a transport-neutral PostgreSQL delivery worker with independent consumer-group state, leased concurrent claims, per-aggregate ordering, exponential retry, dead-letter handling and bounded explicit-ID replay.
-- Add migration `0013_consumer_group_event_filters.sql`; persist allow-listed event-type subscriptions so a consumer group receives only its intended event families.
-- Migrate the Memgraph projection worker to `graph.projection.v1`; project content workflow state by monotonic `lock_version` aggregate sequence while retaining editorial revision `version` separately.
+- Define a validated v1 durable event envelope for PostgreSQL outbox events, add migrations 0010 and 0011, and carry site, actor, correlation, causation and classification metadata with stable event identity.
+- Add migration 0012 and a transport-neutral PostgreSQL delivery worker with independent consumer-group state, leased concurrent claims, per-aggregate ordering, exponential retry, dead-letter handling and bounded explicit-ID replay.
+- Add migration 0013; persist allow-listed event-type subscriptions so a consumer group receives only its intended event families.
+- Migrate the Memgraph projection worker to graph.projection.v1; project content workflow state by monotonic lock_version aggregate sequence while retaining editorial revision version separately.
 - Add unit/integration coverage for graph handler wiring, workflow status projection, event filters, group isolation, ordering, replay, lease recovery and actual Memgraph outage replay.
 - Add Redis/Memurai-compatible shared presence leases with atomic Lua updates, per-site sorted-set indexes, hashed session keys, multi-session aggregation, hidden-state handling, capacity limits and lazy expiry callbacks.
 - Add API bootstrap settings for memory or Redis presence, bounded reconnect behavior and fail-closed store errors; add live coverage proving two independent Redis clients share presence snapshots.
-- Add cross-instance Redis Pub/Sub presence-refresh invalidation fan-out to authenticated SSE clients, including site validation, bounded inbound dispatch, authorization rechecks and lazy lease-expiry propagation. PostgreSQL remains the durable event source. WebSocket delivery, reconnect/replay, distributed connection quotas and production certification remain open.
+- Add cross-instance Redis Pub/Sub presence-refresh invalidation fan-out to authenticated SSE clients, including site validation, bounded inbound dispatch, authorization rechecks and lazy lease-expiry propagation. PostgreSQL remains the durable event source.
 - Add targeted authorization invalidation for membership changes, session logout/revocation, password reset and MFA disable; propagate UUID-only invalidation envelopes across Redis-backed API instances.
 - Bind SSE subscriptions to their authenticated session and absolute expiry; revalidate session revocation, idle expiry, account status and site capability on each heartbeat, closing streams when access is no longer valid.
 
@@ -35,14 +35,24 @@ All notable project-level changes should be recorded here. This changelog does n
 
 - Add a fixed-name realtime metric registry with counters, gauges and histograms for active subscriptions/SSE connections, authorization denials and revocations, event fan-out and lag, queue overflow, backpressure, presence leases and Redis Pub/Sub publications, receives, failures and reconnects.
 - Instrument event hub, SSE gateway, memory/Redis presence adapters, Redis Pub/Sub bridge and realtime API authorization checks; telemetry failures are isolated from request and delivery paths.
-- Extend the existing bearer-token-protected Prometheus `/metrics` endpoint with realtime series. Keep metrics disabled by default, avoid high-cardinality identity/site labels, and document process-local aggregation and lazy Redis lease-expiry semantics.
+- Extend the existing bearer-token-protected Prometheus /metrics endpoint with realtime series. Keep metrics disabled by default, avoid high-cardinality identity/site labels, and document process-local aggregation and lazy Redis lease-expiry semantics.
 - Add focused tests for registry validation/rendering, hub lifecycle/fan-out, presence lease accounting and protected API scraping.
 
 ### Collaborative editing architecture spike (F1.7)
 
 - Compare CRDT and operational transformation against the current page-document v1 tree, editor mutation model, PostgreSQL revision history and one-way SSE transport.
 - Record a provisional server-authoritative semantic-OT recommendation for the first online CMS collaboration release, with stable node/sibling anchors, operation sequencing, conflict semantics, PostgreSQL durability and explicit CRDT revisit conditions.
-- Document the follow-on two-client browser prototype and security/performance acceptance gates. No collaboration runtime, CRDT dependency, operation table, migration, WebSocket route or editor collaboration behavior is claimed.
+- Document the follow-on two-client browser prototype and security/performance acceptance gates. No collaboration runtime, CRDT dependency, operation table, migration or editor collaboration behavior is claimed.
+
+### Distributed real-time controls and recovery (F1.8)
+
+- Add a same-origin, authenticated WebSocket presence preview with a strict command allow-list, per-command authorization rechecks, ping/pong liveness, bounded payload/rate/buffer controls and the existing SSE fallback.
+- Add a shared global/site/principal connection quota interface with memory preview and Redis Lua lease adapters; leases renew during SSE/WebSocket sessions and expire after process crashes. Redis multi-key leases share one Cluster hash slot and quota-store outages fail closed.
+- Share quotas across SSE and WebSocket, require injected distributed quota adapters for Redis-backed/production mode, and release leases on disconnect and graceful shutdown.
+- Add a versioned connection-ready contract with bounded full-jitter reconnect guidance and snapshot-refresh recovery. Ephemeral presence Pub/Sub does not provide replay or durable client event history.
+- Make presence relay publication local-first so a Redis publish outage does not suppress same-instance refresh delivery; record degraded relay state, failures and fan-out/transport/quota metrics.
+- Add failure-injection and API tests for origin/auth rejection, authorization rechecks, command/frame limits, shared quota behavior, disconnect cleanup, relay interruption and local authorization revocation.
+- Production remains NO-GO pending multi-instance/Redis Cluster load and failover tests, browser/proxy reconnect soak, independent security review and operations runbooks.
 
 ### Release engineering and local validation
 

@@ -22,7 +22,7 @@ const SESSION_A3 = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const REDIS_URL = 'redis://127.0.0.1:6379';
 
 class FakeRedisBroker {
-  constructor() { this.clients = []; }
+  constructor() { this.clients = []; this.failPublishes = false; }
 
   createClient() {
     const broker = this;
@@ -43,6 +43,7 @@ class FakeRedisBroker {
         patterns.set(pattern, handler);
       },
       async publish(channel, message) {
+        if (broker.failPublishes) throw Object.assign(new Error('Redis connection interrupted.'), { code: 'ECONNRESET' });
         let delivered = 0;
         for (const target of broker.clients) {
           for (const [pattern, handler] of target.patterns) {
@@ -205,4 +206,66 @@ test('Redis realtime envelope validation enforces channel site, UUID identity an
   assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, payload: { ...authorization.payload, sessionToken: 'secret' } }), 4096), null);
   assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, sessionToken: 'secret' }), 4096), null);
   assert.equal(DEFAULT_CHANNEL_PREFIX, 'systemfabric:realtime:v1');
+});
+
+test('presence invalidation still fans out locally when Redis publish is interrupted', async t => {
+  const broker = new FakeRedisBroker();
+  const metrics = createRealtimeMetrics();
+  const bridge = await createRedisRealtimeBridge({
+    url: REDIS_URL,
+    createClient: () => broker.createClient(),
+    metrics
+  });
+  const hub = createRealtimeHub({ authorizeSubscribe: async () => true });
+  await bridge.attach(hub);
+  t.after(async () => { hub.close(); await bridge.close(); });
+
+  const subscription = await hub.subscribe({ principal: { id: 'user-a' }, siteId: SITE_A, topic: 'presence' });
+  const iterator = subscription.events[Symbol.asyncIterator]();
+  broker.failPublishes = true;
+
+  const result = await bridge.publish({
+    siteId: SITE_A,
+    topic: 'presence',
+    payload: { kind: 'presence.refresh' }
+  });
+
+  assert.equal(result.delivered, 1, 'the local hub receives the invalidation despite Redis failure');
+  assert.equal(result.relayPublished, false);
+  assert.equal(result.degraded, true);
+  const event = await waitForEvent(iterator);
+  assert.equal(event.value.payload.kind, 'presence.refresh');
+  assert.equal(metrics.snapshot().counters.redis_publish_failures_total, 1);
+  assert.equal(metrics.snapshot().gauges.redis_bridge_degraded, 1);
+  assert.equal(metrics.snapshot().gauges.redis_bridge_ready, 0);
+});
+
+test('authorization invalidation remains effective locally when Redis relay is unavailable', async t => {
+  const broker = new FakeRedisBroker();
+  const metrics = createRealtimeMetrics();
+  const bridge = await createRedisRealtimeBridge({
+    url: REDIS_URL,
+    createClient: () => broker.createClient(),
+    metrics
+  });
+  const hub = createRealtimeHub({ authorizeSubscribe: async () => true });
+  await bridge.attach(hub);
+  t.after(async () => { hub.close(); await bridge.close(); });
+
+  const subscription = await hub.subscribe({
+    principal: { id: USER_A },
+    siteId: SITE_A,
+    topic: 'presence',
+    sessionId: SESSION_A1
+  });
+  broker.failPublishes = true;
+
+  await assert.rejects(
+    bridge.invalidateAuthorization({ sessionId: SESSION_A1 }),
+    error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE'
+  );
+  assert.equal(hub.subscriberCount, 0, 'local authorization is revoked before relay publication');
+  assert.equal((await subscription.events[Symbol.asyncIterator]().next()).done, true);
+  assert.equal(metrics.snapshot().gauges.redis_bridge_degraded, 1);
+  assert.equal(metrics.snapshot().counters.fanout_failures_total, 1);
 });
