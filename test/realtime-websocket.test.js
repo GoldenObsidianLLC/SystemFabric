@@ -155,6 +155,9 @@ test('WebSocket rejects unknown and malformed commands and cleans up on close', 
   socket.send('{bad-json');
   const [code] = await new Promise(resolve => socket.once('close', (status, reason) => resolve([status, reason.toString()])));
   assert.equal(code, 1008);
+  for (let attempt = 0; attempt < 100 && server.systemfabric.realtimeMetrics.gauges.active_websocket_connections !== 0; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
   assert.equal(server.systemfabric.realtimeMetrics.gauges.active_websocket_connections, 0);
 });
 

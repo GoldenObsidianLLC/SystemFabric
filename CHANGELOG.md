@@ -79,15 +79,16 @@ All notable project-level changes should be recorded here. This changelog does n
 - Add an opt-in, loopback-only real-Redis failure/recovery test proving that a one-shot document PUBLISH failure preserves local delivery and that a subsequent publish restores bridge readiness.
 - Add a bounded sustained fan-out integration test. Local Memurai/Redis validation delivered 2,000 operations to ten subscribers (20,000/20,000 deliveries) at approximately 69 publications/second, with p50/p95/p99 subscriber delivery latency of 0.98/1.45/1.93 ms and zero document-ingress or slow-consumer queue overflows. These are local harness observations, not production capacity or SLO claims.
 - Add a ten-session WebSocket reconnect-storm check after one local API instance is stopped. Each session replays 24 stored operations in order (240 deliveries), and a subsequent sequence-25 operation reaches all peers; measured reconnect/replay interval was 529 ms using an in-memory test store.
-- Re-run the browser-backed 2/5/10 editor matrix independently: 1/1 pass with 153 samples (p50/p95/p99: 1,613/3,123/3,189 ms). A combined Chrome rerun encountered host page-resource failures, so the full browser set must be rerun on clean CI before release.
+- Re-run the full multi-case `test/e2e/collaboration-multinode.spec.js` browser file locally with one worker: 4/4 passed. The 2/5/10 editor matrix recorded 153 samples (p50/p95/p99: 1,270/2,508/2,545 ms); heartbeat repair completed in 3,625 ms; ten-editor reconnect replay delivered 240 operations in 396 ms and accepted sequence 25. This resolved the earlier local page-crash observation for this file; clean hosted CI remains required.
 - Focused collaboration/realtime unit tests passed 61/61; full `npm run check` passed 206/206, with 141 required paths and 139 JavaScript files syntax-checked. The F1.9 two-session browser collaboration regression passed 1/1.
 - Production remains NO-GO pending Redis Cluster/network-partition and orchestrator failover rehearsals, sustained production-shaped load and soak, complete browser-suite validation on clean CI, independent security/accessibility review, and owned operational runbooks.
 
 ### Release engineering and local validation
 
 - Synchronize the Redis 6.3.1 dependency graph in package-lock.json; validate a fresh isolated npm ci and retain install evidence.
-- Add npm run test:migrations:fresh to apply all 13 migrations to a disposable database derived only from TEST_DATABASE_URL, verify a second pass is idempotent, and drop only the generated test database.
-- Add a Redis service to PostgreSQL/Memgraph CI and make the live integration runner explicitly opt into Redis tests only for a local Redis/Memurai endpoint; retain zero-skip integration evidence.
+- Add npm run test:migrations:fresh to apply all 14 migrations to a disposable database derived only from TEST_DATABASE_URL, verify a second pass is idempotent, and drop only the generated test database.
+- Add dedicated Redis services to PostgreSQL/Memgraph and browser/accessibility CI; pass the explicit loopback URL to the multi-instance browser suite and retain zero-skip integration evidence.
+- Make the WebSocket close-cleanup regression test wait for the server-side connection gauge to reach zero rather than assuming client and server close-event ordering is synchronous.
 - Pin the CI Memgraph loopback port for the outage/restart test so the service remains reachable after Docker restarts its fixed-port container.
 - Refresh release-readiness evidence and regenerate the CycloneDX SBOM after dependency and test-harness changes.
 - Normalize SQL migration line endings before hashing/execution so Windows CRLF checkouts do not trigger false migration-drift failures; add LF/CRLF/CR regression tests.
