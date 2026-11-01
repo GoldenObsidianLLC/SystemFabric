@@ -1,0 +1,51 @@
+{
+  "status": "not_started",
+  "gate": "tenant-isolation-review",
+  "commit": "ab55892dc33b87d8be4165e13931cd6888f358a1",
+  "reviewer": {
+    "name": "",
+    "organization": "",
+    "qualifications": "",
+    "independenceDeclaration": "",
+    "conflictDisclosure": ""
+  },
+  "executedAt": null,
+  "reviewPeriod": {
+    "startedAt": null,
+    "completedAt": null
+  },
+  "command": "",
+  "environment": "",
+  "scope": {
+    "routeInventoryArtifact": "",
+    "capabilityMatrixArtifact": "",
+    "adversarialTestMatrixArtifact": "",
+    "limitations": []
+  },
+  "results": {
+    "routesInventoried": 0,
+    "routesInScope": 0,
+    "routesTested": 0,
+    "testsPlanned": 0,
+    "testsExecuted": 0,
+    "passed": 0,
+    "failed": 0,
+    "notRun": 0,
+    "notApplicable": 0
+  },
+  "findings": [],
+  "remediation": {
+    "criticalHighOpen": 0,
+    "criticalHighRetested": 0,
+    "riskAcceptances": []
+  },
+  "conclusion": "",
+  "artifacts": [],
+  "reviewerSignedReport": "",
+  "notes": [
+    "Template only: not evidence and not a passing result.",
+    "Keep this file outside artifacts/evidence until the assessment is complete.",
+    "Use status=passed only when every gate acceptance criterion has been met and all artifacts listed above exist.",
+    "The evidence validator requires status, executedAt, command, environment, a non-empty artifacts array of existing repository-relative paths, and an exact current HEAD if commit is provided."
+  ]
+}
