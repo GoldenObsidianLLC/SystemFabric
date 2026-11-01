@@ -9,7 +9,8 @@ test('shared secret comparison is byte-safe, constant-time for equal lengths, an
   assert.equal(sameSecret('test-secret', 'wrong-secret'), false);
   assert.equal(sameSecret('short', 'longer-secret'), false);
   assert.equal(sameSecret('', 'non-empty'), false);
-  assert.equal(sameSecret('h\\u00e9llo', 'h\\u00e9llo'), true);
+  const unicodeSecret = 'h' + String.fromCharCode(0x00e9) + 'llo';
+  assert.equal(sameSecret(unicodeSecret, unicodeSecret), true);
 });
 
 async function withServer(fn, envExtra = {}) {

@@ -15,27 +15,24 @@ function updateEnvFile({ target = envFile, template = envExample } = {}) {
     fs.copyFileSync(template, target, fs.constants.COPYFILE_EXCL);
     created = true;
   } catch (error) {
-    if (error.code !== 'EEXIST') {
-      // Windows may report EPERM for an already-existing directory target.
-      // Confirm the target exists before treating that result as an exclusive-create collision.
-      if (error.code !== 'EPERM') throw error;
-      try { fs.lstatSync(target); } catch { throw error; }
-    }
+    if (error.code !== 'EEXIST') throw error;
   }
 
-  // Reject symlinks, directories and hard-linked files. Re-check file identity
-  // after opening so a path swap between lstat and open cannot redirect writes.
-  const pathStats = fs.lstatSync(target);
-  if (!pathStats.isFile() || pathStats.nlink > 1) {
-    throw new Error('.env must be a regular, single-link file; symbolic links and other file types are not accepted.');
-  }
-
-  const descriptor = fs.openSync(target, 'r+');
+  // Open once and operate exclusively through the resulting descriptor.
+  // O_NOFOLLOW prevents symlink traversal on POSIX; Windows does not expose that
+  // flag through Node's fs API, but descriptor-bound I/O still prevents path
+  // replacement between the open and subsequent reads/writes from redirecting I/O.
+  const descriptorFlags = fs.constants.O_RDWR | (fs.constants.O_NOFOLLOW || 0);
+  const descriptor = fs.openSync(target, descriptorFlags);
   try {
     const descriptorStats = fs.fstatSync(descriptor);
-    if (!descriptorStats.isFile() || descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino) {
-      throw new Error('.env changed during secure open; retry development setup.');
+    if (!descriptorStats.isFile() || descriptorStats.nlink > 1) {
+      throw new Error('.env must be a regular, single-link file; symbolic links are not accepted where O_NOFOLLOW is supported.');
     }
+
+    // Environment files may contain credentials. On POSIX, constrain access
+    // to the owning account before reading or updating them.
+    if (process.platform !== 'win32') fs.fchmodSync(descriptor, 0o600);
 
     // Add test-only endpoints without replacing existing credentials/endpoints.
     let envText = fs.readFileSync(descriptor, 'utf8');
