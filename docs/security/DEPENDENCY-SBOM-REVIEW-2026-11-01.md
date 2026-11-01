@@ -47,6 +47,8 @@ A separate local Windows x64 worktree inventory under Node.js 26.12.1/npm 11.7.0
 
 The repository's top-level `LICENSE` is GPL-2.0; the vendored `vendor/enginex/LICENSE` is MIT. These facts do not establish compatibility of the combined product, the correct notice set, or the precise obligations for every distribution form.
 
+A second package-archive inspection verified the lockfile SRI for seven exact Sharp/libvips and platform packages and recorded whether LICENSE/COPYING/NOTICE texts are present in each archive. See `DEPENDENCY-LICENSE-PACKAGE-INSPECTION-2026-11-01.md`. This inspection found no separate license file in the two Linux libvips tarballs and found compound LGPL expressions in the WASM and Windows Sharp package metadata even though the included LICENSE files begin with Apache 2.0. This is a material notice-mapping gap, not a reason to remove the components from the SBOM.
+
 Before distributing binaries, containers or hosted downloadable artifacts, the release owner must determine which optional Sharp/libvips variants are actually shipped for each target platform, verify the package license texts and source offers/notices as applicable, include required third-party notices, and obtain legal review where required. Do not remove a license-bearing package from the SBOM merely because a different platform does not load it.
 
 ## Stale evidence defect — corrected in the latest CI run
