@@ -92,3 +92,7 @@ For each remaining gate, record:
 ## Release decision
 
 SystemFabric remains **NOT_PRODUCTION_CERTIFIED**. Do not mark it production-ready until every required gate has current evidence for the intended release revision, exceptions are documented and approved, restore/rollback paths are proven, and the release owner signs off. A green CI run, public repository, or a passed unit suite is not production certification.
+
+### Recommended 0.5.1 release scope
+
+See [RELEASE-SCOPE.md](RELEASE-SCOPE.md) for the recommended developer-preview scope and provider matrix. It is explicitly marked pending named release-owner approval; it does not certify production or waive the open evidence gates.
