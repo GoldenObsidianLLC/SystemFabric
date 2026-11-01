@@ -110,3 +110,73 @@ test('site-addressed route families deny a member without the required capabilit
     });
   }
 });
+
+
+test('community group member listing is reachable only with the site moderation capability', async t => {
+  const GROUP_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const authorizationCalls = [];
+  const dataQueries = [];
+  const identity = {
+    async authenticate(token) {
+      assert.equal(token, 'site-a-moderator-session');
+      return {
+        mode: 'session',
+        sessionToken: token,
+        sessionId: SESSION_A,
+        expiresAt: new Date(Date.now() + 60_000),
+        user: { id: USER_A, email: 'site-a-moderator@example.test', displayName: 'Site A Moderator', status: 'active' },
+        memberships: [{ siteId: SITE_A }]
+      };
+    },
+    async authorizeSite(userId, siteId, capability) {
+      authorizationCalls.push({ userId, siteId, capability });
+      return userId === USER_A && siteId === SITE_A &&
+        ['content:read', 'community:moderate'].includes(capability);
+    }
+  };
+  const expectedMembers = [{
+    id: USER_A,
+    display_name: 'Site A Moderator',
+    email: 'site-a-moderator@example.test',
+    role: 'moderator',
+    status: 'active'
+  }];
+  const pool = {
+    async query(sql, params) {
+      if (sql.includes('FROM firewall_rules WHERE enabled=true')) return { rows: [] };
+      dataQueries.push({ sql, params });
+      if (sql.includes('FROM social_group_memberships gm JOIN users u')) {
+        assert.deepEqual(params, [SITE_A, GROUP_ID], 'member listing query must be constrained by both site and group');
+        return { rows: expectedMembers };
+      }
+      throw new Error('Unexpected tenant data query: ' + sql);
+    },
+    async end() {}
+  };
+  const server = createApiServer({
+    env: {
+      NODE_ENV: 'test',
+      AI_PROVIDER: 'mock',
+      RATE_LIMIT_MAX_REQUESTS: '100'
+    },
+    pool,
+    identityService: identity,
+    logger: { error() {} }
+  });
+
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+    await server.systemfabric.close();
+  });
+
+  const base = 'http://127.0.0.1:' + server.address().port;
+  assert.equal((await fetch(base + '/health')).status, 200);
+  const response = await fetch(base + '/api/v1/sites/' + SITE_A + '/community/groups/' + GROUP_ID + '/members', {
+    headers: { authorization: 'Bearer site-a-moderator-session' }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).members, expectedMembers);
+  assert.ok(authorizationCalls.some(call => call.siteId === SITE_A && call.capability === 'community:moderate'));
+  assert.equal(dataQueries.length, 1);
+});
