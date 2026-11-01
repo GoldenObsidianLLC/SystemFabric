@@ -2,32 +2,34 @@
 
 **Baseline reviewed:** `1a903b8eab4304dd61b2489381b091d34f1ea546`
 **Remediation branch:** `fix/codeql-high-alert-remediation`
-**Status:** the hosted CodeQL analysis and all five CI jobs completed successfully on revision `f8262c68cdcb9a05ae64d05fd168742979d76bd0`. The latest branch scan has five open alerts: #4–#7 (High) and #14 (Medium). No alert was bulk-dismissed.
+**Latest reviewed commit:** `9a004ff38224882d7f9ccf61a9df7a7efec89a84`
+**Hosted CI run:** [41338029772](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41338029772)
+**Status:** all five hosted CI jobs completed successfully on the latest reviewed commit. The latest branch scan retains five open alerts: #4–#7 (High) and #14 (Medium). No alert was bulk-dismissed.
 
-This record distinguishes code changes from alert disposition. The latest scan confirms that the targeted baseline alerts #3, #8–#13 and #15 are no longer open on this branch. This is a static-analysis result, not an independent security assessment or a claim that the entire product is secure.
+The latest scan confirms that the targeted baseline alerts #3, #8–#13 and #15 are no longer open on this branch. This is a static-analysis result, not an independent security assessment or a claim that the entire product is secure.
 
 ## Remediation in this change
 
-| Baseline alert | Rule / severity | Action taken | Required confirmation |
+| Baseline alert | Rule / severity | Action taken | Latest disposition |
 |---:|---|---|---|
 | 3 | `js/bad-tag-filter` / High | Replaced a test-only regex substring assertion with a literal string check. The assertion was testing escaped output, not attempting to sanitize HTML. | Not open in the latest branch analysis; no dismissal was used. |
 | 8 | `js/insufficient-password-hash` / High | Removed SHA-256 use from a constant-time equality helper. It now compares UTF-8 bytes directly with `timingSafeEqual` after a length guard; this helper verifies configured high-entropy bearer secrets and does not store passwords. | Not open in the latest branch analysis; API-token and metrics/bootstrap authentication tests passed. |
 | 9–10 | `js/polynomial-redos` / High | Replaced unbounded template-token and short-comment detection regexes with monotonic `indexOf` delimiter scans. Added brace-heavy and long-comment regression coverage. | Not open in the latest branch analysis; hosted EnginEx suite passed 92/92. |
-| 11 | `js/file-system-race` / High | Removed the existence-check-then-copy sequence in development setup. Uses exclusive creation, opens with `O_NOFOLLOW` where Node exposes it, validates regular-file and single-link metadata through `fstat`, sets POSIX permissions to `0600`, and performs all reads/writes through the descriptor. Added symlink-rejection (POSIX) and path-replacement regression tests. Node's Windows `fs` API does not expose `O_NOFOLLOW`; on Windows, file-descriptor-bound I/O still prevents a path replacement after open from redirecting subsequent operations, but symlink traversal at open remains a platform-specific limitation. | Not open in the latest branch analysis; setup race/symlink regression tests passed. |
-| 12–13 | `js/file-system-race` / High | Template and precompiled-manifest content is read through the same open file descriptor used for size/metadata checks, with a post-read signature check. Added deterministic path-replacement tests on platforms that permit renaming an open file. | Not open in the latest branch analysis; hosted renderer/manifest suite passed. |
-| 15 | `js/insecure-temporary-file` / High | Local media directories/files now use owner-only permissions (`0700`/`0600`) and exclusive file creation. Added a permission and no-overwrite test; test media is rooted in an isolated project test directory rather than an OS temporary directory. | Not open in the latest branch analysis; local media permission/no-overwrite tests passed. Deployment file ownership and backup process still require separate review. |
+| 11 | `js/file-system-race` / High | Hardened development .env creation and updates using exclusive creation, `O_NOFOLLOW` where Node exposes it, descriptor-bound I/O, regular-file/link checks and owner-only POSIX permissions. | Not open in the latest branch analysis; hosted setup tests passed. Node's Windows fs API does not expose `O_NOFOLLOW`, so symlink traversal at open remains a platform-specific limitation. |
+| 12–13 | `js/file-system-race` / High | Template and precompiled-manifest content is read through the same open file descriptor used for size/metadata checks, with a post-read signature check. Added deterministic path-replacement regression tests. | Not open in the latest branch analysis; hosted renderer/manifest suite passed. |
+| 15 | `js/insecure-temporary-file` / High | Local media directories/files now use owner-only permissions (`0700`/`0600`) and exclusive file creation. Added permission and no-overwrite regression coverage. | Not open in the latest branch analysis; local and hosted media tests passed. Deployment file ownership and backups still require separate review. |
 
 ## Findings retained for human review
 
 ### Alerts 4–7 — cookie storage of sensitive data (High)
 
-These alerts point at browser authentication protocol cookies, not password persistence. The session and MFA challenge values are high-entropy opaque bearer tokens that the browser must present; the identity store persists token digests rather than plaintext session tokens. Session/challenge cookies are HttpOnly and receive Secure in secure deployments, with SameSite and path/expiry restrictions. The separate CSRF cookie is intentionally script-readable for the double-submit defense and is not an authentication credential.
+These alerts point at browser authentication protocol cookies, not password persistence. Session and MFA challenge values are high-entropy opaque bearer tokens that the browser must present; the identity store persists token digests rather than plaintext session tokens. Session/challenge cookies are HttpOnly and receive Secure in secure deployments, with SameSite and path/expiry restrictions. The separate CSRF cookie is intentionally script-readable for the double-submit defense and is not an authentication credential.
 
 This is an intentional protocol boundary, not proof that the risk is zero. A reviewer must verify token entropy, TLS/secure-cookie deployment, cookie scope, expiry, session revocation and CSRF checks. Do not dismiss these alerts solely because they are expected cookies; retain them until the security owner records an explicit, evidence-backed disposition.
 
 ### Alert 14 — legacy dynamic code construction (Medium)
 
-The finding concerns the legacy EnginEx compatibility renderer's `new Function` execution of generated template code. The source and public documentation explicitly distinguish it from the safe default engine: legacy JavaScript blocks require the explicit `allowUnsafeCode: true` opt-in and templates must be trusted. The safe renderer rejects legacy blocks.
+The finding concerns the legacy EnginEx compatibility renderer's `new Function` execution of generated template code. The source and public documentation distinguish it from the safe default engine: legacy JavaScript blocks require the explicit `allowUnsafeCode: true` opt-in and templates must be trusted. The safe renderer rejects legacy blocks.
 
 This finding is not being represented as a false positive. Keep the legacy path out of untrusted-template and production-preview claims. A product/maintainer decision is still required on whether to deprecate/remove this compatibility surface or retain it as a documented unsafe opt-in. Do not suppress the alert without that decision and an appropriate security boundary.
 
@@ -35,7 +37,7 @@ This finding is not being represented as a false positive. Keep the legacy path 
 
 - The code changes above are not an independent security assessment.
 - A successful CodeQL workflow run means analysis completed; it does not mean there are no alerts.
-- The dependency/SBOM/provenance gate remains open until both runtime SBOMs and their retained generation logs are reconciled, license notices are reviewed, and a maintainer signs the dependency tree.
+- Dependency/SBOM evidence has been refreshed for the latest CI run; the optional inventory variance, LGPL distribution obligations, provenance/attestation and maintainer review remain open.
 - The independent tenant-isolation review remains open and must be performed by an independent reviewer.
 - SystemFabric remains `NOT_PRODUCTION_CERTIFIED`; no production release approval is implied.
 
