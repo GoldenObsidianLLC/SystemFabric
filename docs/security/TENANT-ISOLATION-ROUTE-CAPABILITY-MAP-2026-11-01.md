@@ -1,0 +1,144 @@
+# SystemFabric 0.5.1 — preliminary tenant-isolation route/capability map
+
+**Repository:** `GoldenObsidianLLC/SystemFabric`
+**Branch:** `fix/codeql-high-alert-remediation`
+**Reviewed source commit:** `3a378f17635ccb046dca96f3660314c88ad3a260`
+**Coordination gate:** GitHub issue [#14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14)
+**Status:** internal static source map and test-coverage preflight; not exhaustive, not an independent review, not a pass/fail assessment.
+
+> **Critical boundary:** no independent tenant-isolation assessment has been performed. This map records code paths and test references observed in the pinned repository. It does not prove that all handlers, SQL statements, stores, projections, or provider callbacks enforce tenant isolation. The independent reviewer must build their own complete inventory, execute adversarial tests, record limitations, and populate the final evidence file for the exact reviewed commit.
+
+## 1. Scope and interpretation
+
+The primary security question is whether a caller, authenticated actor, administrator, background worker, realtime connection, public endpoint, or signed provider callback can read, mutate, infer, or cause side effects against a different site's data without explicit authorization.
+
+SystemFabric has several distinct boundaries:
+
+1. **Account/session boundary:** identity, password, MFA, invitation, verification, federation, and session lifecycle.
+2. **Site boundary:** authenticated requests that select or address a site, and the site's rows in PostgreSQL or related stores.
+3. **Public publication boundary:** intentionally anonymous reads of published/public content and assets. These paths still need site binding and publication/privacy enforcement.
+4. **Asynchronous boundary:** outbox events, graph projections, worker execution, Redis presence/realtime, webhooks, and reconciliation.
+5. **Privileged boundary:** site owners, membership/role changes, developer shortcuts, plugin lifecycle, cloud connections, firewall policy, and moderation.
+
+A green test suite, a route helper, a `site_id` SQL predicate, or a successful CI job is engineering evidence, not independent confirmation of those boundaries.
+
+## 2. Common authorization and site-context primitives
+
+### Site selector resolution
+
+`apps/api/src/server.js:348-380` implements `siteIdFor({ req, url, body, actor, required, routeSiteId })`.
+
+It:
+- Collects the route path selector, `x-systemfabric-site-id`, query `siteId`, and body `siteId`.
+- Rejects repeated query selectors, non-string selector values, malformed UUIDs, and conflicting selectors.
+- Resolves a missing selector from a configured developer default or the actor's sole membership; multi-site actors must select a site when required.
+- For non-developer actors, confirms site membership (using live authorization plus the authenticated membership snapshot as a membership fallback).
+
+### Capability authorization
+
+`apps/api/src/server.js:382-385` implements `requireCapability(actor, siteId, capability)`; non-developers are checked through `identity.authorizeSite(userId, siteId, capability)`. Developer tokens bypass this capability check and are intentionally only available outside production. Production startup is separately fail-closed on release readiness.
+
+Related checks:
+- `canEditContent` at approximately lines 406-410 permits site-wide edit or owner-scoped `content:edit:own`.
+- `authorizeCollaborationDocument` checks page/draft type, active session, site edit capability, and own-content rules (approximately lines 395-405).
+- `requireRealtimeCapability` wraps site capability checks and tracks denials (approximately lines 386-392).
+- `ensureSiteCapabilityForAI` resolves optional tenant scope and applies site/global capability policy (approximately lines 412-418).
+
+### Important implementation distinction for the assessor
+
+Not every site-addressed handler calls `siteIdFor`. Some handlers parse the path's site ID and immediately call `requireCapability`. In those routes, the path site ID is the effective site authority and other header/query/body selectors are not consistently compared for mismatch. This is not, by itself, proof of a tenant escape: `requireCapability` checks the actor against the path site. It is, however, a route-family difference that the assessor must explicitly test and document rather than assume the selector-conflict policy is universal.
+
+Routes that call `siteIdFor` with `routeSiteId` do compare the path selector with other supplied selectors. The community workflow helper `packages/community/src/workflows.js:20-27` derives its path site and calls `siteIdFor`; its helper passes the route site into the body object, so the path is authoritative for that helper's body context. Verify header/query handling and every route variant.
+
+## 3. Static route-to-capability/data-scope inventory
+
+The table below is a navigational index. The capability names and source locations are the implementation's apparent checks, not an independent endorsement of the policy. The reviewer must follow each route through all queries, transactions, stores, event writes, caches, and provider effects.
+
+| Surface / route family | Source entry point | Context / authorization observed | Data and side-effect boundaries | Preliminary test coverage / unresolved work |
+|---|---|---|---|---|
+| Account, login, MFA, password reset, email verification, bootstrap, invitations, OIDC/SAML | `apps/api/src/server.js:567-679, 915-954`; `packages/auth/src/service.js`, `oidc.js`, `saml.js` | Global identity/session flows, not ordinary site-scoped content routes. Invitations carry a site association; federation subject/session lifecycle must be traced. | Users, `auth_sessions`, MFA challenges, invitations, federation state, authorization invalidations. | Auth-security tests cover password hashing, session digests, challenge digests and revocation events. No exhaustive cross-site invitation, role-change, OIDC/SAML, reset-token or stale-session adversarial review. |
+| Site listing and creation | `apps/api/src/server.js:958-968` | `GET /api/v1/sites` lists sites for the authenticated user; developer mode returns only configured local default. Site creation rejects developer token and delegates ownership rules to identity service. | `sites`, owner membership, identity/audit records. | Unit/integration identity tests exist. Need least-privilege creation, owner handoff, concurrent owner removal and stale membership tests. |
+| Design system | `apps/api/src/server.js:970-991` | Path `siteId`; `content:read` for GET and `site:manage` for PUT via direct `requireCapability`. | PostgreSQL `site_design_systems`, transactions/version locking and audit. Query uses `site_id`. | No dedicated A/B route denial/side-effect test located in the route-level tenant integration suite. Test direct path authorization, header/query/body mismatch behavior and concurrent updates. |
+| Reusable components | `apps/api/src/server.js:993-1018` | Path `siteId`; `content:read` for GET, `content:edit` for writes via direct capability check. | `reusable_components`; item queries/mutations include `site_id` and ID. | Add cross-site read/update/delete IDOR tests, including same item ID under different sites and denied no-write assertions. |
+| Site templates | `apps/api/src/server.js:1020-1045` | Path `siteId`; `content:read` for GET and `site:manage` for writes via direct capability check. | `site_templates`; collection/item reads and mutations use site predicate; active-type replacement transaction is site-filtered. | No route-level A/B coverage located. Test activate/deactivate and delete paths across sites; assert no template-state side effects. |
+| Taxonomy terms | `apps/api/src/server.js:1047-1107` | Path `siteId`; `content:read` for GET, `content:edit` for writes via direct capability check. | `taxonomy_terms` queries use `site_id`; create/update/delete transactions write outbox events containing site ID and audit events. | Test foreign term IDs, duplicate slugs, soft-delete, outbox site classification and event payload tenant ID. |
+| Content relationships | `apps/api/src/server.js:1110-1158` | Path `siteId`; `content:read` for GET and `content:edit` for writes via direct capability check. | `content_relationships`, referenced source/target records, outbox projection. | High-priority: verify source and target existence checks both include the same site, and that foreign-site IDs cannot create, delete, or infer relationships. |
+| Navigation menus | `apps/api/src/server.js:1161-1179` | Path `siteId`; `content:read` for GET, `site:manage` for writes via direct capability check. | `navigation_menus` collection/item operations scoped by site ID or site/slug. | No A/B endpoint suite located. Test list/create/update/delete and mega-menu parity. |
+| AI policy | `apps/api/src/server.js:1181-1202`; AI helpers at `413-485` | Path `siteId`; `site:manage` required to mutate policy; AI call routes separately resolve site and apply policy/usage checks. | `site_ai_policies`, per-site provider allow-list, quotas, classification, usage reservations/audit. | Existing AI unit coverage verifies policy gates but not every route bypass or concurrent cross-site quota. Test missing/mismatched site selectors, disabled policy, provider restrictions, data-classification and transaction rollback. |
+| Content types and records | `apps/api/src/server.js:1238-1281` | Content-type listing and record routes call `siteIdFor`; creation checks `content:create`; item operations retrieve definition in site context. | `content_type_definitions` and record store; record lookups/writes must stay keyed by site plus record/type identifier. | Add A/B same-slug tests, foreign record UUID tests, search/list/count leakage tests, and denial side-effect assertions. |
+| Media asset API | `apps/api/src/server.js:1284-1295`; `packages/media/src/local-store.js`, `s3-store.js` | `siteIdFor`; `media:manage` for list/upload. Public byte retrieval is separate and asset-flag based. | Local/S3 object key plus media metadata row; cleanup on metadata insert failure. | Existing media unit tests cover signature checks and file modes. Test A/B metadata/bytes, private/public flags, variants, deletion, and unauthorized object-path disclosure. |
+| Page list, drafts, item reads, revisions, restore, workflow | `apps/api/src/server.js:1298-1439`; `packages/db/src/postgres-store.js` | Site selected by `siteIdFor`; read allows `content:read` or own-content rule on selected routes; edit requires full or own-edit; workflow operations each require specific submit/approve/publish/archive capabilities. | Content rows, revisions, immutable published snapshots, workflow events/outbox; many store calls take both site and content ID. | PostgreSQL integration verifies save/read-by-site, revisions and published slug site separation. Need route-level A/B tests for every read/write/revision/restore/workflow action and no-side-effect assertions on denial. |
+| Collaboration REST | `apps/api/src/server.js:1321-1385` | Site resolved via `siteIdFor`; document fetched by site + content ID; page/draft type, edit permission and ownership checked before operation/sync. | Durable collaboration operation store and document publisher; site ID is carried into publisher. | Collaboration tests cover draft, capability and size constraints. Add foreign-site content ID, stale/revoked session and cross-site sync/replay tests with no publish side effect. |
+| Site membership and invitations | `apps/api/src/server.js:1445-1469`; `packages/auth/src/service.js` | Path `siteId`; `site:manage` for list/add/remove/invite. These routes directly call `requireCapability`. | Site membership/role and invitation rows; scoped authorization invalidations and audit. | Test admin A attempting member/role/invitation changes in B; removal/revocation invalidates only intended site/session and all relevant active connections. |
+| Plugin registry/lifecycle | `apps/api/src/server.js:1471-1537`; plugin runner modules | Registry uses `siteIdFor` + `plugins:read`; register/action uses `plugins:manage`; plugin lookup/action receives site ID with plugin ID. | `plugin_installs`, approvals, security reviews, immutable image/SBOM/provenance, runner invocation. | Unit tests cover manifest and runner controls. Need cross-site plugin-ID tests and no-run/no-state-change assertions for denied actions. Execution is disabled by default in 0.5.1 preview scope. |
+| Presence, SSE, realtime and WebSocket | `apps/api/src/server.js:836-910, 1584+`; `packages/realtime/src/*` | Path site ID; realtime capability, persistent session/principal checks, active-session checks and per-command reauthorization in WebSocket. | Site-qualified presence leases, channel/topic keys, quotas, Redis pub/sub, session/site authorization invalidations. | Redis integration covers two-instance presence and site-scoped invalidation. Add adversarial cross-site subscription, forged event, reconnect, stale membership, session expiry and cross-site quota tests. |
+| Library metadata and bytes | `apps/api/src/platform-routes.js:48-81`; `packages/library/src/file-store.js` | Route site ID passed to `siteIdFor`; `library:manage` required for all listed operations (read and write). | Library assets, versions, variants, object storage, quarantine/scanner and public flags. | No dedicated A/B library access integration test located. Test asset IDOR, variants/download, optimization status/variants, delete/reconcile, private/public URLs and object-store keys. |
+| Public pages/search/media/library | `apps/api/src/server.js:693-757` | No user authentication for published page/search/public asset routes. Site comes from slug for pages/search; assets use UUID plus store-level public-read function. | Published snapshots and site-scoped query loops/design tokens; `readPublic` media/library operations. | Public paths need explicit proof that unpublished/private/draft assets never become readable, including variants, guessed IDs, cached URLs, and cross-site search/page slug collisions. |
+| Public product and membership catalogs | `apps/api/src/server.js:758-835` | No user authentication; site chosen by slug or explicit site UUID in path. | Queries require `site_id` and published product/active plan status. | Test cross-site slug/UUID substitution, draft/archived exposure, hidden product data and pagination/search count leakage. |
+| Commerce products/orders/checkout | `apps/api/src/platform-routes.js:86-145+` | Path site via `siteIdFor`; `commerce:read` or `commerce:manage` for product/order routes. Customer checkout requires authenticated site membership and performs customer/order ownership checks. | Products, carts, orders, order items, stock reservations and Stripe session metadata. Queries usually use both site ID and object ID; provider side effects happen after DB transaction. | Existing commerce tests include cross-customer idempotency and stock reservation recovery, but no end-to-end tenant A/B product/order/checkout/provider-action matrix. Test foreign order ID, idempotency replay collision across sites, stock locks and no Stripe call on denied requests. |
+| Membership plans/subscriptions | `apps/api/src/platform-routes.js:289-300+`; Stripe webhook in `server.js:773-807` | Plans use path site + `siteIdFor`; management requires `memberships:manage`; checkout requires signed-in user and selected site's plan membership eligibility. Webhook uses Stripe signature and provider event idempotency. | `membership_plans`, `paid_memberships`, provider metadata, Stripe checkout, subscription update. | High-priority: verify provider subscription IDs are globally unique and bound to site/customer/plan; subscription update code filters by provider subscription ID without an explicit site predicate. Signed webhook is trusted but cross-site association/replay must be tested with mismatched metadata and multiple test sites. |
+| Community profile/groups/feed/friends | `apps/api/src/platform-routes.js:301-314` | Site path resolved by `siteIdFor`; profiles are self-scoped; group creation requires `content:create`; group member list requires `community:moderate`; feed/friend operations require signed-in site member and active group/member checks. | Profiles, groups, group memberships, activities, friendships, site-qualified queries. | Sole current API route-level tenant integration test exercises the community feed and selector conflict behavior. It does not cover the other platform route families or group/friend/privacy edge cases. |
+| Community conversations, blocks, reports, notifications, moderation | `packages/community/src/workflows.js:20-35, 40+` and `apps/api/src/platform-routes.js` dispatch | `requireSignedInSite` checks a signed-in actor and calls `siteIdFor`; moderation/report routes additionally require `community:moderate`. Conversation member helper checks conversation ID + site + user; target existence queries include site. | Conversations, members, messages, blocks, reports, notifications, moderation actions and transactional side effects. | Workflow unit tests verify selected validation/rate-limit/role behaviors. Need route-level A/B direct/object IDs, participant membership, report target and notifications tests; assert no cross-site notifications/events. |
+| Firewall/cloud connections/mega menus | `apps/api/src/platform-routes.js:315-323` | Path site + `siteIdFor`; `security:manage`, `cloud:manage`, and `site:manage`/read capability depending on action. | Site-specific rules/config, shared firewall cache, provider probes, navigation menu rows. Firewall GET deliberately also reads global (`site_id IS NULL`) rules. | Test cache invalidation and site/global rule precedence; verify a site can neither mutate nor infer another site's cloud credentials/probe state or navigation config. |
+| Stripe webhook | `apps/api/src/server.js:773-807` | Unauthenticated HTTP route but requires a valid Stripe signature and event idempotency record; route is provider-authenticated, not caller-session-authenticated. | `billing_webhook_events`; order update uses metadata site ID + order ID; subscription update currently keys on provider subscription ID. | Test invalid signature, duplicate event, mismatched order/site metadata, replay, payment state, stock reservation scope, and subscription/account binding against two sites. |
+
+## 4. Non-HTTP and cross-instance flow map
+
+| Flow | Source anchors | Tenant identity carried | Evidence located | Remaining adversarial questions |
+|---|---|---|---|---|
+| PostgreSQL content/outbox | `packages/db/src/postgres-store.js`, `outbox-worker.js`, `outbox-delivery.js` | Content rows and outbox envelopes contain `site_id`; site-private event classification is used. | `test/integration/postgres.integration.test.js:14+` checks a content item saved in A cannot be fetched through site B and that publication snapshots differ by site; event envelope stores A's site. | Test cross-site aggregate/object ID replays, forged/missing envelope site ID, dead-letter/retry and worker authorization end to end. |
+| Memgraph projections | `packages/graph/src/memgraph-store.js`, `apps/worker/src/outbox-worker.js` | Graph nodes/relationships include `siteId`; lookup matches ID + site. | `test/integration/memgraph.integration.test.js:15+` uses a different site ID and expects no relationship result; stale projection versions/tombstones tested. | Test same identifiers across site partitions, malformed outbox site ID, rebuild after site deletion, and no cross-site leakage after replay. |
+| Redis presence/realtime | `packages/realtime/src/redis-presence.js`, `redis-realtime.js`, SSE/WebSocket gateways | Site-qualified keys/channels and payload envelopes; authorization invalidations may be site-, principal-, or session-scoped. | `test/integration/redis-presence.integration.test.js` covers two API instances and verifies invalidating site A closes A's stream without closing B's stream. | Test forged channel/payload/site ID, cross-instance document topics, stale session after membership removal, reconnect/replay and site-specific quota exhaustion. |
+| Community workflows | `packages/community/src/workflows.js` | Site ID passed to queries, membership checks and transaction locks. | Unit tests include validation and direct-conversation recipient membership. | Run two-site E2E for group joins, direct conversations, messages, reports, blocks, notification fan-out and moderation. |
+| Provider callbacks/reconciliation | `apps/api/src/server.js`, `packages/commerce/src/stock-reservations.js`, reconciliation worker | Stripe event metadata includes site/order or site/user/plan; order update predicates include site. | Unit tests cover duplicate/recovery/payment transitions and stock reservation idempotency. | Test mismatched metadata and subscription IDs across multiple sites; prove a signed event cannot update unrelated tenant state. |
+
+## 5. Existing adversarial test evidence — exact limits
+
+The following tests provide useful evidence but do not close the tenant-isolation gate:
+
+1. **Route-level API:** `test/integration/tenant-isolation.integration.test.js:15-218` currently defines one PostgreSQL-gated test. It provisions site A and site B, puts the actor only in B, and attempts site A community feed reads/writes. It checks route/header/query/body selector conflicts, malformed selectors, a denied response without the private marker, absence of a cross-site activity write, valid own-site read and acceptance of matching selectors. It does not test a representative sample of every route family.
+2. **PostgreSQL store:** `test/integration/postgres.integration.test.js:14+` tests A/B content fetch and published snapshot separation; it also inspects the site's outbox row and envelope.
+3. **Memgraph:** `test/integration/memgraph.integration.test.js:15+` checks a relationship is not returned for a different site ID and tests projection version monotonicity/tombstones.
+4. **Redis:** `test/integration/redis-presence.integration.test.js:170+` and around 340-416 test cross-instance streams, site-scoped invalidation and session invalidation.
+5. **Collaboration:** `test/collaboration-api.test.js`, `test/realtime-websocket.test.js`, and related tests cover draft/capability/sequence/revocation behaviors, but this is not an all-route tenant A/B exercise.
+6. **Commerce:** order idempotency tests exercise cross-customer disclosure and replay behavior. They do not establish the full cross-site commerce/provider matrix.
+
+The above suite count and titles were confirmed from current source. Their CI status says whether the tests ran; it does not increase the adversarial breadth beyond the cases described here.
+
+## 6. Priority independent test plan derived from the map
+
+The independent assessor should use synthetic site A/site B data, at least one user in A only, one in B only, one in both with different capabilities, and a privileged actor. For each denied case, inspect response body, database state, outbox, event/notification queue, graph, cache, file/object store, and provider calls.
+
+| Priority | Work package | Minimum high-value checks |
+|---|---|---|
+| P0 | Route A/B IDOR matrix | At least one GET, list, create, update, delete and history path per route family; reuse foreign object IDs and assert 404/403 plus no state change. Start with direct `requireCapability` routes and platform routes. |
+| P0 | Content and workflow | Foreign page ID on get/revisions/restore/collaboration; publish/approve/archive with foreign site selector; own-content exceptions; event/outbox remains unchanged after denial. |
+| P0 | Library and media bytes | Foreign asset metadata/download/version/variant/optimize/delete; private vs public flags; storage object keys and metadata cleanup. |
+| P0 | Membership/admin | Site A administrator IDs used against B, role edits/member removal/invitation; membership revoked mid-session; session/realtime authorization invalidation. |
+| P0 | Commerce/provider | Foreign product/order IDs; idempotency-key replay on B using A's key; no Stripe call or reservation mutation on denied request; signed webhook with intentionally mismatched metadata and cross-site subscription mapping. |
+| P0 | Community/privacy | Foreign group, conversation, message, report, block and member IDs; private/group feed; active conversation membership; notification recipients all site-scoped. |
+| P1 | Async and graph | Forge/replay outbox and graph deliveries with wrong/missing site identity; verify no cross-site nodes, notifications, caches or worker effects. |
+| P1 | Public edge | Unpublished/draft/private content and assets by guessed ID, public variant URL, site slug collision, query-loop content and cache reuse. |
+| P1 | Realtime | Cross-site SSE/WebSocket subscribe/join/presence, forged site/topic payload, expired/revoked session after subscribe, reconnect and replay. |
+| P1 | Developer and admin shortcuts | Confirm developer token impossible in production and cannot escape isolated local preview; verify privileged site operations and global configuration path boundaries. |
+
+For each case, record test ID, route, actor memberships/capabilities, site A/B IDs (sanitized in public evidence), foreign object ID, request selectors, expected response, actual response, database before/after, outbox/events, and any deviations. Keep exploit details private where appropriate.
+
+## 7. Immediate engineering follow-up before an independent reviewer is available
+
+These are no-cost preparatory tasks, not substitutes for the independent review:
+
+1. Turn the P0 route families into a table-driven PostgreSQL API test using two isolated sites and a small set of actor roles. Start with direct path-scoped `requireCapability` routes, because the current only route-level tenant integration test uses the community feed.
+2. Add a reusable assertion that a denied request produced no change in the relevant site rows, outbox, audit, provider mock, storage object count and notifications.
+3. Add specific cross-site tests for the site-scoped `siteId` in Stripe subscription webhook association, relationship source/target validation, library byte/variant access, and public content/assets.
+4. Expand the route inventory as new handlers or providers are added; require every new route to identify its tenant context, capability, store predicate, side effects and regression test in code review.
+
+## 8. Gate status
+
+- **Static route map:** preliminary internal preparation complete for the route families listed; it is not exhaustive and must be independently verified.
+- **Automated tenant isolation:** PARTIAL. The current route-level test is narrow, with supporting data-store, graph, Redis and collaboration tests.
+- **Independent tenant isolation assessment:** OPEN / NOT PERFORMED.
+- **Evidence artifact:** no passing `artifacts/evidence/tenant-isolation-review.json` has been produced by an independent reviewer.
+- **Production certification:** NOT_PRODUCTION_CERTIFIED / NO-GO.
+
+No independent reviewer has been contacted or retained. No paid tool, service, vendor, subscription or contractor was engaged. No spending, debt or liquid reserve is assumed.
