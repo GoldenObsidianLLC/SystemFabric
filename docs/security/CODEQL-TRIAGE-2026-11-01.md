@@ -25,7 +25,16 @@ The latest scan confirms that the targeted baseline alerts #3, #8–#13 and #15 
 
 These alerts point at browser authentication protocol cookies, not password persistence. Session and MFA challenge values are high-entropy opaque bearer tokens that the browser must present; the identity store persists token digests rather than plaintext session tokens. Session/challenge cookies are HttpOnly and receive Secure in secure deployments, with SameSite and path/expiry restrictions. The separate CSRF cookie is intentionally script-readable for the double-submit defense and is not an authentication credential.
 
-This is an intentional protocol boundary, not proof that the risk is zero. A reviewer must verify token entropy, TLS/secure-cookie deployment, cookie scope, expiry, session revocation and CSRF checks. Do not dismiss these alerts solely because they are expected cookies; retain them until the security owner records an explicit, evidence-backed disposition.
+Source-level evidence gathered after the latest scan:
+
+- `packages/auth/src/service.js` creates session and CSRF values with `randomBytes(32).toString('base64url')`. The corresponding `auth_sessions` insert persists `digest(token)` and `digest(csrf)`, not the browser-returned values.
+- The MFA login path creates a 32-byte random challenge, persists only `digest(challengeToken)`, and sets a five-minute expiry. Challenge verification selects by the digest, requires an unconsumed and unexpired row, limits attempts, and marks the challenge consumed in the successful transaction.
+- API session and MFA cookies are HttpOnly. The MFA challenge is also SameSite=Strict, restricted to `/api/v1/auth/mfa`, and limited to 300 seconds.
+- Production API startup refuses to start unless `SESSION_COOKIE_SECURE=true`; that setting makes `secureCookies` true, and every session, MFA and CSRF auth cookie receives the Secure attribute.
+- `sf_csrf` is intentionally not HttpOnly so browser code can copy it into the `x-csrf-token` header. It cannot establish authentication by itself: cookie-authenticated writes require a matching same-origin Origin, the cookie/header double-submit match, and validation against the server-side CSRF digest.
+- New regression tests verify that session, CSRF and MFA browser values are 256-bit random values, only digests are sent to persistence, the Secure option applies to auth cookies, and the MFA challenge cookie is HttpOnly, SameSite=Strict, path-limited and short-lived. The focused tests currently pass (22/22).
+
+This is stronger evidence for the intended design, not a CodeQL false-positive determination. Bearer session tokens are necessarily available to the browser's cookie store in order to authenticate subsequent requests; protection depends on TLS, HttpOnly/Secure flags, scope/expiry, digest-at-rest, revocation and CSRF checks. A reviewer must still examine the cookie protocol, deployment topology (including TLS termination and proxy trust), browser threat model and token lifecycle. Do not dismiss these alerts solely because they are expected cookies; retain them until the security owner records an explicit, evidence-backed disposition.
 
 ### Alert 14 — legacy dynamic code construction (Medium)
 
