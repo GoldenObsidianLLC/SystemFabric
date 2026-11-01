@@ -209,56 +209,6 @@ jobs:
         with:
           languages: javascript
           queries: security-extended
-          packs: codeql/javascript-queries:AlertSuppression.ql
-      - name: Analyze and upload CodeQL results
-        id: analyze
-        uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript"
-          output: sarif-results
-      - name: Verify in-source CodeQL suppressions
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          sarif_files = list(Path("sarif-results").rglob("*.sarif"))
-          if len(sarif_files) != 1:
-              raise SystemExit(f"Expected one JavaScript SARIF file; found {len(sarif_files)}.")
-
-          sarif = json.loads(sarif_files[0].read_text(encoding="utf-8"))
-          results = [
-              result
-              for run in sarif.get("runs", [])
-              for result in run.get("results", [])
-              if result.get("ruleId") == "js/clear-text-storage-of-sensitive-data"
-          ]
-          suppressed = [
-              result
-              for result in results
-              if any(item.get("kind") == "IN_SOURCE" for item in result.get("suppressions", []))
-          ]
-          summary = (
-              f"CodeQL cookie-flow suppressions: {len(suppressed)} of {len(results)} "
-              "results are explicitly annotated in source.\n"
-          )
-          print(summary.strip())
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as report:
-              report.write(summary)
-
-          if len(suppressed) != len(results) or len(suppressed) < 4:
-              raise SystemExit("Unexpected unsuppressed cookie-storage finding; review the source and SARIF before dismissal.")
-          PY
-      # The source-level comments are included in SARIF as IN_SOURCE
-      # suppressions. Dismissal is applied only on a push to the default branch,
-      # because GitHub alert state is repository-wide, not PR-scoped.
-      - name: Dismiss reviewed in-source CodeQL suppressions
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: advanced-security/dismiss-alerts@a18f986bdb40edba0dd7a74382c15d4a3d50a1c8 # v2.0.3
-        with:
-          sarif-id: ${{ steps.analyze.outputs.sarif-id }}
-          sarif-file: sarif-results
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
