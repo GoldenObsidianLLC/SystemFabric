@@ -24,7 +24,7 @@
     "test:integration": "node --test test/integration/*.test.js",
     "test:e2e": "playwright test",
     "test:all": "npm run check && npm run test:integration:live && npm run test:e2e",
-    "sbom": "node -e \"require('node:fs').mkdirSync('artifacts',{recursive:true})\" && npm sbom --sbom-format=cyclonedx --omit=dev > artifacts/systemfabric.sbom.cdx.json",
+    "sbom": "node scripts/generate-sbom.js",
     "postinstall": "node scripts/materialize-katex-assets.js",
     "reconcile:library": "node scripts/reconcile-library-objects.js",
     "release:readiness": "node scripts/release-readiness.js",

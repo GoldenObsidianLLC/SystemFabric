@@ -32,7 +32,13 @@ jobs:
       - name: Syntax, artifact, and unit tests
         run: npm run check
       - name: Dependency audit
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/evidence
+          printf 'Node.js: '; node --version
+          printf 'npm: '; npm --version
+          npm audit --audit-level=high 2>&1 | tee artifacts/evidence/npm-audit-all.log
+          npm audit --omit=dev --audit-level=high 2>&1 | tee artifacts/evidence/npm-audit.log
       - name: Generate CycloneDX SBOM
         run: npm run sbom
       - name: Generate fail-closed release-readiness snapshot
