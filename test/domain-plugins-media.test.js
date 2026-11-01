@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { randomUUID } = require('node:crypto');
+const os = require('node:os');
 const path = require('node:path');
 const { validateContentTypeDefinition, validateRecordValues } = require('../packages/domain/src/content-types');
 const { validatePluginManifest, validatePinnedImageDigest } = require('../packages/plugins/src/manifest');
@@ -52,38 +52,32 @@ test('media type checks are based on file signatures, not client MIME labels', (
 });
 
 test('local media files are created exclusively with owner-only permissions', async t => {
-  const root = path.join(process.cwd(), '.media-test-' + randomUUID());
-  await fs.promises.mkdir(root, { recursive: false, mode: 0o700 });
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-permissions-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const image = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
   let insertedValues;
   const store = createLocalMediaStore({
-    pool: {
-      async query(_sql, values) {
-        insertedValues = values;
-        return { rows: [{ storage_key: values[2], mime_type: values[3] }] };
-      }
-    },
+    pool: { async query(_sql, values) { insertedValues = values; return { rows: [{ storage_key: values[2], mime_type: values[3] }] }; } },
     root
   });
-  const asset = await store.upload({
-    siteId: '00000000-0000-4000-8000-000000000001',
-    dataBase64: image.toString('base64'),
-    mimeType: 'image/png'
-  });
+  const asset = await store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: image.toString('base64'), mimeType: 'image/png' });
   assert.equal(asset.storage_key, insertedValues[2]);
   const filePath = path.join(root, asset.storage_key);
   assert.deepEqual(await fs.promises.readFile(filePath), image);
   if (process.platform !== 'win32') {
-    const stats = await fs.promises.stat(filePath);
-    assert.equal(stats.mode & 0o777, 0o600);
+    const rootStats = await fs.promises.stat(root);
+    const fileStats = await fs.promises.stat(filePath);
+    assert.equal(rootStats.mode & 0o777, 0o700);
+    assert.equal(fileStats.mode & 0o777, 0o600);
   }
   await assert.rejects(() => fs.promises.open(filePath, 'wx', 0o600), { code: 'EEXIST' });
 });
 
-test('media upload rejects SVG and unsupported files before touching storage', async () => {
+test('media upload rejects SVG and unsupported files before touching storage', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-invalid-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const calls = [];
-  const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root: path.join(process.cwd(), 'var', 'media', 'invalid-test-only') });
+  const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root });
   await assert.rejects(() => store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: Buffer.from('<svg></svg>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_SYSTEMFABRIC_MEDIA_INVALID' });
   assert.equal(calls.length, 0);
 });

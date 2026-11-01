@@ -200,7 +200,7 @@ test('context analysis handles a long template without repeated full-prefix scan
 test('output-context scanner handles brace-heavy malformed input without backtracking', () => {
   const unmatched = '{{{{a'.repeat(20000);
   assert.deepEqual(engine.analyzeOutputContexts(unmatched), []);
-  const terminated = `${'{{{{a'.repeat(20000)}}}}`;
+  const terminated = '{{{{a'.repeat(20000) + '}}}}';
   const terminatedDiagnostics = engine.analyzeOutputContexts(terminated);
   assert.equal(terminatedDiagnostics.length, 1);
   assert.equal(terminatedDiagnostics[0].code, 'WARN_ENGINEX_RAW_OUTPUT');
@@ -208,9 +208,14 @@ test('output-context scanner handles brace-heavy malformed input without backtra
 });
 
 test('source analysis detects short comments using bounded delimiter searches', () => {
-  const comment = `{{!${'comment '.repeat(20000)}}}`;
+  const comment = '{{!' + 'comment '.repeat(20000) + '}}';
   const analysis = engine.analyzeSource(comment);
   assert.equal(analysis.features.includes('comments'), true);
+});
+
+test('context scanning handles repeated unmatched delimiters without regex backtracking', () => {
+  const source = '{{{{!'.repeat(50000);
+  assert.deepEqual(engine.analyzeOutputContexts(source), []);
 });
 
 test('strict output-context mode permits the explicit safeUrl and jsonScript helper patterns', async () => {

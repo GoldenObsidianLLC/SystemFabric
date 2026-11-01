@@ -9,8 +9,12 @@ test('shared secret comparison is byte-safe, constant-time for equal lengths, an
   assert.equal(sameSecret('test-secret', 'wrong-secret'), false);
   assert.equal(sameSecret('short', 'longer-secret'), false);
   assert.equal(sameSecret('', 'non-empty'), false);
+  assert.equal(sameSecret('expected', ''), false);
+  assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-01'), true);
+  assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-02'), false);
   const unicodeSecret = 'h' + String.fromCharCode(0x00e9) + 'llo';
   assert.equal(sameSecret(unicodeSecret, unicodeSecret), true);
+  assert.equal(sameSecret('🔐token', '🔐token'), true);
 });
 
 async function withServer(fn, envExtra = {}) {

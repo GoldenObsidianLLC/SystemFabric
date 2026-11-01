@@ -4,6 +4,10 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ## Unreleased
 
+### Documentation and assurance
+
+- Archive the 1 November 2026 SystemFabric 0.5.1 project status report and repository coherence/continuity review; add current-status navigation and mark earlier release/local-validation snapshots as historical. This documentation update does not merge the security candidate or change the NOT_PRODUCTION_CERTIFIED release state.
+
 ### CI and request security
 
 - Serialize live integration test files that share the dedicated PostgreSQL database and graph fixture, preventing cross-suite outbox/event cleanup races from making the Memgraph consumer-group test flaky.

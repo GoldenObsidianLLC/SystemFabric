@@ -320,6 +320,12 @@ async function readTemplateSource(templatePath, limits, attempt = 0) {
   let sourceBytes;
   try {
     before = await handle.stat();
+    const pathEntry = await fsp.lstat(templatePath);
+    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Template path must resolve to the opened regular file.', {
+        code: 'ERR_ENGINEX_TEMPLATE_PATH_CHANGED', templatePath
+      });
+    }
     if (before.size > limits.maxTemplateBytes) {
       throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
         code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
@@ -2408,11 +2414,28 @@ function renderSourceStream(source, options = {}) {
   return renderNodes(compiled.nodes, virtualPath, state);
 }
 
+function* iterateTemplateTokens(source) {
+  let searchOffset = 0;
+  while (searchOffset < source.length) {
+    const start = source.indexOf('{{', searchOffset);
+    if (start === -1) return;
+
+    // A single forward search finds the first closing delimiter. If there is
+    // none, no later opener can form a complete token either.
+    const closeStart = source.indexOf('}}', start + 2);
+    if (closeStart === -1) return;
+
+    const closeLength = source[closeStart + 2] === '}' ? 3 : 2;
+    const end = closeStart + closeLength;
+    yield { token: source.slice(start, end), offset: start };
+    searchOffset = end;
+  }
+}
+
 function getOutputContextDiagnostics(source) {
   if (typeof source !== 'string' || !source.includes('{{')) return [];
 
   const diagnostics = [];
-  let tokenOffset = 0;
   const state = {
     inTag: false,
     quote: '',
@@ -2458,22 +2481,12 @@ function getOutputContextDiagnostics(source) {
     scanOffset = endOffset;
   }
 
-  // Locate delimiters with indexOf instead of a backtracking expression.
-  // Each search advances monotonically, keeping adversarial brace-heavy input linear.
-  while (true) {
-    const start = source.indexOf('{{', tokenOffset);
-    if (start === -1) break;
-    const close = source.indexOf('}}', start + 2);
-    if (close === -1) break;
-    const end = close + 2 + (source[close + 2] === '}' ? 1 : 0);
-    const token = source.slice(start, end);
-    advanceContext(start);
-    const offset = start;
+  for (const { token, offset } of iterateTemplateTokens(source)) {
+    advanceContext(offset);
 
     // Template comments and structural directives aren't output expressions.
     if (token.startsWith('{{!--') || token.startsWith('{{!') || /^{{\s*(?:#|\/|>|\^|else\b)/.test(token)) {
-      scanOffset = end;
-      tokenOffset = end;
+      scanOffset = offset + token.length;
       continue;
     }
 
@@ -2503,8 +2516,7 @@ function getOutputContextDiagnostics(source) {
     if (raw && !usesJsonScript) {
       add('WARN_ENGINEX_RAW_OUTPUT', 'Raw interpolation bypasses ordinary HTML escaping and requires explicitly trusted output.', 'Use escaped interpolation unless the value is branded safe HTML from a trusted/sanitized source.');
     }
-    scanOffset = end;
-    tokenOffset = end;
+    scanOffset = offset + token.length;
   }
   return diagnostics;
 }
@@ -2655,8 +2667,8 @@ function analyzeSource(source, options = {}) {
 
   visitNodes(compiled.nodes);
   diagnostics.push(...getOutputContextDiagnostics(source).map(item => ({ ...item, severity: options.strictOutputContexts === true ? 'error' : 'warning' })));
-  const shortCommentStart = source.indexOf('{{!');
-  if (source.includes('{{!--') || (shortCommentStart !== -1 && source.indexOf('}}', shortCommentStart + 3) !== -1)) features.add('comments');
+  const commentStart = source.indexOf('{{!');
+  if (source.includes('{{!--') || (commentStart !== -1 && source.indexOf('}}', commentStart + 3) !== -1)) features.add('comments');
   if (source.includes('|')) features.add('filter-pipelines');
   const errors = diagnostics.filter(item => item.severity === 'error');
   return {
@@ -2830,6 +2842,10 @@ engine.loadPrecompiled = async function loadPrecompiled(manifestPath, options = 
     // Read through the descriptor whose metadata was checked; do not re-resolve
     // the path between stat and read.
     const before = await handle.stat();
+    const pathEntry = await fsp.lstat(fullPath);
+    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Precompiled manifest path must resolve to the opened regular file.', { code: 'ERR_ENGINEX_MANIFEST_PATH' });
+    }
     if (before.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
     manifestSource = await handle.readFile({ encoding: 'utf8' });
     if (Buffer.byteLength(manifestSource, 'utf8') > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });

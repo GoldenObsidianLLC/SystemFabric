@@ -26,6 +26,10 @@ function updateEnvFile({ target = envFile, template = envExample } = {}) {
   const descriptor = fs.openSync(target, descriptorFlags);
   try {
     const descriptorStats = fs.fstatSync(descriptor);
+    const pathStats = fs.lstatSync(target);
+    if (!pathStats.isFile() || descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino) {
+      throw new Error('.env path must remain bound to the opened regular file.');
+    }
     if (!descriptorStats.isFile() || descriptorStats.nlink > 1) {
       throw new Error('.env must be a regular, single-link file; symbolic links are not accepted where O_NOFOLLOW is supported.');
     }
