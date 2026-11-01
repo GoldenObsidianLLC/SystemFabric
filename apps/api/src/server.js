@@ -571,7 +571,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
            * HttpOnly, Secure in production, SameSite=Strict and path-scoped;
            * PostgreSQL stores only its SHA-256 digest.
            */
-          // codeql[js/clear-text-storage-of-sensitive-data]
+          // codeql[js/clear-text-storage-of-sensitive-data] This high-entropy one-time challenge is digest-stored and must be returned to the same-origin browser for MFA verification.
           res.setHeader('set-cookie', cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
           return sendJson(res, 200, { authenticated: false, mfaRequired: true, user: { id: session.user.id, email: session.user.email }, expiresAt: session.expiresAt, requestId });
         }
@@ -593,7 +593,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
          * echo it in the request header. Both cookies are Secure in production,
          * SameSite=Lax, and expire with the session.
          */
-        // codeql[js/clear-text-storage-of-sensitive-data]
+        // codeql[js/clear-text-storage-of-sensitive-data] The opaque session is random, digest-stored, HttpOnly, and required for browser authentication; the CSRF token is a separate double-submit value.
         res.setHeader('set-cookie', [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('sf_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
         return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
       }
@@ -666,7 +666,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
            * browser for the callback flow; server storage contains only its
            * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
            */
-          // codeql[js/clear-text-storage-of-sensitive-data]
+          // codeql[js/clear-text-storage-of-sensitive-data] This high-entropy one-time challenge is digest-stored and must be returned to the same-origin browser for MFA verification.
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
         }
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
@@ -696,7 +696,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
            * browser for the callback flow; server storage contains only its
            * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
            */
-          // codeql[js/clear-text-storage-of-sensitive-data]
+          // codeql[js/clear-text-storage-of-sensitive-data] This high-entropy one-time challenge is digest-stored and must be returned to the same-origin browser for MFA verification.
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
           return res.end();
         }
