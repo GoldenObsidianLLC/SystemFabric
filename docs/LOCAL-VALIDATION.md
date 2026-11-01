@@ -1,5 +1,7 @@
 # SystemFabric 0.5.1 — Local Validation Report
 
+> **Historical local snapshot — 30 October 2026.** The results below describe the earlier `feature/realtime-foundation-f1` worktree and are retained for continuity. They are not the current main/candidate validation record. For the 1 November PR #36 hosted evidence and current limitations, see the [project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md). Candidate PR #36 is not merged; do not combine the historical local counts with the later CI counts as if they were one run.
+
 **Evidence date:** 2026-10-30
 **Branch:** `feature/realtime-foundation-f1`
 **Revision:** feature/realtime-foundation-f1, rebased onto the current origin/main; exact commit SHA is recorded by Git and the associated GitHub Actions run.
