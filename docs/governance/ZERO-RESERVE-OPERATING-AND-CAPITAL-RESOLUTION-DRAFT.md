@@ -66,7 +66,7 @@ The following is proposed wording for a written consent or resolution by the Com
 
 11. **Treasury priority.** Once funds are received, the Company will first identify and reserve amounts needed for legally due taxes and filings, refunds/chargebacks, customer delivery, restricted grant/sponsorship purposes, payroll/contractor obligations, and other committed liabilities. Discretionary growth and new commitments may be considered only after these obligations are funded. A reserve target must be set from an actual cash forecast and cost baseline; no arbitrary percentage allocation is adopted here.
 
-12. **Independent security evidence.** The first proposed third-party certification expenditure, when funds permit, is the independent tenant/site isolation and authorization review tracked in GitHub issue #14. This resolution neither hires an assessor nor closes that gate. Assessment must use an authorized isolated environment, synthetic data, exact reviewed commit, written rules of engagement, independent reporting, and evidence acceptance under the release plan.
+12. **Independent security evidence.** The first proposed third-party security-assurance expenditure, when funds permit, is the independent tenant/site isolation and authorization review tracked in GitHub issue #14. This resolution neither hires an assessor nor closes that gate. Assessment must use an authorized isolated environment, synthetic data, exact reviewed commit, written rules of engagement, independent reporting, and evidence acceptance under the release plan.
 
 13. **Conflicts and disclosure.** Material conflicts involving a sponsor, customer, investor, supplier, assessor, or decision-maker must be disclosed and managed. No funding source receives automatic project ownership, maintainer status, security-report control, roadmap control, preferential access, or endorsement.
 
@@ -200,7 +200,7 @@ Before discretionary use, establish:
 9. **No distributions during a cash squeeze.** Member distributions, reimbursements, or founder draws should not precede taxes, liabilities, customer obligations and the approved reserve; distributions also require review under the Company agreement and applicable law.
 10. **Monthly governance report.** Record beginning/ending cash, inflows by category, committed obligations, aged receivables, restricted balances, runway, reserve status and any exceptions. Publish only a sanitized summary when useful and lawful.
 
-## 8. Marketing and recruitment messaging approved in principle
+## 8. Example marketing and recruitment messaging (subject to adoption)
 
 Subject to adoption and the existing release-scope approval, the Company can use messaging such as:
 
@@ -261,7 +261,7 @@ This is a sequence of proposed tasks, not a promise that they will produce fundi
 | 1 | Confirm legal entity records and governing documents; determine who may adopt the resolution. | Verified authority map and signed internal resolution, if approved. | Do not represent this draft as adopted before signatures/valid action. |
 | 2 | Establish one-page service offers based on demonstrated founder capability and available capacity. | Two or three precise service packages, sample deliverables, exclusions and qualification criteria. | No paid advertising, unbounded promises, or client commitments without funding/capacity. |
 | 3 | Conduct targeted customer discovery with prospective buyers (not investor solicitation). | Interview notes, problem ranking, buyer/use-case evidence and objections. | No claims that SystemFabric is production-ready or independently audited. |
-| 4 | Ask the assessor shortlist and relevant suppliers for non-binding fee/scope estimates only. | Comparable quotes and a real certification cost target. | No paid pre-assessment or work authorization. |
+| 4 | Ask the assessor shortlist and relevant suppliers for non-binding fee/scope estimates only. | Comparable quotes and a real assessment cost target. | No paid pre-assessment or work authorization. |
 | 5 | Validate one service engagement or narrowly scoped design-partner opportunity. | Written proposal and draft statement of work with costed delivery plan. | No acceptance until separately approved, adequately funded and deliverable. |
 | 6 | Prepare a weekly cash forecast and funding-source ledger template. | Transparent cash controls ready before first receipt. | No commingling, personal-account collections, or unrecorded funds. |
 | 7 | Once cash is actually cleared, consider the first approved use of funds. | Transaction-specific budget and approval, prioritizing liabilities and the reserve before assessor spend. | No hiring or assessor engagement based on expected/uncommitted revenue. |
@@ -282,3 +282,4 @@ This is a planning document, not a legal opinion. The law may differ based on wh
 ---
 
 **Bottom line:** this proposal authorizes no spending. It creates a disciplined route from zero reserve → no-cost customer discovery → funded, deliverable service revenue or properly documented capital → protected operating reserve → independent security assessment → controlled expansion. Until adopted by the proper governing authority, it remains a draft proposal and does not alter the Company's current governance policy or create authority to pay, hire, borrow, fundraise, or contract.
+\n
