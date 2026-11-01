@@ -1,5 +1,7 @@
 # SystemFabric 0.5.1 — Production Certification Execution Plan
 
+> **Status refresh — 1 November 2026:** this document remains the procedural certification plan, not a current evidence snapshot. Its original baseline paragraph and counts refer to the 31 October/PR #12 state and are historical. Use the [1 November project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md) for the latest PR #36 candidate results, blockers, open CodeQL findings and issue state. The independent/provider/operations gates remain open; production remains NO-GO.
+
 > **Decision: NO-GO.** This plan organizes the 13 missing formal evidence gates and the one partial dependency-review check recorded in the 2026-10-31 readiness snapshot. It is a work plan, not evidence that any gate has passed.
 
 ## 1. Baseline and operating rules

@@ -1,5 +1,7 @@
 # SystemFabric 0.5.1 — Local Validation Checkpoint
 
+> **Historical checkpoint — 28 October 2026.** This dated local checkpoint is preserved as historical evidence only. Its migration inventory and test counts have been superseded by later candidate evidence; it is not the current release-readiness record. See the [1 November 2026 status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md).
+
 **Checkpoint date:** 2026-10-28  
 **Classification:** `LOCAL_VALIDATION_PASS_NOT_PRODUCTION_CERTIFIED`  
 **Environment reported:** Windows PowerShell, Node.js `v26.12.1`, npm `11.7.0`, local PostgreSQL and Memgraph.
