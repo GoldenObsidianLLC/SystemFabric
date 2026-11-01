@@ -30,8 +30,9 @@ function createLocalMediaStore({ pool, root = path.resolve(process.env.MEDIA_ROO
       const id = randomUUID(); const storageKey = `${siteId}/${id}.${MIME_TYPES[detected]}`;
       const filePath = path.resolve(mediaRoot, storageKey);
       if (!filePath.startsWith(`${mediaRoot}${path.sep}`)) throw invalid('Invalid media path.');
-      await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o750 });
-      const handle = await fs.promises.open(filePath, 'wx', 0o640);
+      await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+      // Exclusive creation prevents replacement; owner-only permissions keep media private at rest.
+      const handle = await fs.promises.open(filePath, 'wx', 0o600);
       try { await handle.writeFile(buffer); await handle.sync(); } finally { await handle.close(); }
       try {
         const result = await pool.query(

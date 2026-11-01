@@ -6,6 +6,46 @@ const os = require('node:os');
 const path = require('node:path');
 const engine = require('../index');
 
+async function replacePathAfterOpen(target, replacementContents, callback) {
+  const originalOpen = fs.open;
+  let swapped = false;
+  fs.open = async function patchedOpen(file, flags, ...args) {
+    const handle = await originalOpen.call(fs, file, flags, ...args);
+    if (!swapped && path.resolve(file) === target && flags === 'r') {
+      swapped = true;
+      await fs.rename(target, `${target}.original`);
+      await fs.writeFile(target, replacementContents);
+    }
+    return handle;
+  };
+  try { return await callback(); }
+  finally { fs.open = originalOpen; }
+}
+
+test('template source reads remain bound to the descriptor if the path is replaced', async t => {
+  if (process.platform === 'win32') return t.skip('Open-file rename semantics differ on Windows.');
+  await withViews({ 'page.html': '<p>original</p>' }, async root => {
+    const target = path.join(root, 'page.html');
+    await replacePathAfterOpen(target, '<p>replacement</p>', async () => {
+      const template = await engine.load('page.html', { root, cache: false });
+      assert.equal(template.render({}), '<p>original</p>');
+    });
+  });
+});
+
+test('precompiled manifest reads remain bound to the descriptor if the path is replaced', async t => {
+  if (process.platform === 'win32') return t.skip('Open-file rename semantics differ on Windows.');
+  await withViews({ 'page.html': '<p>original</p>' }, async root => {
+    const manifest = await engine.buildManifest(root, { entry: 'page.html' });
+    const target = path.join(root, 'manifest.json');
+    await fs.writeFile(target, JSON.stringify(manifest));
+    await replacePathAfterOpen(target, '{not valid json', async () => {
+      const template = await engine.loadPrecompiled(target);
+      assert.equal(template.render({}), '<p>original</p>');
+    });
+  });
+});
+
 async function withViews(files, callback) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'enginex-62-'));
   try {
@@ -155,6 +195,22 @@ test('context analysis handles a long template without repeated full-prefix scan
   const source = `${'<p>static text</p>'.repeat(1000)}<p>{{ value }}</p>`;
   const diagnostics = engine.analyzeOutputContexts(source);
   assert.deepEqual(diagnostics, []);
+});
+
+test('output-context scanner handles brace-heavy malformed input without backtracking', () => {
+  const unmatched = '{{{{a'.repeat(20000);
+  assert.deepEqual(engine.analyzeOutputContexts(unmatched), []);
+  const terminated = `${'{{{{a'.repeat(20000)}}}}`;
+  const terminatedDiagnostics = engine.analyzeOutputContexts(terminated);
+  assert.equal(terminatedDiagnostics.length, 1);
+  assert.equal(terminatedDiagnostics[0].code, 'WARN_ENGINEX_RAW_OUTPUT');
+  assert.equal(terminatedDiagnostics[0].offset, 0);
+});
+
+test('source analysis detects short comments using bounded delimiter searches', () => {
+  const comment = `{{!${'comment '.repeat(20000)}}}`;
+  const analysis = engine.analyzeSource(comment);
+  assert.equal(analysis.features.includes('comments'), true);
 });
 
 test('strict output-context mode permits the explicit safeUrl and jsonScript helper patterns', async () => {

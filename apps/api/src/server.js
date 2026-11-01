@@ -3,7 +3,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createHash, randomUUID, timingSafeEqual } = require('node:crypto');
+const { randomUUID, timingSafeEqual } = require('node:crypto');
 const { loadEnvFile } = require('../../../scripts/load-env');
 const { createAIService } = require('../../../packages/ai/src/service');
 const { createPostgresPool, createPostgresStore } = require('../../../packages/db/src/postgres-store');
@@ -61,8 +61,9 @@ function sendHtml(res, statusCode, html, csp) {
 }
 function sameSecret(candidate, expected) {
   if (typeof candidate !== 'string' || typeof expected !== 'string' || expected.length === 0) return false;
-  const left = createHash('sha256').update(candidate).digest(); const right = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(left, right);
+  const left = Buffer.from(candidate, 'utf8');
+  const right = Buffer.from(expected, 'utf8');
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 function parseBearer(req) { const header = req.headers.authorization; return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null; }
 function parseCookies(header = '') {
@@ -74,6 +75,14 @@ function parseCookies(header = '') {
   }
   return cookies;
 }
+/**
+ * Serializes browser authentication protocol cookies. Session and MFA challenge
+ * values are high-entropy opaque bearer tokens: the server-side identity store
+ * persists only token digests, while the browser must present the original token
+ * on subsequent requests. The CSRF cookie is intentionally script-readable for
+ * the double-submit pattern and is not an authentication credential. Never pass
+ * passwords or personal data to this helper.
+ */
 function cookie(name, value, { httpOnly = false, secure = false, maxAge = 43_200, sameSite = 'Lax', path = '/' } = {}) {
   return `${name}=${value}; Path=${path}; SameSite=${sameSite}; Max-Age=${maxAge}${httpOnly ? '; HttpOnly' : ''}${secure ? '; Secure' : ''}`;
 }

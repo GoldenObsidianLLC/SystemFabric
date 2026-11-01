@@ -311,20 +311,31 @@ function cacheGet(cacheKey) {
 }
 
 async function readTemplateSource(templatePath, limits, attempt = 0) {
-  const before = await fsp.stat(templatePath);
-  if (before.size > limits.maxTemplateBytes) {
-    throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
-      code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
-    });
+  // Keep the file descriptor open across metadata checks and the read so a path
+  // replacement cannot redirect the read to a different file between calls.
+  const handle = await fsp.open(templatePath, 'r');
+  let before;
+  let after;
+  let source;
+  let sourceBytes;
+  try {
+    before = await handle.stat();
+    if (before.size > limits.maxTemplateBytes) {
+      throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
+        code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
+      });
+    }
+    source = await handle.readFile({ encoding: 'utf8' });
+    sourceBytes = Buffer.byteLength(source, 'utf8');
+    if (sourceBytes > limits.maxTemplateBytes) {
+      throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
+        code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
+      });
+    }
+    after = await handle.stat();
+  } finally {
+    await handle.close();
   }
-  const source = await fsp.readFile(templatePath, 'utf8');
-  const sourceBytes = Buffer.byteLength(source, 'utf8');
-  if (sourceBytes > limits.maxTemplateBytes) {
-    throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
-      code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
-    });
-  }
-  const after = await fsp.stat(templatePath);
   if (getSignature(before) !== getSignature(after)) {
     if (attempt < 2) return readTemplateSource(templatePath, limits, attempt + 1);
     throw new TemplateError('Template changed repeatedly while being read; retry rendering.', {
@@ -2401,7 +2412,7 @@ function getOutputContextDiagnostics(source) {
   if (typeof source !== 'string' || !source.includes('{{')) return [];
 
   const diagnostics = [];
-  const tokenPattern = /{{{?[\s\S]*?}}}?/g;
+  let tokenOffset = 0;
   const state = {
     inTag: false,
     quote: '',
@@ -2410,7 +2421,6 @@ function getOutputContextDiagnostics(source) {
     tagChars: []
   };
   let scanOffset = 0;
-  let match;
 
   // Advance context state exactly once over ordinary template text. This avoids
   // repeatedly slicing the entire source prefix for each interpolation.
@@ -2448,14 +2458,22 @@ function getOutputContextDiagnostics(source) {
     scanOffset = endOffset;
   }
 
-  while ((match = tokenPattern.exec(source))) {
-    advanceContext(match.index);
-    const token = match[0];
-    const offset = match.index;
+  // Locate delimiters with indexOf instead of a backtracking expression.
+  // Each search advances monotonically, keeping adversarial brace-heavy input linear.
+  while (true) {
+    const start = source.indexOf('{{', tokenOffset);
+    if (start === -1) break;
+    const close = source.indexOf('}}', start + 2);
+    if (close === -1) break;
+    const end = close + 2 + (source[close + 2] === '}' ? 1 : 0);
+    const token = source.slice(start, end);
+    advanceContext(start);
+    const offset = start;
 
     // Template comments and structural directives aren't output expressions.
     if (token.startsWith('{{!--') || token.startsWith('{{!') || /^{{\s*(?:#|\/|>|\^|else\b)/.test(token)) {
-      scanOffset = match.index + token.length;
+      scanOffset = end;
+      tokenOffset = end;
       continue;
     }
 
@@ -2485,7 +2503,8 @@ function getOutputContextDiagnostics(source) {
     if (raw && !usesJsonScript) {
       add('WARN_ENGINEX_RAW_OUTPUT', 'Raw interpolation bypasses ordinary HTML escaping and requires explicitly trusted output.', 'Use escaped interpolation unless the value is branded safe HTML from a trusted/sanitized source.');
     }
-    scanOffset = match.index + token.length;
+    scanOffset = end;
+    tokenOffset = end;
   }
   return diagnostics;
 }
@@ -2636,7 +2655,8 @@ function analyzeSource(source, options = {}) {
 
   visitNodes(compiled.nodes);
   diagnostics.push(...getOutputContextDiagnostics(source).map(item => ({ ...item, severity: options.strictOutputContexts === true ? 'error' : 'warning' })));
-  if (source.includes('{{!--') || /{{![\s\S]*?}}/.test(source)) features.add('comments');
+  const shortCommentStart = source.indexOf('{{!');
+  if (source.includes('{{!--') || (shortCommentStart !== -1 && source.indexOf('}}', shortCommentStart + 3) !== -1)) features.add('comments');
   if (source.includes('|')) features.add('filter-pipelines');
   const errors = diagnostics.filter(item => item.severity === 'error');
   return {
@@ -2803,11 +2823,25 @@ engine.writeManifest = async function writeManifest(rootDirectory, outputPath, o
 engine.loadPrecompiled = async function loadPrecompiled(manifestPath, options = {}) {
   if (typeof manifestPath !== 'string' || !manifestPath) throw new TypeError('manifestPath must be a JSON file path.');
   const fullPath = path.resolve(manifestPath);
-  const stat = await fsp.stat(fullPath);
   const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
-  if (stat.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+  const handle = await fsp.open(fullPath, 'r');
+  let manifestSource;
+  try {
+    // Read through the descriptor whose metadata was checked; do not re-resolve
+    // the path between stat and read.
+    const before = await handle.stat();
+    if (before.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+    manifestSource = await handle.readFile({ encoding: 'utf8' });
+    if (Buffer.byteLength(manifestSource, 'utf8') > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+    const after = await handle.stat();
+    if (getSignature(before) !== getSignature(after)) {
+      throw new TemplateError('Precompiled manifest changed while being read; retry loading.', { code: 'ERR_ENGINEX_MANIFEST_CHANGED_DURING_READ' });
+    }
+  } finally {
+    await handle.close();
+  }
   let manifest;
-  try { manifest = JSON.parse(await fsp.readFile(fullPath, 'utf8')); }
+  try { manifest = JSON.parse(manifestSource); }
   catch (cause) { throw new TemplateError('Unable to parse precompiled manifest JSON.', { code: 'ERR_ENGINEX_MANIFEST_JSON', cause }); }
   if (!manifest || manifest.format !== MANIFEST_FORMAT || manifest.engineVersion !== VERSION || !Array.isArray(manifest.templates) || !Array.isArray(manifest.dependencies)) {
     throw new TemplateError('Unsupported or incompatible precompiled manifest.', { code: 'ERR_ENGINEX_MANIFEST_VERSION' });

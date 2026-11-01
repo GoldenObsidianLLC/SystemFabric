@@ -2,7 +2,15 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createApiServer } = require('../apps/api/src/server');
+const { createApiServer, sameSecret } = require('../apps/api/src/server');
+
+test('shared secret comparison is byte-safe, constant-time for equal lengths, and rejects mismatches', () => {
+  assert.equal(sameSecret('test-secret', 'test-secret'), true);
+  assert.equal(sameSecret('test-secret', 'wrong-secret'), false);
+  assert.equal(sameSecret('short', 'longer-secret'), false);
+  assert.equal(sameSecret('', 'non-empty'), false);
+  assert.equal(sameSecret('h\\u00e9llo', 'h\\u00e9llo'), true);
+});
 
 async function withServer(fn, envExtra = {}) {
   const server = createApiServer({
