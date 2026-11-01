@@ -190,3 +190,7 @@ The open tickets below provide per-gate execution and evidence tracking. No revi
 | Operations runbooks and release-owner approval | [#26](https://github.com/GoldenObsidianLLC/SystemFabric/issues/26) |
 
 Start with #13 to freeze the supported release scope, then #14 to commission the independent tenant/site review. Provider-specific work in #15–#18 should use only the resulting approved provider matrix. The 13 evidence gates remain open until their respective artifacts are accepted; opening an issue does not change the readiness status.
+
+## Appendix C — Recommended release scope
+
+The proposed baseline for SystemFabric 0.5.1 is recorded in [RELEASE-SCOPE.md](RELEASE-SCOPE.md). It follows the current manifest and environment defaults, limits 0.5.1 to an isolated developer preview, identifies provider/feature exclusions, and requires named release-owner approval before becoming an official product decision. The production evidence gates remain open.
