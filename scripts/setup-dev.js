@@ -22,16 +22,27 @@ function updateEnvFile({ target = envFile, template = envExample } = {}) {
   // O_NOFOLLOW prevents symlink traversal on POSIX; Windows does not expose that
   // flag through Node's fs API, but descriptor-bound I/O still prevents path
   // replacement between the open and subsequent reads/writes from redirecting I/O.
+  // On platforms with O_NOFOLLOW, the open itself rejects symlink traversal.
+  // Where that flag is unavailable, capture the non-following path identity
+  // before opening and compare it to fstat() to detect a replacement before
+  // the descriptor was acquired. After open, all I/O stays descriptor-bound;
+  // a later path rename/replacement must not redirect those operations.
+  let pathStats = null;
+  if (!fs.constants.O_NOFOLLOW) {
+    pathStats = fs.lstatSync(target);
+    if (!pathStats.isFile()) {
+      throw new Error('.env must be a regular file; symbolic links are not accepted.');
+    }
+  }
   const descriptorFlags = fs.constants.O_RDWR | (fs.constants.O_NOFOLLOW || 0);
   const descriptor = fs.openSync(target, descriptorFlags);
   try {
     const descriptorStats = fs.fstatSync(descriptor);
-    const pathStats = fs.lstatSync(target);
-    if (!pathStats.isFile() || descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino) {
-      throw new Error('.env path must remain bound to the opened regular file.');
-    }
     if (!descriptorStats.isFile() || descriptorStats.nlink > 1) {
       throw new Error('.env must be a regular, single-link file; symbolic links are not accepted where O_NOFOLLOW is supported.');
+    }
+    if (pathStats && (descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino)) {
+      throw new Error('.env path changed while opening; refusing to use an unexpected file.');
     }
 
     // Environment files may contain credentials. On POSIX, constrain access
