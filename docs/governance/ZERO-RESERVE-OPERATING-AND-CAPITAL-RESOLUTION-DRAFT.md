@@ -48,7 +48,7 @@ The following is proposed wording for a written consent or resolution by the Com
    - the authorized signatory and customer counterparty;
    - precise deliverables, exclusions, milestones, acceptance criteria, schedule, and change control;
    - the cost to perform, including tools, subcontractors, hosting, tax, insurance, and support;
-   - the source and amount of cleared funds sufficient to meet the Company's near-term performance obligations;
+   - the source and amount of funding sufficient to cover the next delivery stage's direct costs, applicable taxes/fees, and a reasonable refund/chargeback contingency. If a customer advance or milestone payment is intended to fund that stage, the agreement must make commencement and work authorization conditional on the funds actually clearing into a Company-controlled account; the receipt must be booked according to its legal/accounting character and kept available for the customer's delivery, refund, and other contractual obligations rather than treated as unrestricted cash;
    - data protection, security, confidentiality, IP, warranty, liability, refund, and termination terms; and
    - that the engagement does not depend on an unsupported production-readiness or certification claim.
 
@@ -282,4 +282,3 @@ This is a planning document, not a legal opinion. The law may differ based on wh
 ---
 
 **Bottom line:** this proposal authorizes no spending. It creates a disciplined route from zero reserve → no-cost customer discovery → funded, deliverable service revenue or properly documented capital → protected operating reserve → independent security assessment → controlled expansion. Until adopted by the proper governing authority, it remains a draft proposal and does not alter the Company's current governance policy or create authority to pay, hire, borrow, fundraise, or contract.
-\n
