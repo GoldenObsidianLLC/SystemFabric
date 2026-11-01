@@ -48,9 +48,14 @@ test('media type checks are based on file signatures, not client MIME labels', (
   assert.equal(detectImageType(Buffer.from('<svg></svg>')), null);
 });
 
-test('media upload rejects SVG and unsupported files before touching storage', async () => {
+test('media upload rejects SVG and unsupported files before touching storage', async t => {
+  const fs = require('node:fs/promises');
+  const os = require('node:os');
+  const path = require('node:path');
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-tests-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
   const calls = [];
-  const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root: '/tmp/systemfabric-media-tests' });
+  const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root });
   await assert.rejects(() => store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: Buffer.from('<svg></svg>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_SYSTEMFABRIC_MEDIA_INVALID' });
   assert.equal(calls.length, 0);
 });

@@ -157,6 +157,11 @@ test('context analysis handles a long template without repeated full-prefix scan
   assert.deepEqual(diagnostics, []);
 });
 
+test('context scanning handles repeated unmatched delimiters without regex backtracking', () => {
+  const source = '{{{{!'.repeat(50_000);
+  assert.deepEqual(engine.analyzeOutputContexts(source), []);
+});
+
 test('strict output-context mode permits the explicit safeUrl and jsonScript helper patterns', async () => {
   await withViews({
     'page.html': '<a href="{{ safeUrl(destination) }}">Open</a><script>const label = {{{ jsonScript(label) }}};</script>'
