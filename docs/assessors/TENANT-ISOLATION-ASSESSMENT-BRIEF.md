@@ -10,7 +10,7 @@
 |---|---|
 | Repository | `GoldenObsidianLLC/SystemFabric` |
 | Product version | `0.5.1` |
-| Candidate source commit | `ab55892dc33b87d8be4165e13931cd6888f358a1` |
+| Pre-packet application-source baseline | `ab55892dc33b87d8be4165e13931cd6888f358a1` |
 | Candidate branch | `main` |
 | Formal gate | `tenant-isolation-review` |
 | Evidence destination after completion | `artifacts/evidence/tenant-isolation-review.json` |
@@ -18,7 +18,7 @@
 | Technical plan | [docs/PRODUCTION-CERTIFICATION-PLAN.md](../PRODUCTION-CERTIFICATION-PLAN.md) |
 | Scope proposal | [docs/RELEASE-SCOPE.md](../RELEASE-SCOPE.md) |
 
-The candidate commit is the review pin. PRs #27 and #28 added documentation only; they did not change application source. If any application-source commit lands before or during the review, stop and agree a new full SHA with the project owner. The final report and machine-readable evidence must identify exactly the commit actually reviewed.
+The SHA above is the application-source baseline before the assessor packet was added. The prior release-scope and assessor-packet changes were documentation-only, but the assessor must independently verify this by comparing application source on current `main` with the baseline above. For the actual assessment, check out a clean current `main`, run `git rev-parse HEAD`, and record that exact full SHA in the assessor's report. If application source differs from the baseline, include those changes in the review scope. The final report and machine-readable evidence must identify exactly the commit actually reviewed. The readiness validator rejects a passing evidence record when its `commit` differs from current Git HEAD, so populate that field from the final reviewed checkout rather than copying a stale SHA from this hand-off document.
 
 The 0.5.1 scope proposal remains pending named product/release-owner approval on issue #13. That product decision is separate from this technical review. Do not infer scope approval or production readiness from this packet.
 
