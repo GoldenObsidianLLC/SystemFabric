@@ -311,27 +311,41 @@ function cacheGet(cacheKey) {
 }
 
 async function readTemplateSource(templatePath, limits, attempt = 0) {
-  const before = await fsp.stat(templatePath);
-  if (before.size > limits.maxTemplateBytes) {
-    throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
-      code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
-    });
+  // Open once and perform all size/content checks against the same descriptor.
+  // Replacing the pathname during the read cannot redirect the file operation.
+  const handle = await fsp.open(templatePath, 'r');
+  try {
+    const before = await handle.stat();
+    const pathEntry = await fsp.lstat(templatePath);
+    if (!before.isFile() || !pathEntry.isFile() ||
+        before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Template path must resolve to the opened regular file.', {
+        code: 'ERR_ENGINEX_TEMPLATE_PATH_CHANGED', templatePath
+      });
+    }
+    if (before.size > limits.maxTemplateBytes) {
+      throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
+        code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
+      });
+    }
+    const source = await handle.readFile('utf8');
+    const sourceBytes = Buffer.byteLength(source, 'utf8');
+    if (sourceBytes > limits.maxTemplateBytes) {
+      throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
+        code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
+      });
+    }
+    const after = await handle.stat();
+    if (getSignature(before) !== getSignature(after)) {
+      if (attempt < 2) return readTemplateSource(templatePath, limits, attempt + 1);
+      throw new TemplateError('Template changed repeatedly while being read; retry rendering.', {
+        code: 'ERR_ENGINEX_TEMPLATE_CHANGED_DURING_READ', templatePath
+      });
+    }
+    return { source, sourceBytes, stats: after };
+  } finally {
+    await handle.close();
   }
-  const source = await fsp.readFile(templatePath, 'utf8');
-  const sourceBytes = Buffer.byteLength(source, 'utf8');
-  if (sourceBytes > limits.maxTemplateBytes) {
-    throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
-      code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
-    });
-  }
-  const after = await fsp.stat(templatePath);
-  if (getSignature(before) !== getSignature(after)) {
-    if (attempt < 2) return readTemplateSource(templatePath, limits, attempt + 1);
-    throw new TemplateError('Template changed repeatedly while being read; retry rendering.', {
-      code: 'ERR_ENGINEX_TEMPLATE_CHANGED_DURING_READ', templatePath
-    });
-  }
-  return { source, sourceBytes, stats: after };
 }
 
 async function loadTemplateAst(templatePath, options, limits) {
@@ -2397,11 +2411,28 @@ function renderSourceStream(source, options = {}) {
   return renderNodes(compiled.nodes, virtualPath, state);
 }
 
+function* iterateTemplateTokens(source) {
+  let searchOffset = 0;
+  while (searchOffset < source.length) {
+    const start = source.indexOf('{{', searchOffset);
+    if (start === -1) return;
+
+    // A single forward search finds the first closing delimiter. If there is
+    // none, no later opener can form a complete token either.
+    const closeStart = source.indexOf('}}', start + 2);
+    if (closeStart === -1) return;
+
+    const closeLength = source[closeStart + 2] === '}' ? 3 : 2;
+    const end = closeStart + closeLength;
+    yield { token: source.slice(start, end), offset: start };
+    searchOffset = end;
+  }
+}
+
 function getOutputContextDiagnostics(source) {
   if (typeof source !== 'string' || !source.includes('{{')) return [];
 
   const diagnostics = [];
-  const tokenPattern = /{{{?[\s\S]*?}}}?/g;
   const state = {
     inTag: false,
     quote: '',
@@ -2410,7 +2441,6 @@ function getOutputContextDiagnostics(source) {
     tagChars: []
   };
   let scanOffset = 0;
-  let match;
 
   // Advance context state exactly once over ordinary template text. This avoids
   // repeatedly slicing the entire source prefix for each interpolation.
@@ -2448,14 +2478,12 @@ function getOutputContextDiagnostics(source) {
     scanOffset = endOffset;
   }
 
-  while ((match = tokenPattern.exec(source))) {
-    advanceContext(match.index);
-    const token = match[0];
-    const offset = match.index;
+  for (const { token, offset } of iterateTemplateTokens(source)) {
+    advanceContext(offset);
 
     // Template comments and structural directives aren't output expressions.
     if (token.startsWith('{{!--') || token.startsWith('{{!') || /^{{\s*(?:#|\/|>|\^|else\b)/.test(token)) {
-      scanOffset = match.index + token.length;
+      scanOffset = offset + token.length;
       continue;
     }
 
@@ -2485,7 +2513,7 @@ function getOutputContextDiagnostics(source) {
     if (raw && !usesJsonScript) {
       add('WARN_ENGINEX_RAW_OUTPUT', 'Raw interpolation bypasses ordinary HTML escaping and requires explicitly trusted output.', 'Use escaped interpolation unless the value is branded safe HTML from a trusted/sanitized source.');
     }
-    scanOffset = match.index + token.length;
+    scanOffset = offset + token.length;
   }
   return diagnostics;
 }
@@ -2636,7 +2664,8 @@ function analyzeSource(source, options = {}) {
 
   visitNodes(compiled.nodes);
   diagnostics.push(...getOutputContextDiagnostics(source).map(item => ({ ...item, severity: options.strictOutputContexts === true ? 'error' : 'warning' })));
-  if (source.includes('{{!--') || /{{![\s\S]*?}}/.test(source)) features.add('comments');
+  const commentStart = source.indexOf('{{!');
+  if (source.includes('{{!--') || (commentStart !== -1 && source.indexOf('}}', commentStart + 3) !== -1)) features.add('comments');
   if (source.includes('|')) features.add('filter-pipelines');
   const errors = diagnostics.filter(item => item.severity === 'error');
   return {
@@ -2803,12 +2832,26 @@ engine.writeManifest = async function writeManifest(rootDirectory, outputPath, o
 engine.loadPrecompiled = async function loadPrecompiled(manifestPath, options = {}) {
   if (typeof manifestPath !== 'string' || !manifestPath) throw new TypeError('manifestPath must be a JSON file path.');
   const fullPath = path.resolve(manifestPath);
-  const stat = await fsp.stat(fullPath);
-  const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
-  if (stat.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+  const manifestHandle = await fsp.open(fullPath, 'r');
   let manifest;
-  try { manifest = JSON.parse(await fsp.readFile(fullPath, 'utf8')); }
-  catch (cause) { throw new TemplateError('Unable to parse precompiled manifest JSON.', { code: 'ERR_ENGINEX_MANIFEST_JSON', cause }); }
+  try {
+    // Validate and read the manifest through one descriptor to avoid a
+    // pathname replacement between the size check and content read.
+    const stat = await manifestHandle.stat();
+    const pathEntry = await fsp.lstat(fullPath);
+    if (!stat.isFile() || !pathEntry.isFile() ||
+        stat.dev !== pathEntry.dev || stat.ino !== pathEntry.ino) {
+      throw new TemplateError('Precompiled manifest path must resolve to the opened regular file.', {
+        code: 'ERR_ENGINEX_MANIFEST_PATH'
+      });
+    }
+    const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
+    if (stat.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+    try { manifest = JSON.parse(await manifestHandle.readFile('utf8')); }
+    catch (cause) { throw new TemplateError('Unable to parse precompiled manifest JSON.', { code: 'ERR_ENGINEX_MANIFEST_JSON', cause }); }
+  } finally {
+    await manifestHandle.close();
+  }
   if (!manifest || manifest.format !== MANIFEST_FORMAT || manifest.engineVersion !== VERSION || !Array.isArray(manifest.templates) || !Array.isArray(manifest.dependencies)) {
     throw new TemplateError('Unsupported or incompatible precompiled manifest.', { code: 'ERR_ENGINEX_MANIFEST_VERSION' });
   }

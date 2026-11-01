@@ -2,7 +2,16 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createApiServer } = require('../apps/api/src/server');
+const { createApiServer, sameSecret } = require('../apps/api/src/server');
+
+test('configured bearer secrets use exact constant-time byte comparison', () => {
+  assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-01'), true);
+  assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-02'), false);
+  assert.equal(sameSecret('short', 'longer'), false);
+  assert.equal(sameSecret('', 'expected'), false);
+  assert.equal(sameSecret('expected', ''), false);
+  assert.equal(sameSecret('🔐token', '🔐token'), true);
+});
 
 async function withServer(fn, envExtra = {}) {
   const server = createApiServer({

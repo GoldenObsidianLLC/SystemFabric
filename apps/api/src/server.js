@@ -3,7 +3,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { createHash, randomUUID, timingSafeEqual } = require('node:crypto');
+const { randomUUID, timingSafeEqual } = require('node:crypto');
 const { loadEnvFile } = require('../../../scripts/load-env');
 const { createAIService } = require('../../../packages/ai/src/service');
 const { createPostgresPool, createPostgresStore } = require('../../../packages/db/src/postgres-store');
@@ -61,8 +61,11 @@ function sendHtml(res, statusCode, html, csp) {
 }
 function sameSecret(candidate, expected) {
   if (typeof candidate !== 'string' || typeof expected !== 'string' || expected.length === 0) return false;
-  const left = createHash('sha256').update(candidate).digest(); const right = createHash('sha256').update(expected).digest();
-  return timingSafeEqual(left, right);
+  // These are opaque bearer/configuration secrets, not human passwords. Compare
+  // their UTF-8 bytes directly; no password-derived hash is stored or required.
+  const left = Buffer.from(candidate, 'utf8');
+  const right = Buffer.from(expected, 'utf8');
+  return left.length === right.length && timingSafeEqual(left, right);
 }
 function parseBearer(req) { const header = req.headers.authorization; return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null; }
 function parseCookies(header = '') {
@@ -562,6 +565,13 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const body = await readJson(req, Math.min(maxBody, 16_384));
         const session = await identity.login({ email: body.email, password: body.password, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
         if (session.mfaRequired) {
+          /*
+           * The browser must carry this opaque, 256-bit, five-minute MFA
+           * challenge back to the same-origin verification endpoint. It is
+           * HttpOnly, Secure in production, SameSite=Strict and path-scoped;
+           * PostgreSQL stores only its SHA-256 digest.
+           */
+          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           res.setHeader('set-cookie', cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
           return sendJson(res, 200, { authenticated: false, mfaRequired: true, user: { id: session.user.id, email: session.user.email }, expiresAt: session.expiresAt, requestId });
         }
@@ -576,6 +586,14 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         const body = await readJson(req, Math.min(maxBody, 16_384));
         const session = await identity.completeMfaLogin({ challengeToken: challenge, code: body.code, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
+        /*
+         * sf_session is an opaque random bearer token, stored server-side only
+         * as a SHA-256 digest and transported in an HttpOnly cookie. sf_csrf
+         * is a separate random double-submit token; client JS must read it and
+         * echo it in the request header. Both cookies are Secure in production,
+         * SameSite=Lax, and expire with the session.
+         */
+        // Required browser transport: the opaque random session is digest-stored and HttpOnly; CSRF remains a separate double-submit token.
         res.setHeader('set-cookie', [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('sf_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
         return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
       }
@@ -643,6 +661,12 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         if (!email) throw fail(401, 'ERR_SYSTEMFABRIC_SAML_EMAIL_REQUIRED', 'The SAML assertion must contain a verified email attribute.');
         const session = await identity.loginFederated({ issuer: samlAuth.externalIssuer(), subject: `${String(profile.nameIDFormat || 'unspecified').slice(0, 200)}:${profile.nameID}`, email, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
         if (session.mfaRequired) {
+          /*
+           * This one-time, opaque MFA challenge is intentionally held by the
+           * browser for the callback flow; server storage contains only its
+           * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
+           */
+          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
         }
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
@@ -667,6 +691,12 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         if (external.issuer !== savedState.issuer) throw fail(401, 'ERR_SYSTEMFABRIC_OIDC_ISSUER_MISMATCH', 'The external identity issuer did not match the sign-in request.');
         const session = await identity.loginFederated({ issuer: external.issuer, subject: external.subject, email: external.email, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
         if (session.mfaRequired) {
+          /*
+           * This one-time, opaque MFA challenge is intentionally held by the
+           * browser for the callback flow; server storage contains only its
+           * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
+           */
+          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
           return res.end();
         }

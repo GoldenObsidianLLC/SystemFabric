@@ -9,26 +9,48 @@ const envExample = path.join(root, '.env.example');
 const envFile = path.join(root, '.env');
 
 function main() {
-  if (!fs.existsSync(envFile)) {
+  try {
+    // COPYFILE_EXCL is the atomic create-if-absent operation. Do not use an
+    // existsSync check followed by a copy, which leaves a pathname race.
     fs.copyFileSync(envExample, envFile, fs.constants.COPYFILE_EXCL);
     console.log('Created .env from .env.example. Review the development-only values before use.');
-  } else {
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
     console.log('.env already exists; preserving configured values.');
   }
 
-  // Add test-only endpoints to older developer .env files without replacing any
-  // existing credential or endpoint. The live runner still requires explicit opt-in.
-  let envText = fs.readFileSync(envFile, 'utf8');
-  const defaults = {
-    TEST_DATABASE_URL: 'postgres://systemfabric:systemfabric_dev@127.0.0.1:5432/systemfabric_test',
-    MEMGRAPH_TEST_URL: 'bolt://127.0.0.1:7687'
-  };
-  let changed = false;
-  for (const [key, value] of Object.entries(defaults)) {
-    const existing = new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=`, 'm');
-    if (!existing.test(envText)) { envText += `\n${key}=${value}`; changed = true; }
+  // Add test-only endpoints without replacing existing credentials or endpoints.
+  // Read and update through one descriptor so a later pathname swap cannot
+  // redirect the write to a different file.
+  const envHandle = fs.openSync(envFile, 'r+');
+  try {
+    const openedFile = fs.fstatSync(envHandle);
+    const pathEntry = fs.lstatSync(envFile);
+    if (!openedFile.isFile() || !pathEntry.isFile() ||
+        openedFile.dev !== pathEntry.dev || openedFile.ino !== pathEntry.ino) {
+      throw new Error('The .env path must be a regular, non-symlink file.');
+    }
+
+    let envText = fs.readFileSync(envHandle, 'utf8');
+    const defaults = {
+      TEST_DATABASE_URL: 'postgres://systemfabric:systemfabric_dev@127.0.0.1:5432/systemfabric_test',
+      MEMGRAPH_TEST_URL: 'bolt://127.0.0.1:7687'
+    };
+    let changed = false;
+    for (const [key, value] of Object.entries(defaults)) {
+      const existing = new RegExp(`^\\s*(?:export\\s+)?${key}\\s*=`, 'm');
+      if (!existing.test(envText)) { envText += `\n${key}=${value}`; changed = true; }
+    }
+    if (changed) {
+      const updated = envText.replace(/\s*$/, '') + '\n';
+      fs.ftruncateSync(envHandle, 0);
+      fs.writeSync(envHandle, updated, 0, 'utf8');
+      fs.ftruncateSync(envHandle, Buffer.byteLength(updated, 'utf8'));
+      fs.fsyncSync(envHandle);
+    }
+  } finally {
+    fs.closeSync(envHandle);
   }
-  if (changed) fs.writeFileSync(envFile, envText.replace(/\s*$/, '') + '\n');
 
   fs.mkdirSync(path.join(root, 'artifacts', 'evidence'), { recursive: true });
   fs.mkdirSync(path.join(root, 'var', 'media'), { recursive: true });
