@@ -797,9 +797,19 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
             const md=object.metadata||{};const found=await client.query("UPDATE commerce_orders SET status='failed',updated_at=now() WHERE status='pending_payment' AND (($1::text IS NOT NULL AND provider_session_id=$1) OR ($2::uuid IS NOT NULL AND id=$2)) AND ($3::uuid IS NULL OR site_id=$3) RETURNING id,site_id",[typeof object.id==='string'?object.id:null,md.order_id||null,md.site_id||null]);
             for(const row of found.rows) await releaseOrderStockReservations(client,{siteId:row.site_id,orderId:row.id,status:'released'});
           }
-          if (event.type.startsWith('customer.subscription.') && object.id) {
-            const status = object.status==='active'||object.status==='trialing'?'active':object.status==='past_due'?'past_due':object.status==='canceled'?'cancelled':'pending';
-            await client.query('UPDATE paid_memberships SET status=$2,cancel_at_period_end=$3,current_period_start=to_timestamp(NULLIF($4,0)),current_period_end=to_timestamp(NULLIF($5,0)),updated_at=now() WHERE provider_subscription_id=$1',[object.id,status,object.cancel_at_period_end===true,Number(object.current_period_start||0),Number(object.current_period_end||0)]);
+          if (event.type.startsWith('customer.subscription.') && typeof object.id === 'string') {
+            const md = object.metadata || {};
+            // Checkout stores these tenant binding fields on subscription metadata.
+            // Require the complete binding before applying an asynchronous provider
+            // update so a provider ID alone cannot select rows across site boundaries.
+            if (md.purchase_type === 'membership' && ID_RE.test(md.site_id || '') &&
+                ID_RE.test(md.user_id || '') && ID_RE.test(md.membership_plan_id || '')) {
+              const status = object.status==='active'||object.status==='trialing'?'active':object.status==='past_due'?'past_due':object.status==='canceled'?'cancelled':'pending';
+              await client.query(
+                "UPDATE paid_memberships SET status=$5,cancel_at_period_end=$6,current_period_start=to_timestamp(NULLIF($7,0)),current_period_end=to_timestamp(NULLIF($8,0)),updated_at=now() WHERE site_id=$1 AND provider='stripe' AND provider_subscription_id=$2 AND user_id=$3 AND plan_id=$4",
+                [md.site_id, object.id, md.user_id, md.membership_plan_id, status, object.cancel_at_period_end===true, Number(object.current_period_start||0), Number(object.current_period_end||0)]
+              );
+            }
           }
           await client.query("UPDATE billing_webhook_events SET status='processed',processed_at=now() WHERE provider='stripe' AND provider_event_id=$1",[event.id]);
           await client.query('COMMIT'); return sendJson(res,200,{received:true,requestId});
