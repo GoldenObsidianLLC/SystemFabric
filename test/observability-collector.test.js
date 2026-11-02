@@ -8,7 +8,10 @@ const path = require('node:path');
 const {
   configureLocalCollector,
   upsertEnv,
-  collectorImageTagForArch
+  collectorImageTagForArch,
+  readRegularFile,
+  writeTemporaryFile,
+  replaceFileAtomically
 } = require('../scripts/configure-otel-dev');
 
 function temporaryRoot(t) {
@@ -96,6 +99,50 @@ test('local collector setup rejects invalid existing or newly generated secrets'
   );
 });
 
+test('configuration reads validate the opened file identity and reject symbolic-link entries', t => {
+  const root = temporaryRoot(t);
+  const realRoot = fs.realpathSync(root);
+  const secretDirectory = path.join(root, 'var', 'secrets');
+  fs.mkdirSync(secretDirectory, { recursive: true });
+  const tokenFile = path.join(secretDirectory, 'otel-collector-token.txt');
+  fs.writeFileSync(tokenFile, 'j'.repeat(43));
+
+  assert.equal(readRegularFile(realRoot, tokenFile), 'j'.repeat(43));
+  assert.equal(
+    readRegularFile(realRoot, path.join(secretDirectory, 'missing-token.txt'), { optional: true }),
+    null
+  );
+
+  const linkPath = path.join(secretDirectory, 'token-link.txt');
+  try {
+    fs.symlinkSync(tokenFile, linkPath, 'file');
+  } catch (error) {
+    if (process.platform === 'win32' && ['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) {
+      t.skip('The Windows host does not permit unprivileged symbolic-link creation.');
+      return;
+    }
+    throw error;
+  }
+  assert.throws(
+    () => readRegularFile(realRoot, linkPath),
+    /changed while it was being opened/
+  );
+});
+
+test('temporary writes use exclusive files and replacement publishes complete contents', t => {
+  const root = temporaryRoot(t);
+  const target = path.join(root, '.env');
+  fs.writeFileSync(target, 'old=1\n');
+
+  const temporary = writeTemporaryFile(target, 'new=2\n', 0o600);
+  assert.equal(fs.readFileSync(temporary, 'utf8'), 'new=2\n');
+  fs.renameSync(temporary, target);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'new=2\n');
+
+  replaceFileAtomically(target, 'final=3\n', 0o600);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'final=3\n');
+});
+
 test('environment updates preserve unrelated settings and reject duplicate OTEL keys', () => {
   const result = upsertEnv(
     '# keep me\nDATABASE_URL=postgres://localhost/db\nSYSTEMFABRIC_OTEL_ENABLED=false\n',
@@ -136,7 +183,7 @@ test('collector reference config is authenticated, trace-only, memory-bounded an
   assert.doesNotMatch(config, /\n\s+metrics:\s*\n\s+receivers:/);
   assert.doesNotMatch(config, /\n\s+logs:\s*\n\s+receivers:/);
   assert.match(config, /telemetry:\s*\n\s+logs:\s*\n\s+level:\s+info/);
-  assert.match(compose, /ghcr\.io\/open-telemetry\/opentelemetry-collector-releases\/opentelemetry-collector-contrib:/);
+  assert.ok(compose.includes('image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}'));
   assert.match(compose, /127\.0\.0\.1:4318:4318/);
   assert.match(compose, /cap_drop:\s*\[\s*"ALL"\s*\]/);
   assert.match(compose, /no-new-privileges:true/);

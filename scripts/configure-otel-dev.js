@@ -28,6 +28,93 @@ const ENVIRONMENT = Object.freeze({
   SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE: './var/secrets/otel-collector-token.txt'
 });
 
+function isInsideDirectory(directory, candidate) {
+  return candidate.startsWith(directory + path.sep);
+}
+
+function sameFileIdentity(left, right) {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+/**
+ * Open first, then validate and read through the same descriptor. This avoids
+ * checking a pathname and subsequently reopening a different file after a
+ * symlink/path replacement race. The canonical target must stay inside root.
+ */
+function readRegularFile(rootRealPath, filePath, { optional = false } = {}) {
+  let descriptor;
+  try {
+    descriptor = fs.openSync(filePath, fs.constants.O_RDONLY);
+  } catch (error) {
+    if (optional && error.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  try {
+    const openedStats = fs.fstatSync(descriptor);
+    if (!openedStats.isFile()) {
+      throw new Error('The local OTLP configuration path must be a regular file.');
+    }
+
+    // Inspect the directory entry only after opening. Match it to the opened
+    // file identity, then consume the descriptor rather than reopening the path.
+    const entryStats = fs.lstatSync(filePath);
+    if (!entryStats.isFile() || entryStats.isSymbolicLink() ||
+        !sameFileIdentity(openedStats, entryStats)) {
+      throw new Error('The local OTLP configuration file changed while it was being opened.');
+    }
+
+    const canonicalPath = fs.realpathSync(filePath);
+    if (!isInsideDirectory(rootRealPath, canonicalPath)) {
+      throw new Error('The local OTLP configuration file must remain inside the repository root.');
+    }
+    const canonicalStats = fs.statSync(canonicalPath);
+    if (!sameFileIdentity(openedStats, canonicalStats)) {
+      throw new Error('The local OTLP configuration file changed while it was being opened.');
+    }
+
+    return fs.readFileSync(descriptor, 'utf8');
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+/**
+ * Create an exclusive temporary file and write to the open descriptor. Callers
+ * publish it with renameSync so readers never observe a partially written file.
+ */
+function writeTemporaryFile(targetPath, content, mode) {
+  const temporaryPath = targetPath + '.tmp-' + process.pid + '-' + crypto.randomBytes(8).toString('hex');
+  let descriptor;
+  try {
+    descriptor = fs.openSync(
+      temporaryPath,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL,
+      mode
+    );
+    fs.writeFileSync(descriptor, content, 'utf8');
+    fs.fsyncSync(descriptor);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try { fs.closeSync(descriptor); } catch {}
+    }
+    fs.rmSync(temporaryPath, { force: true });
+    throw error;
+  }
+  fs.closeSync(descriptor);
+  return temporaryPath;
+}
+
+function replaceFileAtomically(targetPath, content, mode) {
+  const temporaryPath = writeTemporaryFile(targetPath, content, mode);
+  try {
+    fs.renameSync(temporaryPath, targetPath);
+  } catch (error) {
+    fs.rmSync(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
 function upsertEnv(content, updates) {
   const lines = String(content || '').replace(/^\uFEFF/, '').split(/\r?\n/);
   if (lines.length && lines[lines.length - 1] === '') lines.pop();
@@ -78,24 +165,13 @@ function configureLocalCollector({
     }
   }
   const realSecretDirectory = fs.realpathSync(secretDirectory);
-  if (!realSecretDirectory.startsWith(rootRealPath + path.sep)) {
+  if (!isInsideDirectory(rootRealPath, realSecretDirectory)) {
     throw new Error('The local OTLP secret directory must remain inside the repository root.');
   }
 
-  const secretExists = fs.existsSync(secretFile);
-  let previousToken = null;
-  if (secretExists) {
-    const stats = fs.lstatSync(secretFile);
-    if (!stats.isFile() || stats.isSymbolicLink()) {
-      throw new Error('The local OTLP token path must be a regular file, not a symbolic link.');
-    }
-    previousToken = fs.readFileSync(secretFile, 'utf8');
-  }
-
-  const writeToken = !secretExists || rotate;
-  const token = writeToken
-    ? tokenFactory()
-    : previousToken.trim();
+  const previousToken = readRegularFile(rootRealPath, secretFile, { optional: true });
+  const writeToken = previousToken === null || rotate;
+  const token = writeToken ? tokenFactory() : previousToken.trim();
   if (typeof token !== 'string' || !TOKEN_PATTERN.test(token)) {
     throw new TypeError(writeToken
       ? 'The generated local OTLP token must be 40–64 base64url characters.'
@@ -109,26 +185,37 @@ function configureLocalCollector({
       authorization: 'Bearer ' + token
     })
   };
-  const currentEnv = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '';
-  // Validate .env before writing a new token so duplicate entries cannot
-  // rotate the collector secret while leaving the application on the old one.
+
+  // Validate .env before writing a new token so duplicate entries cannot rotate
+  // the collector secret while leaving the application on the old one.
+  const currentEnv = readRegularFile(rootRealPath, envFile, { optional: true }) || '';
   const nextEnv = upsertEnv(currentEnv, updates);
-  const temporaryEnv = envFile + '.tmp-' + process.pid;
-  const temporaryToken = secretFile + '.tmp-' + process.pid;
+  let temporaryEnv = null;
+  let temporaryToken = null;
 
   try {
-    fs.writeFileSync(temporaryEnv, nextEnv, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    temporaryEnv = writeTemporaryFile(envFile, nextEnv, 0o600);
     if (writeToken) {
-      fs.writeFileSync(temporaryToken, token + '\n', { encoding: 'utf8', mode: 0o644, flag: 'wx' });
+      temporaryToken = writeTemporaryFile(secretFile, token + '\n', 0o644);
       fs.renameSync(temporaryToken, secretFile);
+      temporaryToken = null;
     }
     fs.renameSync(temporaryEnv, envFile);
+    temporaryEnv = null;
   } catch (error) {
-    fs.rmSync(temporaryEnv, { force: true });
-    fs.rmSync(temporaryToken, { force: true });
+    if (temporaryEnv) fs.rmSync(temporaryEnv, { force: true });
+    if (temporaryToken) fs.rmSync(temporaryToken, { force: true });
+
     if (writeToken) {
-      if (previousToken === null) fs.rmSync(secretFile, { force: true });
-      else fs.writeFileSync(secretFile, previousToken, { encoding: 'utf8', mode: 0o644 });
+      try {
+        if (previousToken === null) fs.rmSync(secretFile, { force: true });
+        else replaceFileAtomically(secretFile, previousToken, 0o644);
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Local OTLP configuration failed and the previous secret could not be restored.'
+        );
+      }
     }
     throw error;
   }
@@ -159,4 +246,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { configureLocalCollector, upsertEnv, collectorImageTagForArch };
+module.exports = {
+  configureLocalCollector,
+  upsertEnv,
+  collectorImageTagForArch,
+  readRegularFile,
+  writeTemporaryFile,
+  replaceFileAtomically
+};
