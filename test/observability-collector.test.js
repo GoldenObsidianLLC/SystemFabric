@@ -33,9 +33,17 @@ test('local collector setup creates an ignored token file and matching loopback 
   assert.equal(savedToken, token);
   assert.match(env, /^SYSTEMFABRIC_OTEL_ENABLED=true$/m);
   assert.match(env, /^SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/traces$/m);
+  assert.match(env, /^SYSTEMFABRIC_OTEL_LOGS_ENABLED=true$/m);
+  assert.match(env, /^SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/logs$/m);
   assert.match(env, /^SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true$/m);
   assert.match(env, /^SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE=\.\/var\/secrets\/otel-collector-token\.txt$/m);
   assert.deepEqual(JSON.parse(headersLine.slice(headersLine.indexOf('=') + 1)), {
+    authorization: 'Bearer ' + token
+  });
+  const logHeadersLine = env.split(/\r?\n/).find(line =>
+    line.startsWith('SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
+  );
+  assert.deepEqual(JSON.parse(logHeadersLine.slice(logHeadersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + token
   });
   assert.match(env, /^SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG=0\.164\.0-amd64$/m);
@@ -80,6 +88,12 @@ test('local collector setup is idempotent and token rotation updates both sides'
   );
   assert.equal(fs.readFileSync(rotated.secretFile, 'utf8').trim(), 'c'.repeat(43));
   assert.deepEqual(JSON.parse(headersLine.slice(headersLine.indexOf('=') + 1)), {
+    authorization: 'Bearer ' + 'c'.repeat(43)
+  });
+  const logHeadersLine = env.split(/\r?\n/).find(line =>
+    line.startsWith('SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
+  );
+  assert.deepEqual(JSON.parse(logHeadersLine.slice(logHeadersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + 'c'.repeat(43)
   });
   assert.equal(rotated.rotated, true);
@@ -187,7 +201,7 @@ test('collector image tags are pinned per supported host architecture', () => {
   assert.throws(() => collectorImageTagForArch('unsupported'), /No pinned OpenTelemetry Collector image/);
 });
 
-test('collector reference config is authenticated, trace-only, memory-bounded and debug-only', () => {
+test('collector reference config is authenticated, supports traces and logs, memory-bounded and debug-only', () => {
   const root = path.resolve(__dirname, '..');
   const config = fs.readFileSync(path.join(root, 'docker', 'otel', 'collector.yaml'), 'utf8');
   const compose = fs.readFileSync(path.join(root, 'compose.yaml'), 'utf8');
@@ -200,8 +214,8 @@ test('collector reference config is authenticated, trace-only, memory-bounded an
   assert.match(config, /exporters:\s*\n\s+debug:/);
   assert.match(config, /verbosity:\s+normal/);
   assert.match(config, /pipelines:\s*\n\s+traces:/);
+  assert.match(config, /\n\s+logs:\s*\n\s+receivers:\s+\[otlp\]/);
   assert.doesNotMatch(config, /\n\s+metrics:\s*\n\s+receivers:/);
-  assert.doesNotMatch(config, /\n\s+logs:\s*\n\s+receivers:/);
   assert.match(config, /telemetry:\s*\n\s+logs:\s*\n\s+level:\s+info/);
   assert.ok(compose.includes('image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}'));
   assert.match(compose, /127\.0\.0\.1:4318:4318/);

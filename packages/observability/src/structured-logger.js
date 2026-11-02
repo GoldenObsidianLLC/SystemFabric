@@ -1,19 +1,68 @@
 'use strict';
 
+const {
+  context: otelContext,
+  trace: otelTrace
+} = require('@opentelemetry/api');
 const { getTraceContext } = require('./trace-context');
 
 const SAFE_FIELD_NAMES = new Set([
   'requestId', 'traceId', 'spanId', 'parentSpanId',
   'method', 'route', 'statusCode', 'statusClass', 'elapsedMs',
-  'code', 'errorType', 'component', 'operation', 'outcome'
+  'code', 'errorType', 'component', 'operation', 'outcome',
+  'count', 'checked', 'errors', 'unlinked', 'intervalMs',
+  'batchSize', 'dispatchBatchSize', 'leaseMs', 'maxAttempts',
+  'pollMs', 'attempts', 'terminal', 'processed', 'durationMs'
 ]);
 const TOKEN_RE = /^[A-Za-z0-9_.:-]{1,120}$/;
 const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
 const TRACE_ID_RE = /^[0-9a-f]{32}$/;
 const SPAN_ID_RE = /^[0-9a-f]{16}$/;
 const ROUTE_RE = /^\/[A-Za-z0-9_/:.-]{0,119}$/;
+const EVENT_NAME_RE = /^systemfabric\.[a-z0-9_.-]{1,100}$/;
 const METHOD_RE = /^[A-Z]{1,12}$/;
 const STATUS_CLASS_RE = /^[1-5]xx$/;
+const NUMERIC_FIELDS = new Set([
+  'count', 'checked', 'errors', 'unlinked', 'intervalMs',
+  'batchSize', 'dispatchBatchSize', 'leaseMs', 'maxAttempts',
+  'pollMs', 'attempts', 'processed', 'durationMs'
+]);
+const OTEL_ATTRIBUTE_NAMES = Object.freeze({
+  requestId: 'systemfabric.request_id',
+  traceId: 'systemfabric.trace_id',
+  spanId: 'systemfabric.span_id',
+  parentSpanId: 'systemfabric.parent_span_id',
+  method: 'http.request.method',
+  route: 'http.route',
+  statusCode: 'http.response.status_code',
+  statusClass: 'systemfabric.http.status_class',
+  elapsedMs: 'systemfabric.elapsed_ms',
+  code: 'error.code',
+  errorType: 'error.type',
+  component: 'systemfabric.component',
+  operation: 'systemfabric.operation',
+  outcome: 'systemfabric.outcome',
+  count: 'systemfabric.count',
+  checked: 'systemfabric.checked',
+  errors: 'systemfabric.errors',
+  unlinked: 'systemfabric.unlinked',
+  intervalMs: 'systemfabric.interval_ms',
+  batchSize: 'systemfabric.batch_size',
+  dispatchBatchSize: 'systemfabric.dispatch_batch_size',
+  leaseMs: 'systemfabric.lease_ms',
+  maxAttempts: 'systemfabric.max_attempts',
+  pollMs: 'systemfabric.poll_ms',
+  attempts: 'systemfabric.attempts',
+  terminal: 'systemfabric.terminal',
+  processed: 'systemfabric.processed',
+  durationMs: 'systemfabric.duration_ms'
+});
+const SEVERITY_NUMBERS = Object.freeze({
+  debug: 5,
+  info: 9,
+  warn: 13,
+  error: 17
+});
 
 function sanitizeField(name, value) {
   if (!SAFE_FIELD_NAMES.has(name)) return undefined;
@@ -24,7 +73,15 @@ function sanitizeField(name, value) {
   if (name === 'method') return typeof value === 'string' && METHOD_RE.test(value) ? value : 'OTHER';
   if (name === 'statusClass') return typeof value === 'string' && STATUS_CLASS_RE.test(value) ? value : undefined;
   if (name === 'statusCode') return Number.isInteger(value) && value >= 100 && value <= 599 ? value : undefined;
-  if (name === 'elapsedMs') return Number.isFinite(value) && value >= 0 ? Math.round(value * 1000) / 1000 : undefined;
+  if (name === 'elapsedMs' || name === 'durationMs') {
+    return Number.isFinite(value) && value >= 0 && value <= 86_400_000
+      ? Math.round(value * 1000) / 1000
+      : undefined;
+  }
+  if (NUMERIC_FIELDS.has(name)) {
+    return Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : undefined;
+  }
+  if (name === 'terminal') return typeof value === 'boolean' ? value : undefined;
   if (name === 'code') return typeof value === 'string' && /^ERR_[A-Z0-9_.-]{1,96}$/.test(value) ? value : 'ERR_SYSTEMFABRIC_UNKNOWN';
   if (name === 'errorType' || name === 'component' || name === 'operation' || name === 'outcome') {
     return typeof value === 'string' && TOKEN_RE.test(value) ? value : undefined;
@@ -33,13 +90,58 @@ function sanitizeField(name, value) {
 }
 
 function normalizeEventName(event) {
-  return typeof event === 'string' && /^systemfabric\.[a-z0-9_.-]{1,100}$/.test(event)
+  return typeof event === 'string' && EVENT_NAME_RE.test(event)
     ? event
     : 'systemfabric.observability.event';
 }
 
+function toHrTime(value) {
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) return undefined;
+  const seconds = Math.floor(milliseconds / 1000);
+  const nanoseconds = (milliseconds - seconds * 1000) * 1_000_000;
+  return [seconds, nanoseconds];
+}
+
+/**
+ * Emit only the already-sanitized structured record through the OpenTelemetry
+ * Logs API. The active trace context is attached as OTLP trace/span correlation
+ * metadata; request-specific identifiers remain bounded attributes.
+ */
+function emitOtelLog(otelLogger, record) {
+  if (!otelLogger || typeof otelLogger.emit !== 'function') return false;
+  const attributes = { 'event.name': record.event };
+  for (const [field, attribute] of Object.entries(OTEL_ATTRIBUTE_NAMES)) {
+    if (Object.hasOwn(record, field)) attributes[attribute] = record[field];
+  }
+
+  const traceContext = getTraceContext();
+  let correlatedContext;
+  if (traceContext && TRACE_ID_RE.test(traceContext.traceId || '') &&
+      SPAN_ID_RE.test(traceContext.spanId || '')) {
+    correlatedContext = otelTrace.setSpanContext(otelContext.active(), {
+      traceId: traceContext.traceId,
+      spanId: traceContext.spanId,
+      traceFlags: Number.parseInt(traceContext.traceFlags || '00', 16) || 0,
+      isRemote: false
+    });
+  }
+
+  const logRecord = {
+    timestamp: toHrTime(record.timestamp),
+    severityNumber: SEVERITY_NUMBERS[record.level],
+    severityText: record.level.toUpperCase(),
+    body: record.event,
+    attributes
+  };
+  if (correlatedContext) logRecord.context = correlatedContext;
+  otelLogger.emit(logRecord);
+  return true;
+}
+
 function createStructuredLogger({
   logger = console,
+  otelLogger = null,
   service = 'systemfabric-api',
   environment = 'development',
   accessLogsEnabled = false,
@@ -49,11 +151,11 @@ function createStructuredLogger({
   const safeEnvironment = TOKEN_RE.test(environment) ? environment : 'unknown';
 
   function emit(level, event, fields = {}) {
-    if (!['debug', 'info', 'warn', 'error'].includes(level)) return false;
+    if (!Object.hasOwn(SEVERITY_NUMBERS, level)) return false;
     const writer = typeof logger?.[level] === 'function'
       ? logger[level]
       : (typeof logger?.log === 'function' ? logger.log : null);
-    if (!writer) return false;
+    if (!writer && typeof otelLogger?.emit !== 'function') return false;
 
     const context = getTraceContext();
     const record = {
@@ -74,13 +176,23 @@ function createStructuredLogger({
       if (sanitized !== undefined) record[name] = sanitized;
     }
 
-    try {
-      writer.call(logger, JSON.stringify(record));
-      return true;
-    } catch {
-      // Observability must never change the outcome of an application request.
-      return false;
+    let delivered = false;
+    if (writer) {
+      try {
+        writer.call(logger, JSON.stringify(record));
+        delivered = true;
+      } catch {
+        // A local log sink must never change the outcome of an application request.
+      }
     }
+    if (otelLogger) {
+      try {
+        if (emitOtelLog(otelLogger, record)) delivered = true;
+      } catch {
+        // Telemetry export is best-effort and never changes application behavior.
+      }
+    }
+    return delivered;
   }
 
   function requestCompleted({ requestId, method, route, statusCode, elapsedMs } = {}) {
@@ -91,7 +203,7 @@ function createStructuredLogger({
       method,
       route,
       statusCode: safeStatus,
-      statusClass: safeStatus >= 100 && safeStatus <= 599 ? `${Math.floor(safeStatus / 100)}xx` : undefined,
+      statusClass: safeStatus >= 100 && safeStatus <= 599 ? String(Math.floor(safeStatus / 100)) + 'xx' : undefined,
       elapsedMs
     });
   }
@@ -99,4 +211,10 @@ function createStructuredLogger({
   return Object.freeze({ emit, requestCompleted });
 }
 
-module.exports = { createStructuredLogger, SAFE_FIELD_NAMES, sanitizeField };
+module.exports = {
+  createStructuredLogger,
+  emitOtelLog,
+  SAFE_FIELD_NAMES,
+  sanitizeField,
+  normalizeEventName
+};

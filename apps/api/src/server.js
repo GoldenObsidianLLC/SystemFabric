@@ -32,6 +32,7 @@ const { createRequestMetrics, createRealtimeMetrics } = require('../../../packag
 const { createTraceContext } = require('../../../packages/observability/src/trace-context');
 const { createStructuredLogger } = require('../../../packages/observability/src/structured-logger');
 const { initializeTracing, runWithServerSpan, setHttpStatus } = require('../../../packages/observability/src/tracing');
+const { initializeLogExport } = require('../../../packages/observability/src/otel-logs');
 const { createRealtimeHub } = require('../../../packages/realtime/src/event-hub');
 const { createMemoryPresenceAdapter, createPresenceService } = require('../../../packages/realtime/src/presence');
 const { createRedisPresenceService } = require('../../../packages/realtime/src/redis-presence');
@@ -154,7 +155,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console } = {}) {
+function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -167,8 +168,9 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     if (missing.length) throw new Error(`SystemFabric is not production-ready: configure ${missing.join(', ')} and complete deployment review before starting.`);
   }
 
-  const structuredLogger = createStructuredLogger({
+  const structuredLogger = suppliedStructuredLogger || createStructuredLogger({
     logger,
+    otelLogger,
     service: 'systemfabric-api',
     environment: env.NODE_ENV || 'development',
     accessLogsEnabled: env.SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED === 'true'
@@ -182,7 +184,16 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   const maxBody = boundedInt(env.MAX_REQUEST_BYTES, MAX_BODY_DEFAULT, 1_024, 16 * 1024 * 1024, 'MAX_REQUEST_BYTES');
   const maxMediaBody = Math.max(maxBody, MAX_MEDIA_BODY);
   const allowRequest = createRateLimiter(env);
-  const ai = aiService || createAIService({ env });
+  const ai = aiService || createAIService({
+    env,
+    audit: event => structuredLogger.emit(event.succeeded ? 'info' : 'warn', 'systemfabric.ai.audit', {
+      component: 'ai',
+      operation: event.action,
+      outcome: event.succeeded ? 'success' : 'failure',
+      elapsedMs: event.elapsedMs,
+      code: event.errorCode
+    })
+  });
   const registry = createWidgetRegistry();
   let localPool = pool || null; let store = contentStore || null;
   if (!store && env.DATABASE_URL) { localPool = localPool || createPostgresPool(env); store = createPostgresStore({ pool: localPool }); }
@@ -460,7 +471,12 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     try {
       await localPool.query(`INSERT INTO ai_run_audit(site_id,actor_id,provider,model,action,status,latency_ms,input_chars,output_chars,error_code)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [context.siteId, context.userId, context.provider || ai.providerInfo().provider, context.model || ai.providerInfo().model, context.action, status, Math.max(0, Math.min(2_147_483_647, Math.floor(elapsedMs))), context.chars || 0, Math.max(0, Number(outputChars) || 0), error ? String(error.code || 'ERR_SYSTEMFABRIC_AI_FAILURE').slice(0,100) : null]);
-    } catch (auditError) { logger.error?.(JSON.stringify({ type: 'systemfabric.ai.audit_persist_failed', requestId, code: auditError.code || 'ERR_SYSTEMFABRIC_AI_AUDIT_FAILED' })); }
+    } catch (auditError) {
+      structuredLogger.emit('error', 'systemfabric.ai.audit_persist_failed', {
+        component: 'ai', operation: 'audit_persist',
+        code: auditError.code || 'ERR_SYSTEMFABRIC_AI_AUDIT_FAILED'
+      });
+    }
   }
   async function runGovernedAI({ actor, siteId, body, action, inputChars, requestId, run }) {
     const started = Date.now();
@@ -1756,7 +1772,26 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
-  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-api', serviceVersion: SYSTEMFABRIC_VERSION });
+  let tracingRuntime = null;
+  let logRuntime = null;
+  try {
+    tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-api', serviceVersion: SYSTEMFABRIC_VERSION });
+    logRuntime = initializeLogExport({ env: process.env, serviceName: 'systemfabric-api', serviceVersion: SYSTEMFABRIC_VERSION });
+  } catch (error) {
+    await Promise.all([
+      tracingRuntime?.shutdown?.().catch(() => {}),
+      logRuntime?.shutdown?.().catch(() => {})
+    ]);
+    throw error;
+  }
+  const structuredLogger = createStructuredLogger({
+    logger: console,
+    otelLogger: logRuntime.logger,
+    service: 'systemfabric-api',
+    environment: process.env.NODE_ENV || 'development',
+    accessLogsEnabled: process.env.SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED === 'true'
+  });
+  try {
   let presenceService = null;
   let realtimeBridge = null;
   let realtimeConnectionLimiter = null;
@@ -1785,7 +1820,10 @@ async function main() {
       realtimeBridge = await createRedisRealtimeBridge({
         url: redisUrl,
         metrics: realtimeMetrics,
-        onError: event => console.error(JSON.stringify({ type: 'systemfabric.realtime.redis_error', ...event }))
+        onError: event => structuredLogger.emit('error', 'systemfabric.realtime.redis_error', {
+          component: 'realtime',
+          code: event?.code
+        })
       });
     presenceService = await createRedisPresenceService({
       url: redisUrl,
@@ -1793,11 +1831,21 @@ async function main() {
       maxEntriesPerSite: boundedInt(process.env.SYSTEMFABRIC_PRESENCE_MAX_SESSIONS_PER_SITE, 10_000, 1, 100_000, 'SYSTEMFABRIC_PRESENCE_MAX_SESSIONS_PER_SITE'),
       expiryRetentionMs: boundedInt(process.env.SYSTEMFABRIC_PRESENCE_EXPIRY_RETENTION_MS, 30_000, 1_000, 300_000, 'SYSTEMFABRIC_PRESENCE_EXPIRY_RETENTION_MS'),
       metrics: realtimeMetrics,
-      onError: event => console.error(JSON.stringify({ type: 'systemfabric.presence.redis_error', ...event })),
+      onError: event => structuredLogger.emit('error', 'systemfabric.presence.redis_error', {
+        component: 'presence',
+        code: event?.code
+      }),
       onExpired: event => {
-        console.error(JSON.stringify({ type: 'systemfabric.presence.lease_expired', siteId: event.siteId, expiredAtMs: event.expiredAtMs }));
+        structuredLogger.emit('info', 'systemfabric.presence.lease_expired', {
+          component: 'presence',
+          operation: 'lease_expired'
+        });
         return realtimeBridge.publish({ siteId: event.siteId, topic: 'presence', payload: { kind: 'presence.refresh' } })
-          .catch(() => console.error(JSON.stringify({ type: 'systemfabric.realtime.expiry_publish_failed', siteId: event.siteId })));
+          .catch(error => structuredLogger.emit('error', 'systemfabric.realtime.expiry_publish_failed', {
+            component: 'realtime',
+            operation: 'expiry_publish',
+            code: error?.code
+          }));
       }
       });
     } catch (error) {
@@ -1811,7 +1859,7 @@ async function main() {
   }
   let server;
   try {
-    server = createApiServer({ presenceService, realtimeBridge, realtimeMetrics, realtimeConnectionLimiter });
+    server = createApiServer({ presenceService, realtimeBridge, realtimeMetrics, realtimeConnectionLimiter, structuredLogger });
     await server.systemfabric.ready();
   } catch (error) {
     await Promise.all([
@@ -1822,9 +1870,23 @@ async function main() {
     throw error;
   }
   const host = process.env.HOST || '127.0.0.1'; const port = Number(process.env.PORT || 8787);
-  server.listen(port, host, () => console.error(JSON.stringify({ type: 'systemfabric.api.started', host, port, version: SYSTEMFABRIC_VERSION, aiProvider: server.systemfabric ? 'configured' : 'unknown', realtimeMode: server.systemfabric.realtimeMode, presenceStore: server.systemfabric.presenceStore })));
-  const shutdown = async () => { server.close(async () => { await server.systemfabric.close().catch(() => {}); await tracingRuntime.shutdown().catch(() => {}); process.exit(0); }); setTimeout(() => process.exit(1), 5000).unref(); };
+  server.listen(port, host, () => structuredLogger.emit('info', 'systemfabric.api.started', {
+    component: 'api', operation: 'startup', outcome: 'success'
+  }));
+  const shutdown = async () => { server.close(async () => {
+    await server.systemfabric.close().catch(() => {});
+    await Promise.all([tracingRuntime.shutdown().catch(() => {}), logRuntime.shutdown().catch(() => {})]);
+    process.exit(0);
+  }); setTimeout(() => process.exit(1), 5000).unref(); };
   process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
+  } catch (error) {
+    structuredLogger.emit('error', 'systemfabric.api.start_failed', {
+      component: 'api', operation: 'startup', outcome: 'failure',
+      code: error?.code, errorType: error?.name || 'Error'
+    });
+    await Promise.all([tracingRuntime.shutdown().catch(() => {}), logRuntime.shutdown().catch(() => {})]);
+    throw error;
+  }
 }
-if (require.main === module) void main().catch(error => { console.error(`SystemFabric failed to start: ${error.message}`); process.exitCode = 1; });
+if (require.main === module) void main().catch(() => { process.exitCode = 1; });
 module.exports = { createApiServer, readJson, normalizeSlug, validateSaveDraftBody, sameSecret, parseCookies, ID_RE };

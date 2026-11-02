@@ -1,7 +1,7 @@
 # Observability and Trace Correlation
 
-**Status:** Optional OpenTelemetry tracing and an authenticated local-only Collector profile are implemented; production collector/backend deployment and observability certification remain open.
-**Scope:** API request handling, WebSocket upgrades, authenticated API-to-plugin-runner calls, PostgreSQL, Redis, outbox delivery, Memgraph projection, and scheduler operations.
+**Status:** Optional OpenTelemetry tracing and curated structured-log export, plus an authenticated local-only Collector profile, are implemented; production collector/backend deployment, log access/retention governance, and observability certification remain open.
+**Scope:** API request handling, WebSocket upgrades, authenticated API-to-plugin-runner calls, PostgreSQL, Redis, outbox delivery, Memgraph projection, scheduler, mail worker, and AI audit events.
 
 ## 1. Implemented capabilities
 
@@ -54,15 +54,15 @@ npm run otel:dev:setup -- --rotate
 docker compose --profile observability restart otel-collector
 ~~~
 
-Restart the API, plugin runner, worker, and scheduler after changing `.env` so each process reads the new token. View local spans with:
+Restart the API, plugin runner, outbox worker, mail worker, and scheduler after changing `.env` so each process reads the new token. View local spans and redacted structured logs with:
 
 ~~~sh
 docker compose --profile observability logs -f otel-collector
 ~~~
 
-The reference collector uses the OpenTelemetry Collector Contrib `0.164.0` release image from the [official GHCR release repository](https://github.com/open-telemetry/opentelemetry-collector-releases/pkgs/container/opentelemetry-collector-contrib). The setup script selects a pinned architecture-specific image tag (for example, `0.164.0-amd64` or `0.164.0-arm64`) and fails closed on unsupported architectures. It listens on OTLP/HTTP only, requires bearer authentication, and is published on host loopback `127.0.0.1:4318`. The Compose profile drops capabilities, disables privilege escalation, runs as UID/GID `10001:10001`, mounts configuration and the token read-only, and applies CPU/memory limits. The collector applies a memory limiter before batching and exports to the `debug` exporter only.
+The reference collector uses the OpenTelemetry Collector Contrib `0.164.0` release image from the [official GHCR release repository](https://github.com/open-telemetry/opentelemetry-collector-releases/pkgs/container/opentelemetry-collector-contrib). The setup script selects a pinned architecture-specific image tag (for example, `0.164.0-amd64` or `0.164.0-arm64`) and fails closed on unsupported architectures. It listens on OTLP/HTTP only, requires bearer authentication, and is published on host loopback `127.0.0.1:4318`. The Compose profile drops capabilities, disables privilege escalation, runs as UID/GID `10001:10001`, mounts configuration and the token read-only, and applies CPU/memory limits. The collector applies a memory limiter before batching and exports traces and logs to the `debug` exporter only.
 
-This local profile is deliberately **ephemeral and development-only**. It does not persist spans, provide a query UI, forward telemetry to a SaaS vendor, or create a production retention policy. It uses HTTP because the receiver is authenticated and bound to host loopback; do not widen this port binding or use the profile on a public host.
+This local profile is deliberately **ephemeral and development-only**. It does not persist spans or logs, provide a query UI, forward telemetry to a SaaS vendor, or create a production retention policy. It uses HTTP because the receiver is authenticated and bound to host loopback; do not widen this port binding or use the profile on a public host.
 
 ### External / production collector
 
@@ -94,14 +94,17 @@ A production collector should use TLS (prefer mTLS for service identity where su
 | `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` | unset | Secret-injected JSON object limited to `authorization` and `x-api-key`. |
 | `SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE` | `./var/secrets/otel-collector-token.txt` | Local Compose profile secret source path; created by `npm run otel:dev:setup`. |
 | `SYSTEMFABRIC_OTEL_SAMPLE_RATIO` | `0.1` | Root trace sampling ratio from 0 to 1; parent-based sampling respects the upstream sampled flag. |
-| `SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS` | `5000` | Bounded export timeout (250–30,000 ms). |
+| `SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS` | `5000` | Bounded traces/logs export timeout (250–30,000 ms). |
 | `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP` | `false` | Explicitly permit HTTP transport; use only on isolated private networks. |
+| `SYSTEMFABRIC_OTEL_LOGS_ENABLED` | `false` | Independently enable the curated OTLP Logs pipeline. |
+| `SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP Logs endpoint; normalized to `/v1/logs`. |
+| `SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON` | unset | Optional separate secret-injected log exporter headers; falls back to trace headers when unset. |
 | `SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE` | `false` | Accept a valid upstream W3C v00 parent only behind a trusted ingress. |
 | `SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED` | `false` | Emit normalized API request-completion events to the injected logger. |
 | `SYSTEMFABRIC_METRICS_ENABLED` | `false` | Existing protected metrics endpoint switch. |
 | `SYSTEMFABRIC_METRICS_TOKEN` | unset | Dedicated bearer token for the private `/metrics` endpoint. |
 
-The SDK is configured for tracing only. Metrics and logs continue to use the existing SystemFabric mechanisms; this change does not add OTLP metrics or log exporters. Sampling uses a bounded batch queue and batch size. Export is asynchronous so collector/network failures do not become application request dependencies; process shutdown attempts to flush the trace queue. The local Compose collector uses only a debug exporter; it stores no trace history.
+The trace and log SDKs are independently opt-in. The Logs SDK uses a bounded batch queue and batch size; exporter failures are best-effort and must not become application request dependencies. Process shutdown attempts to flush both queues. The local Compose collector uses only a debug exporter and stores no trace or log history. OTLP metrics are not added by this increment.
 
 ## 5. Attribute and data-safety policy
 
@@ -113,7 +116,7 @@ Trace data remains potentially linkable operational metadata. Restrict collector
 
 ## 6. Structured logging and access events
 
-The API and plugin runner retain their allow-listed JSON structured logger. It accepts request/trace/span/parent-span IDs, HTTP method, normalized route, status, elapsed time, bounded error code/type, component, operation, and outcome. It excludes message text, request bodies, raw paths/query strings, IP addresses, authorization headers, cookies, session tokens, business identifiers, prompts, provider responses, plugin inputs, stack traces, and exception messages.
+The API, plugin runner, outbox worker, mail worker, and scheduler share the allow-listed JSON structured logger. Selected AI audit events are projected into this logger without actor, provider, model, prompt, or content values. It accepts request/trace/span/parent-span IDs, HTTP method, normalized route, status, elapsed time, bounded error code/type, component, operation, outcome, and a small set of bounded operational counters. It excludes message text, request bodies, raw paths/query strings, IP addresses, authorization headers, cookies, session tokens, business identifiers, prompts, provider responses, plugin inputs, stack traces, and exception messages.
 
 Optional API request-completion events remain disabled by default:
 
@@ -121,7 +124,25 @@ Optional API request-completion events remain disabled by default:
 SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED=true
 ~~~
 
-Safe API error records and authenticated plugin-runner invocation completion events are separate from the OTLP trace exporter. This increment does **not** centralize logs or establish their retention/access policy.
+Safe structured events are emitted locally as JSON and, when independently enabled, sent to the OTLP Logs exporter. Log records contain the event key as their body and only allow-listed attributes; the request-scoped trace/span context is attached as OTLP correlation metadata. The log provider is deliberately not registered globally, so third-party libraries and arbitrary `console` output are not automatically captured. API request-completion events remain disabled unless explicitly enabled.
+
+### OTLP Logs transport
+
+Set the separate log-export switch and a deployment-managed endpoint:
+
+~~~dotenv
+SYSTEMFABRIC_OTEL_LOGS_ENABLED=true
+SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=https://otel-collector.internal:4318/v1/logs
+SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=
+~~~
+
+The endpoint must use HTTPS and exactly `/v1/logs` (a root endpoint is normalized); URL credentials, query strings, fragments, and other paths are rejected. The log-specific header setting accepts the same narrow `authorization` and `x-api-key` allow-list as trace export. When the log-specific value is unset, trace exporter headers are reused; inject either value through the deployment secret manager and never commit it. The shared export timeout and explicit private-network HTTP override apply to both pipelines. OTLP log export is independent of trace export and disabled by default.
+
+The SDK uses bounded batching and asynchronous export. Only structured SystemFabric events passed through `createStructuredLogger` enter the OTLP pipeline; raw `console` output, prompts, request/response bodies, SQL text, arbitrary exception messages/stacks, and application payloads are not collected. The log event key is the body, avoiding arbitrary message text. Correlation is carried in the OTLP log record's trace/span context when available.
+
+The F1.15 local Collector profile now accepts both traces and logs with bearer authentication and exports each to the ephemeral `debug` exporter. The smoke command tests HTTP 401 for unauthenticated requests and HTTP 200 for authenticated traces and log records. This proves transport and receiver authentication only: it does not make logs centrally searchable, durable, access-controlled, or retained.
+
+This increment implements a vendor-neutral transport interface, **not production log centralization**. A deployment owner must still approve the receiving backend and define authenticated/encrypted ingress, role-based access, audit of log access, retention and deletion deadlines, legal holds where applicable, incident access, data residency/classification, and named technical/data owners. Do not infer a policy or retention period from the local development profile.
 
 ## 7. Validation
 
@@ -132,17 +153,17 @@ Automated tests verify:
 - Error status/code recording without the exception message.
 - Callback-style PostgreSQL queries remain functional when tracing is disabled.
 - Local collector setup is idempotent, stores the generated token outside source control, supports explicit rotation, preserves unrelated `.env` values, and rejects malformed/duplicate configuration.
-- The collector smoke command verifies that unauthenticated OTLP requests receive HTTP 401 and a valid local OTLP JSON span receives HTTP 200; it refuses non-loopback destinations and mismatched credentials.
-- The Compose collector reference is checked for bearer authentication, loopback-only publishing, least-privilege container settings, bounded memory, batching, and a trace-only debug pipeline.
+- The collector smoke command verifies that unauthenticated OTLP trace and log requests receive HTTP 401, while authenticated OTLP JSON span/log submissions receive HTTP 200; it refuses non-loopback destinations and mismatched credentials.
+- The Compose collector reference is checked for bearer authentication, loopback-only publishing, least-privilege container settings, bounded memory, batching, and traces/logs debug pipelines.
 - F1.13 tests continue to verify W3C v00 validation, remote-parent trust gating, request isolation, structured-log redaction, and authenticated plugin-runner trace propagation.
 
 The repository validation and local Docker-host smoke test pass. A real PostgreSQL/Redis/Memgraph deployment, trusted ingress, production OTLP receiver/backend, cross-process sampling policy, throughput/queue behavior, durable storage, and production network path still require environment-specific verification.
 
 ## 8. Remaining work and production boundary
 
-- Select, deploy, secure, and load-test the production OTLP collector and trace backend; define durable delivery and the receiving service's ownership.
-- Validate exporter retries, queue saturation, sampling, TLS/mTLS, secret rotation, retention, and shutdown behavior in the actual deployment topology.
-- Add centralized redacted log transport with access controls, retention/deletion, and named ownership.
+- Select, deploy, secure, and load-test the production OTLP collector and trace/log backends; define durable delivery and each receiving service's ownership.
+- Validate trace/log exporter retries, queue saturation, sampling, TLS/mTLS, secret rotation, retention, and shutdown behavior in the actual deployment topology.
+- Complete production log centralization only after selecting an approved backend and defining log access controls, retention/deletion, audit, and named ownership. The current OTLP transport and local debug exporter do not satisfy these governance requirements.
 - Add additional spans only where they provide actionable operational value without exporting business payloads.
 
 SystemFabric remains **NOT_PRODUCTION_CERTIFIED / NO-GO** until the independent security, deployment, operational, backup/restore, and release gates are satisfied. Optional trace export is not a production-readiness assertion.

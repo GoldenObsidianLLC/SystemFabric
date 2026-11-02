@@ -22,6 +22,8 @@ function collectorImageTagForArch(arch = process.arch) {
 const ENVIRONMENT = Object.freeze({
   SYSTEMFABRIC_OTEL_ENABLED: 'true',
   SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/traces',
+  SYSTEMFABRIC_OTEL_LOGS_ENABLED: 'true',
+  SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/logs',
   SYSTEMFABRIC_OTEL_SAMPLE_RATIO: '0.1',
   SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS: '5000',
   SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP: 'true',
@@ -191,6 +193,9 @@ function configureLocalCollector({
     ...ENVIRONMENT,
     SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG: collectorImageTag,
     SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON: JSON.stringify({
+      authorization: 'Bearer ' + token
+    }),
+    SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON: JSON.stringify({
       authorization: 'Bearer ' + token
     })
   };
