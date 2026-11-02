@@ -45,5 +45,152 @@ async function createStripeCheckoutSession({ secretKey, mode = 'payment', lineIt
   if (typeof data.url !== 'string' || typeof data.id !== 'string') throw billingError('Payment provider returned an incomplete checkout session.','ERR_SYSTEMFABRIC_BILLING_PROVIDER',502);
   return { id:data.id, url:data.url, mode:data.mode, status:data.status, paymentStatus:data.payment_status, customerId:data.customer || null, subscriptionId:data.subscription || null };
 }
+async function createStripeRefund({
+  secretKey,
+  paymentIntentId,
+  amountMinor,
+  reason = 'requested_by_customer',
+  idempotencyKey,
+  metadata = {},
+  fetchImpl = fetch
+}) {
+  if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) {
+    throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 503);
+  }
+  if (typeof paymentIntentId !== 'string' || !/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) {
+    throw billingError('A valid Stripe payment intent is required.');
+  }
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < 1) {
+    throw billingError('Refund amount must be a positive safe integer.');
+  }
+  if (!['duplicate', 'fraudulent', 'requested_by_customer'].includes(reason)) {
+    throw billingError('Refund reason is invalid.');
+  }
+  if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{8,255}$/.test(idempotencyKey)) {
+    throw billingError('Refund idempotency key is invalid.');
+  }
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw billingError('Refund metadata must be an object.');
+  }
+
+  const form = new URLSearchParams();
+  form.set('payment_intent', paymentIntentId);
+  form.set('amount', String(amountMinor));
+  form.set('reason', reason);
+  for (const [key, value] of Object.entries(metadata)) {
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(key) || typeof value !== 'string' || value.length > 500) {
+      throw billingError('Refund metadata is invalid.');
+    }
+    form.set(`metadata[${key}]`, value);
+  }
+
+  let response;
+  try {
+    response = await fetchImpl('https://api.stripe.com/v1/refunds', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${secretKey}`,
+        'content-type': 'application/x-www-form-urlencoded',
+        'idempotency-key': idempotencyKey
+      },
+      body: form.toString()
+    });
+  } catch (cause) {
+    const error = billingError(
+      'Refund provider outcome is unknown. Retry with the same idempotency key to recover the refund.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+    error.cause = cause;
+    throw error;
+  }
+
+  let raw;
+  try {
+    raw = await response.text();
+  } catch (cause) {
+    const error = billingError(
+      'Refund provider response was interrupted. Retry with the same idempotency key to recover the refund.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+    error.cause = cause;
+    throw error;
+  }
+
+  const statusCode = Number(response.status);
+  if (!response.ok && (statusCode >= 500 || statusCode === 429)) {
+    throw billingError(
+      'Refund provider outcome is unknown. Retry with the same idempotency key to recover the refund.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+  }
+  if (!response.ok) {
+    throw billingError('Payment provider rejected the refund.', 'ERR_SYSTEMFABRIC_BILLING_PROVIDER', 502);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw billingError(
+      'Refund provider response was unreadable; the refund outcome must be reconciled.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw billingError(
+      'Refund provider response had an invalid shape; the refund outcome must be reconciled.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+  }
+
+  const returnedPaymentIntentId = typeof data.payment_intent === 'string'
+    ? data.payment_intent
+    : data.payment_intent && typeof data.payment_intent.id === 'string'
+      ? data.payment_intent.id
+      : null;
+  const validStatuses = new Set(['pending', 'requires_action', 'succeeded', 'failed', 'canceled']);
+  if (
+    typeof data.id !== 'string' || !/^re_[A-Za-z0-9]+$/.test(data.id) ||
+    returnedPaymentIntentId !== paymentIntentId ||
+    data.amount !== amountMinor ||
+    typeof data.currency !== 'string' || !/^[a-zA-Z]{3}$/.test(data.currency) ||
+    !validStatuses.has(data.status)
+  ) {
+    throw billingError(
+      'Refund provider response did not match the requested payment and amount; reconcile before retrying.',
+      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      502
+    );
+  }
+
+  return {
+    id: data.id,
+    paymentIntentId: returnedPaymentIntentId,
+    amount: data.amount,
+    currency: data.currency.toUpperCase(),
+    reason: data.reason || reason,
+    status: data.status
+  };
+}
+
+function normalizeStripeRefundStatus(status) {
+  if (status === 'succeeded') return 'succeeded';
+  if (status === 'failed') return 'failed';
+  if (status === 'canceled') return 'cancelled';
+  return 'pending';
+}
+
 function digestWebhookBody(rawBody) { return createHash('sha256').update(rawBody).digest('hex'); }
-module.exports = { verifyStripeSignature, createStripeCheckoutSession, digestWebhookBody, billingError };
+module.exports = {
+  verifyStripeSignature,
+  createStripeCheckoutSession,
+  createStripeRefund,
+  normalizeStripeRefundStatus,
+  digestWebhookBody,
+  billingError
+};

@@ -96,6 +96,7 @@ The Platform Hub is served at `GET /platform`; its data operations require an au
 | `/api/v1/sites/{siteId}/products` | manage product records | `commerce:read` / `commerce:manage` |
 | `/api/v1/public/sites/{siteId}/products` | list published products by bounded pagination, or one by slug | Public read-only fields; published records only |
 | `/api/v1/sites/{siteId}/commerce/checkout` | create order snapshots and Stripe Checkout | Authenticated; validates product availability and stock server-side |
+| `/api/v1/sites/{siteId}/commerce/orders/{orderId}/refunds` | request an integer-minor-unit Stripe refund | `commerce:manage`; requires a confirmed Stripe PaymentIntent and an `Idempotency-Key`; amount is reserved per order and cannot exceed the remaining refundable balance |
 | `/api/v1/sites/{siteId}/memberships/plans` | manage plans | `content:read` / `memberships:manage` |
 | `/api/v1/public/sites/{siteId}/membership-plans` | list active plans | Public read-only fields; active plans only |
 | `/api/v1/sites/{siteId}/memberships/checkout` | hosted one-time/recurring checkout | Authenticated account and active plan required |
@@ -105,7 +106,7 @@ The Platform Hub is served at `GET /platform`; its data operations require an au
 | `/api/v1/sites/{siteId}/security/firewall-rules` | inspect/create/delete application firewall rules | `security:manage`; rules are not a managed WAF |
 | `/api/v1/sites/{siteId}/cloud/connections` | configure/inspect adapter metadata | `cloud:manage`; configuration test is not a real bucket I/O test |
 
-Stripe's webhook endpoint is provider-authenticated by timestamped HMAC verification, not browser session. It records event IDs for duplicate handling. Use the OpenAPI document as the machine-readable API inventory, and note that it is a subset of routes rather than a guarantee that every conditional provider route is available in a deployment.
+Stripe's webhook endpoint is provider-authenticated by timestamped HMAC verification, not browser session. It records event IDs for duplicate handling. Checkout and refund events are bound to the site/order and exact provider session or PaymentIntent. Refund creation commits a local idempotency reservation before calling Stripe; retries reuse the same provider key, and ambiguous provider outcomes remain reserved until webhook or retry reconciliation. Partial refunds do not mark an order fully refunded; succeeded refunds mark it refunded only when the cumulative successful amount reaches the order total. Refunds do not automatically restock inventory. Use the OpenAPI document as the machine-readable API inventory, and note that it is a subset of routes rather than a guarantee that every conditional provider route is available in a deployment.
 
 
 ## 0.5.0 operational additions
