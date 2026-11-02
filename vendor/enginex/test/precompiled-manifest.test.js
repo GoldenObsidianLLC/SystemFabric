@@ -41,3 +41,25 @@ test('precompiled manifest rejects unknown versions and unsafe paths', async t =
   await fs.writeFile(pathPayload, JSON.stringify({ format: 'enginex-precompiled-ast-v1', engineVersion: engine.version, entry: '../evil.html', templates: [], dependencies: [] }));
   await assert.rejects(engine.loadPrecompiled(pathPayload), { code: 'ERR_ENGINEX_MANIFEST_ENTRY' });
 });
+
+test('precompiled manifest rejects a final symlink when the platform supports no-follow opens', async t => {
+  if (process.platform === 'win32' || !require('node:fs').constants.O_NOFOLLOW) {
+    t.skip('Atomic no-follow opens are not available on this platform.');
+    return;
+  }
+  const root = await fixture();
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const target = path.join(root, 'real-manifest.json');
+  const link = path.join(root, 'linked-manifest.json');
+  await fs.writeFile(target, JSON.stringify({
+    format: 'enginex-precompiled-ast-v1',
+    engineVersion: engine.version,
+    entry: 'page.html',
+    templates: [{ id: 'page.html', nodes: [] }],
+    dependencies: []
+  }));
+  await fs.symlink(target, link);
+  await assert.rejects(engine.loadPrecompiled(link), error =>
+    error && (error.code === 'ELOOP' || error.code === 'ERR_ENGINEX_MANIFEST_PATH')
+  );
+});
