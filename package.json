@@ -34,6 +34,7 @@
     "dev:doctor": "node scripts/dev-doctor.js",
     "otel:dev:setup": "node scripts/configure-otel-dev.js",
     "otel:dev:smoke": "node scripts/test-otel-collector.js",
+    "observability:deployment:validate": "node scripts/validate-observability-deployment.js",
     "test:integration:live": "node scripts/test-integration-live.js",
     "test:integration:memgraph-outage": "node scripts/test-memgraph-outage.js",
     "test:e2e:install": "playwright install chromium",

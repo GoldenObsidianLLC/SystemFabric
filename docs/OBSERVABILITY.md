@@ -1,6 +1,6 @@
 # Observability and Trace Correlation
 
-**Status:** Optional OpenTelemetry tracing and curated structured-log export, plus an authenticated local-only Collector profile, are implemented; production collector/backend deployment, log access/retention governance, and observability certification remain open.
+**Status:** Optional OpenTelemetry tracing and curated structured-log export, plus an authenticated local-only Collector profile and a vendor-neutral production deployment evidence contract, are implemented. No production collector/backend or data-governance policy is approved; production deployment and certification remain open.
 **Scope:** API request handling, WebSocket upgrades, authenticated API-to-plugin-runner calls, PostgreSQL, Redis, outbox delivery, Memgraph projection, scheduler, mail worker, and AI audit events.
 
 ## 1. Implemented capabilities
@@ -83,7 +83,7 @@ When collector authentication is required, inject `SYSTEMFABRIC_OTEL_EXPORTER_HE
 
 Configure the same endpoint and authentication policy independently for each process that should emit spans: API, plugin runner, outbox worker, and scheduler. Each process advertises a stable service name: `systemfabric-api`, `systemfabric-plugin-runner`, `systemfabric-outbox-worker`, or `systemfabric-scheduler`.
 
-A production collector should use TLS (prefer mTLS for service identity where supported), explicit receiver authentication, restricted network ingress, bounded memory, batching, an approved durable/retry queue, and an exporter to the deployment's selected backend. Restrict collector health/diagnostic endpoints to management networks. Do not use the local debug exporter as a production backend.
+A production collector should use TLS (prefer mTLS for service identity where supported), explicit receiver authentication, restricted network ingress, bounded memory, batching, an approved durable/retry queue, and an exporter to the deployment's selected backend. Restrict collector health/diagnostic endpoints to management networks. Do not use the local debug exporter as a production backend. The deployment decisions and required evidence are defined in [Production Observability Deployment Contract](OBSERVABILITY-DEPLOYMENT.md); no sample value in the local profile is production approval.
 
 ## 4. Configuration reference
 
@@ -161,8 +161,8 @@ The repository validation and local Docker-host smoke test pass. A real PostgreS
 
 ## 8. Remaining work and production boundary
 
-- Select, deploy, secure, and load-test the production OTLP collector and trace/log backends; define durable delivery and each receiving service's ownership.
-- Validate trace/log exporter retries, queue saturation, sampling, TLS/mTLS, secret rotation, retention, and shutdown behavior in the actual deployment topology.
+- Select, deploy, secure, and load-test the production OTLP collector and trace/log backends using the [deployment evidence contract](OBSERVABILITY-DEPLOYMENT.md); define durable delivery and each receiving service's ownership.
+- Independently verify the manifest's external evidence references and approvals, then validate trace/log exporter retries, queue saturation, sampling, TLS/mTLS, secret rotation, retention, deletion, and shutdown behavior in the actual deployment topology.
 - Complete production log centralization only after selecting an approved backend and defining log access controls, retention/deletion, audit, and named ownership. The current OTLP transport and local debug exporter do not satisfy these governance requirements.
 - Add additional spans only where they provide actionable operational value without exporting business payloads.
 

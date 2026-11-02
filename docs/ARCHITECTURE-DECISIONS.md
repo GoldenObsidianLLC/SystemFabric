@@ -152,3 +152,16 @@
 **Consequences:** This decision implements a transport interface, not production log centralization or a storage service. No vendor, backend, retention period, role/access matrix, deletion policy or service owner is selected by the code. Before production centralization, the deployment owner must approve encrypted/authenticated ingress, access authorization and audit, retention/deletion and legal-hold handling, data residency/classification, incident access and named technical/data ownership. The local debug exporter is not a production sink. Metrics export is not introduced by this decision.
 
 **Revisit when:** A deployment selects a governed log backend or requires a transport other than OTLP/HTTP; evaluate the alternate against the same redaction, isolation, reliability and access-control requirements.
+
+
+## ADR-021: Production observability requires a deployment-approved evidence contract
+
+**Status:** Contract and structural validator implemented; no production deployment is approved.
+
+**Decision:** Before production OTLP traces/logs are treated as centralized operational observability, each deployment must provide an approved, revision-bound manifest covering the chosen backend and service, deployment model and region, data classification/residency, TLS and receiver authentication, network ingress/egress, secret rotation, access authorization/audit, retention/deletion/legal hold, named owners, durable queue/retry/dead-letter behavior, measured capacity/loss, outage recovery and incident response. A strict validator checks declaration completeness, cross-field consistency and owner-declared evidence freshness. The release-readiness report blocks production readiness when the manifest is missing, invalid, stale, or targets a different Git revision.
+
+**Reason:** OTLP transport is intentionally backend-neutral. Production safety depends on deployment-specific contracts and evidence that cannot be inferred from source code or a local debug Collector. Explicit evidence prevents a passing unit suite, example endpoint, or unreviewed provider choice from being mistaken for production approval.
+
+**Consequences:** SystemFabric does not choose a provider, region, retention period, classification, allowed data-loss tolerance, recovery objective or owner. Those values must come from the deployment's accountable owners and applicable legal/security policies. Evidence references point to an external controlled evidence system; the validator checks their syntax and declared validity, not their contents. Independent reviewers must verify approvals and artifacts. The local manifest is Git-ignored and must not contain secrets or raw telemetry. A structural pass is not production certification.
+
+**Revisit when:** A deployment standardizes a governed backend and infrastructure-as-code workflow, or the OTLP deployment contract changes; update the schema and its release gate with backward-compatible evidence migration.

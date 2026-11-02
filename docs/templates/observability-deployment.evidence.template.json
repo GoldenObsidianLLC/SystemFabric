@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "deploymentId": "REPLACE-WITH-DEPLOYMENT-IDENTIFIER",
+  "sourceRevision": "",
+  "decision": {
+    "status": "draft",
+    "approvedAt": "",
+    "approvedBy": "",
+    "changeReference": ""
+  },
+  "backend": {
+    "provider": "",
+    "service": "",
+    "deploymentModel": "select-managed-or-self-hosted",
+    "region": "",
+    "dataResidency": "",
+    "dataClassification": ""
+  },
+  "transport": {
+    "protocol": "otlp-http",
+    "tracesEndpoint": "",
+    "logsEndpoint": "",
+    "tlsMode": "select-tls-or-mtls",
+    "minimumTlsVersion": "1.2",
+    "authentication": {
+      "mode": "select-mtls-workload-identity-bearer-token-or-api-key",
+      "credentialReference": ""
+    },
+    "network": {
+      "privateIngress": null,
+      "ingressRestricted": null,
+      "egressRestricted": null
+    },
+    "secretManagement": {
+      "manager": "",
+      "rotationOwner": "",
+      "rotationPeriodDays": null,
+      "lastRotatedAt": ""
+    }
+  },
+  "governance": {
+    "retentionDays": null,
+    "deletionSlaDays": null,
+    "legalHoldSupported": null,
+    "legalHoldProcedureReference": null,
+    "retentionPolicyReference": "",
+    "deletionProcedureReference": "",
+    "accessControl": {
+      "model": "",
+      "leastPrivilegeVerified": null,
+      "accessLoggingEnabled": null,
+      "reviewCadenceDays": null,
+      "lastReviewedAt": ""
+    }
+  },
+  "owners": {
+    "serviceOwner": "",
+    "technicalOwner": "",
+    "dataOwner": "",
+    "securityOwner": "",
+    "onCallRoute": ""
+  },
+  "delivery": {
+    "queue": {
+      "durable": null,
+      "encryptedAtRest": null,
+      "survivesRestart": null,
+      "restoreTested": null,
+      "capacityRecords": null,
+      "overflowPolicy": "select-backpressure-reject-drop-oldest-or-drop-newest"
+    },
+    "retry": {
+      "strategy": "bounded-exponential-backoff",
+      "maxAttempts": null,
+      "initialDelayMs": null,
+      "maxDelayMs": null,
+      "jitterEnabled": null,
+      "deadLetterQueueEnabled": null,
+      "redriveProcedureReference": ""
+    },
+    "capacity": {
+      "expectedPeakRecordsPerSecond": null,
+      "validatedSustainedRecordsPerSecond": null,
+      "expectedBurstRecords": null,
+      "validatedBurstRecords": null,
+      "loadTestDurationSeconds": null,
+      "observedLossPercent": null,
+      "allowedLossPercent": null,
+      "maxObservedQueueUtilizationPercent": null
+    },
+    "recovery": {
+      "passed": null,
+      "outageDurationSeconds": null,
+      "totalRecordsSubmitted": null,
+      "recordsRecovered": null,
+      "recordsLost": null,
+      "recoveryTimeSeconds": null,
+      "targetRecoveryTimeSeconds": null
+    },
+    "alerting": {
+      "exportFailures": null,
+      "queueSaturation": null,
+      "droppedRecords": null,
+      "unauthorizedAccess": null,
+      "alertOwner": "",
+      "incidentRunbookReference": ""
+    }
+  },
+  "evidence": {
+    "networkSecurity": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "redactionReview": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "accessReview": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "dataGovernance": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "loadTest": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "outageRecovery": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "backupRestore": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    },
+    "incidentExercise": {
+      "reference": "",
+      "executedAt": "",
+      "validForDays": null
+    }
+  }
+}

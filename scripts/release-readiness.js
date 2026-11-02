@@ -16,6 +16,8 @@ const { performance } = require('node:perf_hooks');
 const { loadEnvFile } = require('./load-env');
 const { configureReleaseRedisIntegrationEnv } = require('./release-integration-env');
 const { hasSuccessfulPlaywrightSummary, isFreshMigrationEvidence } = require('./release-readiness-validation');
+const { validateObservabilityDeploymentManifest } = require('../packages/observability/src/deployment-contract');
+const { readRegularFile } = require('./configure-otel-dev');
 
 const root = path.resolve(__dirname, '..');
 loadEnvFile(path.join(root, '.env'));
@@ -236,6 +238,61 @@ const currentGates = [
   ['operations-release-approval', 'Deployment runbooks, secrets/rollback plan, monitoring and release approval', 'operations-release-approval.json']
 ];
 for (const gate of currentGates) evidenceFileStatus(...gate);
+
+// This deployment-specific manifest is ignored by Git because it contains
+// operational configuration and internal evidence references. It must identify
+// the exact release revision and remain structurally separate from source tests.
+function addObservabilityDeploymentGate() {
+  const filename = 'observability-production.json';
+  const absolute = path.join(evidenceDir, filename);
+  const evidencePath = 'artifacts/evidence/' + filename;
+  let status = 'MISSING_EVIDENCE';
+  let details = 'No deployment-approved OTLP backend manifest is available.';
+
+  if (fs.existsSync(absolute)) {
+    try {
+      const stat = fs.lstatSync(absolute);
+      const realPath = fs.realpathSync(absolute);
+      const relative = path.relative(root, realPath);
+      if (!stat.isFile() || stat.isSymbolicLink() || !relative ||
+          relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+        status = 'BLOCKED';
+        details = 'The observability evidence manifest must be a regular file inside the repository.';
+      } else {
+        const manifest = JSON.parse(readRegularFile(fs.realpathSync(root), realPath));
+        const validation = validateObservabilityDeploymentManifest(manifest);
+        if (!validation.ready) {
+          status = 'BLOCKED';
+          details = 'Deployment evidence failed ' + validation.errors.length +
+            ' structural check(s): ' + validation.errors.slice(0, 8)
+              .map(error => error.path + ' (' + error.code + ')').join('; ') +
+            (validation.errors.length > 8 ? '; additional issues omitted.' : '');
+        } else if (!gitHead || manifest.sourceRevision.toLowerCase() !== gitHead.toLowerCase()) {
+          status = 'BLOCKED';
+          details = 'The deployment manifest must identify the exact current release Git revision.';
+        } else if (!sourceTreeClean) {
+          status = 'BLOCKED';
+          details = 'The source tree must be clean before deployment evidence is accepted.';
+        } else {
+          status = 'PASS';
+          details = 'Manifest structure, approved transport/governance controls, evidence freshness declarations, measured capacity and outage-recovery relationships passed. External references and deployment behavior still require independent human verification.';
+        }
+      }
+    } catch {
+      status = 'BLOCKED';
+      details = 'The observability deployment manifest is not valid readable JSON or could not be checked safely.';
+    }
+  }
+
+  report.evidenceGates.push({
+    id: 'observability-production',
+    title: 'Production OTLP backend, security, governance, ownership and delivery evidence',
+    status,
+    evidencePath,
+    details
+  });
+}
+addObservabilityDeploymentGate();
 
 const supplemental = [];
 function supplementalFile(id, title, filename, validator, successDetails) {
