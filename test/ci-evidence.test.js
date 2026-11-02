@@ -180,7 +180,7 @@ test('reads the manifest through its opened descriptor when the path is replaced
   const manifestFile = path.join(directory, 'manifest.json');
   const backupFile = manifestFile + '.original';
   const originalOpenSync = fs.openSync;
-  const originalReadFileSync = fs.readFileSync;
+  const originalReaddirSync = fs.readdirSync;
   let replaced = false;
 
   fs.openSync = function patchedOpenSync(filePath, ...args) {
@@ -192,16 +192,13 @@ test('reads the manifest through its opened descriptor when the path is replaced
     }
     return descriptor;
   };
-  fs.readFileSync = function patchedReadFileSync(filePath, ...args) {
-    try {
-      return originalReadFileSync.call(fs, filePath, ...args);
-    } finally {
-      if (replaced) {
-        fs.rmSync(manifestFile, { force: true });
-        fs.renameSync(backupFile, manifestFile);
-        replaced = false;
-      }
+  fs.readdirSync = function patchedReaddirSync(directoryPath, ...args) {
+    if (replaced && path.resolve(directoryPath) === path.resolve(directory)) {
+      fs.rmSync(manifestFile, { force: true });
+      fs.renameSync(backupFile, manifestFile);
+      replaced = false;
     }
+    return originalReaddirSync.call(fs, directoryPath, ...args);
   };
 
   try {
@@ -215,7 +212,7 @@ test('reads the manifest through its opened descriptor when the path is replaced
     assert.equal(result.valid, true, result.errors.join('; '));
   } finally {
     fs.openSync = originalOpenSync;
-    fs.readFileSync = originalReadFileSync;
+    fs.readdirSync = originalReaddirSync;
     if (fs.existsSync(backupFile)) {
       fs.rmSync(manifestFile, { force: true });
       fs.renameSync(backupFile, manifestFile);
