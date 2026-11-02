@@ -1,5 +1,7 @@
 'use strict';
 
+const { getTraceContext, getTraceparent } = require('../../observability/src/trace-context');
+
 function createRemotePluginRunner({ url = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_URL, token = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN, timeoutMs = 8000, allowHttpInternal = process.env.PLUGIN_RUNNER_ALLOW_HTTP_INTERNAL === 'true' } = {}) {
   let endpoint = null;
   if (url) {
@@ -15,9 +17,14 @@ function createRemotePluginRunner({ url = process.env.SYSTEMFABRIC_PLUGIN_RUNNER
       }
       const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), timeoutMs); timer.unref?.();
       try {
+        const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
+        const traceparent = getTraceparent();
+        const traceContext = getTraceContext();
+        if (traceparent) headers.traceparent = traceparent;
+        if (traceContext?.requestId) headers['x-request-id'] = traceContext.requestId;
         const response = await fetch(new URL('/v1/invoke', endpoint), {
           method: 'POST', signal: controller.signal,
-          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          headers,
           body: JSON.stringify(payload)
         });
         const data = await response.json().catch(() => ({}));

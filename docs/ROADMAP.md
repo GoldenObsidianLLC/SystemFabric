@@ -71,7 +71,9 @@ This track establishes reusable infrastructure before individual screens and fea
 - [x] Add bounded backpressure, shared global/site/principal connection quota leases for SSE and WebSocket, connection-rate controls, and local-first presence degradation when Redis relay publication fails. Redis quotas fail closed when the shared store is unavailable.
 - [x] Add bounded low-cardinality realtime metrics for connections, fan-out, authorization, presence and Redis operations; define production scrape/alert ownership separately.
 - [x] Document real-time subsystem operating boundaries, current metrics, privacy rules, triage and recovery procedures in the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). This is a developer-preview operating baseline, not deployment approval.
-- [ ] Add distributed trace propagation/export and centralized redacted logs with approved access, retention and deletion controls; do not collect prompt/content/token payloads.
+- [x] Add request-scoped W3C Trace Context v00, AsyncLocalStorage correlation, trusted-ingress guard, internal plugin-runner propagation, and allow-listed API/plugin-runner structured logs. See [Observability and Trace Correlation](OBSERVABILITY.md); no exporter or centralized log transport is claimed.
+- [ ] Add OpenTelemetry span instrumentation/exporter and deployment-approved collector for PostgreSQL, Redis, outbox/worker, graph projection and selected internal calls.
+- [ ] Centralize redacted logs with approved transport, access controls, retention/deletion, and named ownership; do not collect prompt/content/token payloads.
 - [x] Validate cross-site/document subscription and delivery isolation with adversarial integration tests; no separate tenantId is modeled yet.
 
 **Exit condition:** a reproducible multi-instance test demonstrates authenticated, tenant-isolated delivery, reconnect, duplicate handling, stale-presence expiry and recovery from relay or broker interruption.

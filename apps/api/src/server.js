@@ -29,6 +29,8 @@ const { validateMenuItems } = require('../../../packages/domain/src/navigation')
 const { validateContentTypeDefinition, validateRecordValues, NAME_RE: CONTENT_TYPE_NAME_RE } = require('../../../packages/domain/src/content-types');
 const { renderPageDocument, rendererInfo } = require('../../../packages/render/src');
 const { createRequestMetrics, createRealtimeMetrics } = require('../../../packages/observability/src/metrics');
+const { createTraceContext, runWithTraceContext } = require('../../../packages/observability/src/trace-context');
+const { createStructuredLogger } = require('../../../packages/observability/src/structured-logger');
 const { createRealtimeHub } = require('../../../packages/realtime/src/event-hub');
 const { createMemoryPresenceAdapter, createPresenceService } = require('../../../packages/realtime/src/presence');
 const { createRedisPresenceService } = require('../../../packages/realtime/src/redis-presence');
@@ -164,6 +166,12 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     if (missing.length) throw new Error(`SystemFabric is not production-ready: configure ${missing.join(', ')} and complete deployment review before starting.`);
   }
 
+  const structuredLogger = createStructuredLogger({
+    logger,
+    service: 'systemfabric-api',
+    environment: env.NODE_ENV || 'development',
+    accessLogsEnabled: env.SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED === 'true'
+  });
   const devToken = env.SYSTEMFABRIC_API_TOKEN;
   const realtimeBridge = injectedRealtimeBridge || null;
   if (injectedDocumentPublisher !== undefined && injectedDocumentPublisher !== null && typeof injectedDocumentPublisher !== 'function') {
@@ -185,7 +193,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         if (realtimeBridge) await realtimeBridge.invalidateAuthorization(change);
         else realtimeHub?.invalidateAuthorization?.(change);
       } catch (error) {
-        logger.error?.(JSON.stringify({ type: 'systemfabric.realtime.authorization_invalidation_failed', code: String(error?.code || 'ERR_REALTIME_INVALIDATION').slice(0, 100) }));
+        structuredLogger.emit('error', 'systemfabric.realtime.authorization_invalidation_failed', { component: 'realtime', code: error?.code || 'ERR_REALTIME_INVALIDATION' });
         realtimeHub?.invalidateAuthorization?.(change);
       }
     }
@@ -495,14 +503,25 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
   async function handler(req, res) {
     const requestId = typeof req.headers['x-request-id'] === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(req.headers['x-request-id']) ? req.headers['x-request-id'] : randomUUID();
-    res.setHeader('x-request-id', requestId); res.setHeader('x-content-type-options', 'nosniff'); res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
+    const traceContext = createTraceContext({
+      requestId,
+      incomingTraceparent: req.headers.traceparent,
+      trustRemote: env.SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE === 'true'
+    });
+    res.setHeader('x-request-id', requestId); res.setHeader('x-trace-id', traceContext.traceId); res.setHeader('x-content-type-options', 'nosniff'); res.setHeader('referrer-policy', 'strict-origin-when-cross-origin');
     res.setHeader('x-frame-options', 'SAMEORIGIN'); res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     res.setHeader('cross-origin-opener-policy', 'same-origin'); res.setHeader('x-permitted-cross-domain-policies', 'none');
     if (env.NODE_ENV === 'production' && secureCookies) res.setHeader('strict-transport-security', `max-age=${boundedInt(env.SYSTEMFABRIC_HSTS_MAX_AGE, 15552000, 0, 63072000, 'SYSTEMFABRIC_HSTS_MAX_AGE')}; includeSubDomains`);
-    const started = Date.now(); let route = 'unknown';
-    res.once('finish', () => requestMetrics.record({ method: req.method, pathname: (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })(), statusCode: res.statusCode, durationMs: Date.now() - started }));
-    try {
-      const url = new URL(req.url, 'http://localhost'); route = `${req.method} ${url.pathname}`;
+    return runWithTraceContext(traceContext, async () => {
+      const started = Date.now();
+      res.once('finish', () => {
+        const pathname = (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })();
+        const durationMs = Date.now() - started;
+        requestMetrics.record({ method: req.method, pathname, statusCode: res.statusCode, durationMs });
+        structuredLogger.requestCompleted({ requestId, method: req.method, route: requestMetrics.normalizeRoute(pathname), statusCode: res.statusCode, elapsedMs: durationMs });
+      });
+      try {
+      const url = new URL(req.url, 'http://localhost');
       const firewallSite = url.pathname.match(/\/sites\/([0-9a-f-]{36})(?:\/|$)/i)?.[1] || null;
       const firewallResult = await firewall.evaluate({ ip: req.socket.remoteAddress || 'unknown', path: url.pathname, userAgent: String(req.headers['user-agent'] || '').slice(0, 500), siteId: firewallSite });
       if (firewallResult.action === 'deny') return sendJson(res, 403, { error: 'Request blocked by SystemFabric firewall policy.', code: 'ERR_SYSTEMFABRIC_FIREWALL_DENY', requestId });
@@ -1572,11 +1591,21 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       return sendJson(res, 404, { error: 'Route not found.', code: 'ERR_SYSTEMFABRIC_NOT_FOUND', requestId });
     } catch (error) {
       const status = Number.isInteger(error.statusCode) ? error.statusCode : error.code === 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT' ? 422 : 500;
-      logger.error?.(JSON.stringify({ type: 'systemfabric.http.error', requestId, route, code: error.code || 'ERR_SYSTEMFABRIC_INTERNAL', status, elapsedMs: Date.now() - started }));
+      const errorPath = (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })();
+      structuredLogger.emit('error', 'systemfabric.http.error', {
+        requestId,
+        method: req.method,
+        route: requestMetrics.normalizeRoute(errorPath),
+        code: error.code || 'ERR_SYSTEMFABRIC_INTERNAL',
+        statusCode: status,
+        elapsedMs: Date.now() - started,
+        errorType: error.name || 'Error'
+      });
       if (status >= 500 && !error.statusCode) return sendJson(res, status, { error: 'An internal error occurred.', code: error.code || 'ERR_SYSTEMFABRIC_INTERNAL', requestId });
       if (status === 429 && error.retryAfterSeconds) res.setHeader('retry-after', String(error.retryAfterSeconds));
       return sendJson(res, status, { error: error.message, code: error.code || 'ERR_SYSTEMFABRIC_REQUEST', details: error.details, requestId });
-    }
+      }
+    });
   }
 
   const server = http.createServer((req, res) => { void handler(req, res); });
@@ -1600,8 +1629,18 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   }
 
   server.on('upgrade', (req, socket, head) => {
-    void (async () => {
+    const requestId = typeof req.headers['x-request-id'] === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(req.headers['x-request-id']) ? req.headers['x-request-id'] : randomUUID();
+    const traceContext = createTraceContext({
+      requestId,
+      incomingTraceparent: req.headers.traceparent,
+      trustRemote: env.SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE === 'true'
+    });
+    void runWithTraceContext(traceContext, async () => {
+      const started = Date.now();
+      let upgradePath = '/other';
+      try {
       const url = new URL(req.url || '/', 'http://localhost');
+      upgradePath = url.pathname;
       const match = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/realtime\/ws$/i);
       if (!match) throw fail(404, 'ERR_SYSTEMFABRIC_NOT_FOUND', 'The WebSocket route was not found.');
       if (req.method !== 'GET') throw fail(405, 'ERR_SYSTEMFABRIC_METHOD_NOT_ALLOWED', 'WebSocket upgrades require GET.');
@@ -1651,7 +1690,21 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         siteId,
         topic: 'presence'
       });
-    })().catch(error => rejectWebSocketUpgrade(socket, error));
+      structuredLogger.requestCompleted({ requestId, method: req.method, route: requestMetrics.normalizeRoute(upgradePath), statusCode: 101, elapsedMs: Date.now() - started });
+    } catch (error) {
+      const status = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+      structuredLogger.emit('warn', 'systemfabric.http.websocket_upgrade_rejected', {
+        requestId,
+        method: req.method,
+        route: requestMetrics.normalizeRoute(upgradePath),
+        code: error.code || 'ERR_SYSTEMFABRIC_REALTIME_UPGRADE',
+        statusCode: status,
+        elapsedMs: Date.now() - started,
+        errorType: error.name || 'Error'
+      });
+      rejectWebSocketUpgrade(socket, error);
+    }
+    });
   });
 
   server.systemfabric = {
