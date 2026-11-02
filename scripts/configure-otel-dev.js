@@ -164,6 +164,15 @@ function configureLocalCollector({
       throw new Error('The local OTLP secret directories must be real directories, not symbolic links.');
     }
   }
+
+  // The token file is readable by the non-root Collector UID inside its bind
+  // mount. Keep the host directory private so other local users cannot traverse
+  // to that file. On Windows, NTFS ACLs govern access rather than POSIX mode bits.
+  fs.chmodSync(secretDirectory, 0o700);
+  if (process.platform !== 'win32' && (fs.statSync(secretDirectory).mode & 0o077) !== 0) {
+    throw new Error('The local OTLP secret directory must not grant access to group or other users.');
+  }
+
   const realSecretDirectory = fs.realpathSync(secretDirectory);
   if (!isInsideDirectory(rootRealPath, realSecretDirectory)) {
     throw new Error('The local OTLP secret directory must remain inside the repository root.');

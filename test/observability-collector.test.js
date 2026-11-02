@@ -43,6 +43,26 @@ test('local collector setup creates an ignored token file and matching loopback 
   assert.equal(JSON.stringify(result).includes(token), false);
 });
 
+test('existing collector secret directories are restricted to the owner on POSIX hosts', t => {
+  const root = temporaryRoot(t);
+  const secretDirectory = path.join(root, 'var', 'secrets');
+  fs.mkdirSync(secretDirectory, { recursive: true });
+  if (process.platform !== 'win32') fs.chmodSync(secretDirectory, 0o755);
+
+  const configured = configureLocalCollector({
+    root,
+    tokenFactory: () => 'k'.repeat(43)
+  });
+
+  const directoryStats = fs.statSync(secretDirectory);
+  assert.equal(directoryStats.isDirectory(), true);
+  if (process.platform !== 'win32') {
+    assert.equal(directoryStats.mode & 0o777, 0o700);
+    assert.equal(directoryStats.mode & 0o077, 0);
+  }
+  assert.equal(fs.readFileSync(configured.secretFile, 'utf8').trim(), 'k'.repeat(43));
+});
+
 test('local collector setup is idempotent and token rotation updates both sides', t => {
   const root = temporaryRoot(t);
   let calls = 0;

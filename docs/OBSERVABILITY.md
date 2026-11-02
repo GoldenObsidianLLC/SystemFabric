@@ -47,7 +47,7 @@ docker compose --profile observability up -d otel-collector
 npm run otel:dev:smoke
 ~~~
 
-The setup command creates `var/secrets/otel-collector-token.txt` (ignored by Git) and updates only the OTLP settings in the local `.env`. Run it after your normal local environment setup; when no `.env` exists, it creates a collector-only file rather than copying the rest of `.env.example`. It reuses the generated token on subsequent runs. Rotate it with:
+The setup command creates `var/secrets/otel-collector-token.txt` (ignored by Git), restricts the secrets directory to its owner on POSIX hosts, and updates only the OTLP settings in the local `.env`. Run it after your normal local environment setup; when no `.env` exists, it creates a collector-only file rather than copying the rest of `.env.example`. It reuses the generated token on subsequent runs. Rotate it with:
 
 ~~~sh
 npm run otel:dev:setup -- --rotate

@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { loadEnvFile } = require('./load-env');
+const { readRegularFile } = require('./configure-otel-dev');
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,64}$/;
 const LOCAL_COLLECTOR_URL = 'http://127.0.0.1:4318/v1/traces';
@@ -32,15 +33,7 @@ function readLocalCollectorConfig(root) {
     throw new Error('The local collector token path must remain inside the repository root.');
   }
 
-  const stats = fs.lstatSync(secretFile);
-  if (!stats.isFile() || stats.isSymbolicLink()) {
-    throw new Error('The local collector token path must be a regular file.');
-  }
-  const realSecretFile = fs.realpathSync(secretFile);
-  if (!realSecretFile.startsWith(rootPrefix)) {
-    throw new Error('The local collector token file must not resolve outside the repository root.');
-  }
-  const token = fs.readFileSync(realSecretFile, 'utf8').trim();
+  const token = readRegularFile(rootRealPath, secretFile).trim();
   if (!TOKEN_PATTERN.test(token)) {
     throw new Error('The local collector token file is invalid; rerun npm run otel:dev:setup.');
   }
