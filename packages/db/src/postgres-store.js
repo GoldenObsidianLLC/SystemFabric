@@ -1,6 +1,7 @@
 'use strict';
 
 const { createHash, randomUUID } = require('node:crypto');
+const { instrumentPostgresPool } = require('../../observability/src/tracing');
 const {
   validateCollaborationOperation,
   transformCollaborationOperation,
@@ -10,7 +11,7 @@ const {
 function createPostgresPool(env = process.env) {
   if (!env.DATABASE_URL) return null;
   const { Pool } = require('pg');
-  return new Pool({ connectionString: env.DATABASE_URL, max: Number(env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, application_name: 'systemfabric-api' });
+  return instrumentPostgresPool(new Pool({ connectionString: env.DATABASE_URL, max: Number(env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, application_name: 'systemfabric-api' }));
 }
 
 function extractPageText(document, maxChars = 200_000) {

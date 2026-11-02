@@ -1,5 +1,6 @@
 'use strict';
 
+const { instrumentRedisClient } = require('../../observability/src/tracing');
 const { createHash, randomUUID } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
 
@@ -214,7 +215,7 @@ async function createRedisRealtimeConnectionLimiter({
   }
   const normalized = normalizeOptions({ limits, leaseMs, now });
   const createClient = createClientOverride || require('redis').createClient;
-  const client = createClient({
+  const client = instrumentRedisClient(createClient({
     url,
     socket: {
       connectTimeout: 5_000,
@@ -224,7 +225,7 @@ async function createRedisRealtimeConnectionLimiter({
         return Math.min(100 * (2 ** Math.min(retries, 5)), 2_000);
       }
     }
-  });
+  }));
   client.on?.('error', () => incrementMetric(metrics, 'connection_quota_store_errors_total'));
 
   try {

@@ -5,7 +5,7 @@
 1. Use Node.js `>=22.23.4`.
 2. Copy `.env.example` to `.env`; replace all example secrets.
 3. Start PostgreSQL: `docker compose up -d postgres`. Optional local Memgraph: `docker compose --profile graph up -d memgraph`.
-4. Run `npm install` after generating a reviewed package lockfile in a network-enabled environment. The lockfile is absent from this source snapshot because generation timed out in the build environment; production should use `npm ci`.
+4. Run `npm ci` to install the exact reviewed dependency graph in the tracked `package-lock.json`. Use `npm install` only when intentionally changing dependencies, then review the lockfile diff and run the full check suite.
 5. Run `npm run migrate`.
 6. Set `SYSTEMFABRIC_ADMIN_EMAIL`, `SYSTEMFABRIC_ADMIN_PASSWORD`, and the site name/slug; run `npm run bootstrap:owner` once.
 7. Start API with `npm start`, then open `http://127.0.0.1:8787/admin`.
@@ -32,7 +32,7 @@ The execution runner invokes Docker/Podman with no network, read-only root, `cap
 
 Collect request IDs, response status, latency, content IDs, workflow transitions, outbox queue age/depth, projection retry/failure count, scheduled-publish failures, plugin invocation duration/timeout, AI provider error and quota events, cache hit/miss and database pool metrics. Redact content, passwords, cookies, session tokens, invitation tokens and provider keys. Prompt logging is disabled by default; do not enable it without data classification and retention approval.
 
-For realtime presence, SSE/WebSocket, Redis relay, and collaborative-document synchronization, use the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). It catalogs the fixed low-cardinality metric registry, safe scrape boundary, incident triage, and known preview limitations. It does not authorize production deployment or define production SLOs.
+For realtime presence, SSE/WebSocket, Redis relay, and collaborative-document synchronization, use the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). It catalogs the fixed low-cardinality metric registry, safe scrape boundary, incident triage, and known preview limitations. It does not authorize production deployment or define production SLOs. For request/trace correlation and the redacted structured logging contract, see [Observability and Trace Correlation](OBSERVABILITY.md). Trace propagation is not yet an exported OpenTelemetry tracing deployment.
 
 ## Before each release
 
