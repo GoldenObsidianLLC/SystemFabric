@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createAIService } = require('../packages/ai/src/service');
 const { createAIProviderFromEnv } = require('../packages/ai/src/provider-factory');
+const { createAICancellationError } = require('../packages/ai/src/providers/utils');
 const { validatePageDocument } = require('../packages/domain/src/page-document');
 
 function silentAudit() { return () => {}; }
@@ -51,6 +52,64 @@ test('page-draft requires a real non-empty prompt', async () => {
   await assert.rejects(() => ai.generatePageDraft({ prompt: undefined }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
 });
 
+
+test('AI service propagates caller cancellation and records a safe cancelled outcome', async () => {
+  const controller = new AbortController();
+  const auditEvents = [];
+  let providerSignal = null;
+  let startedResolve;
+  const started = new Promise(resolve => { startedResolve = resolve; });
+  const provider = {
+    name: 'mock',
+    model: 'cancellation-test',
+    async generate({ signal }) {
+      providerSignal = signal;
+      startedResolve();
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) {
+          reject(createAICancellationError(signal.reason));
+          return;
+        }
+        signal.addEventListener('abort', () => reject(createAICancellationError(signal.reason)), { once: true });
+      });
+    }
+  };
+  const ai = createAIService({
+    provider,
+    env: { AI_ALLOWED_PROVIDERS: 'mock' },
+    audit: event => auditEvents.push(event)
+  });
+
+  const pending = ai.assistContent({ text: 'This request should be cancelled.', signal: controller.signal });
+  await started;
+  controller.abort(new Error('test client disconnected'));
+
+  await assert.rejects(pending, {
+    code: 'ERR_SYSTEMFABRIC_AI_CANCELLED',
+    statusCode: 499
+  });
+  assert.equal(providerSignal, controller.signal, 'the exact task signal reaches the provider adapter');
+  assert.equal(auditEvents.length, 1);
+  assert.equal(auditEvents[0].succeeded, false);
+  assert.equal(auditEvents[0].errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
+});
+
+test('pre-cancelled AI requests do not invoke a provider', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let calls = 0;
+  const ai = createAIService({
+    provider: { name: 'mock', model: 'cancellation-test', async generate() { calls += 1; return JSON.stringify({ text: 'unexpected' }); } },
+    env: { AI_ALLOWED_PROVIDERS: 'mock' },
+    audit: silentAudit()
+  });
+
+  await assert.rejects(
+    ai.assistContent({ text: 'Do not send this.', signal: controller.signal }),
+    { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 }
+  );
+  assert.equal(calls, 0);
+});
 
 test('external AI processing fails closed until explicitly enabled', async () => {
   let calls = 0;

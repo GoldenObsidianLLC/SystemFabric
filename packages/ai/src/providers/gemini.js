@@ -11,7 +11,7 @@ function createGeminiProvider({
   if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY is required for gemini.'), { code: 'ERR_SYSTEMFABRIC_AI_NOT_CONFIGURED' });
   return Object.freeze({
     name: 'gemini', model,
-    async generate({ system, input, schemaName, schema, maxOutputTokens = 6000 }) {
+    async generate({ system, input, schemaName, schema, maxOutputTokens = 6000, signal }) {
       const body = {
         model,
         input,
@@ -21,7 +21,7 @@ function createGeminiProvider({
         store: false
       };
       if (schema) body.response_format = { type: 'text', mime_type: 'application/json', schema };
-      const result = await postJson(`${trimBaseUrl(baseUrl)}/interactions`, { 'x-goog-api-key': apiKey }, body, timeoutMs);
+      const result = await postJson(`${trimBaseUrl(baseUrl)}/interactions`, { 'x-goog-api-key': apiKey }, body, timeoutMs, { signal });
       let text = typeof result.output_text === 'string' ? result.output_text : '';
       if (!text) {
         const outputSteps = (result.steps || []).filter(step => step.type === 'model_output');

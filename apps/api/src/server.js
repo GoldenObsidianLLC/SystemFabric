@@ -486,19 +486,53 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       });
     }
   }
-  async function runGovernedAI({ actor, siteId, body, action, inputChars, requestId, run }) {
+  async function runGovernedAI({ actor, siteId, body, action, inputChars, requestId, signal, run }) {
     const started = Date.now();
     let context = null;
+    const cancellationError = cause => Object.assign(
+      new Error('AI task was cancelled because the requesting client disconnected.'),
+      { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499, ...(cause ? { cause } : {}) }
+    );
+    const throwIfCancelled = () => {
+      if (signal?.aborted) throw cancellationError(signal.reason);
+    };
     try {
+      throwIfCancelled();
       context = await reserveAIUsage({ actor, siteId, body, action, inputChars });
-      const result = await run();
+      throwIfCancelled();
+      const result = await run(signal);
+      throwIfCancelled();
       const outputChars = typeof result === 'string' ? result.length : JSON.stringify(result).length;
       await recordAIUsage(context, { status: 'succeeded', outputChars, elapsedMs: Date.now() - started, requestId });
       if (identity && context.siteId && actor.user.id) await identity.audit({ siteId: context.siteId, actorId: actor.user.id, action: `ai.${action}`, targetType: 'ai-run', requestId, details: { provider: context.provider, model: context.model, classification: context.classification, inputChars: context.chars, outputChars } });
       return result;
     } catch (error) {
-      if (context) await recordAIUsage(context, { status: error.statusCode === 403 || error.statusCode === 429 ? 'blocked' : 'failed', error, elapsedMs: Date.now() - started, requestId });
-      throw error;
+      const failure = signal?.aborted && error.code !== 'ERR_SYSTEMFABRIC_AI_CANCELLED'
+        ? cancellationError(error)
+        : error;
+      if (context) await recordAIUsage(context, { status: failure.statusCode === 403 || failure.statusCode === 429 ? 'blocked' : 'failed', error: failure, elapsedMs: Date.now() - started, requestId });
+      throw failure;
+    }
+  }
+  async function runGovernedAIForRequest({ req, res, ...options }) {
+    const controller = new AbortController();
+    const abortOnDisconnect = () => {
+      if (!res.writableEnded && !controller.signal.aborted) {
+        controller.abort(new Error('The HTTP client disconnected before the AI task completed.'));
+      }
+    };
+    req.once('aborted', abortOnDisconnect);
+    res.once('close', abortOnDisconnect);
+    if (req.aborted || res.destroyed) abortOnDisconnect();
+    try {
+      return await runGovernedAI({
+        ...options,
+        signal: controller.signal,
+        run: () => options.run(controller.signal)
+      });
+    } finally {
+      req.removeListener('aborted', abortOnDisconnect);
+      res.removeListener('close', abortOnDisconnect);
     }
   }
 
@@ -1562,22 +1596,22 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/page-draft') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAI({ actor, siteId, body, action: 'page_draft', inputChars: String(body.prompt || '').length + String(body.siteContext || '').length, requestId, run: () => ai.generatePageDraft({ prompt: body.prompt, siteContext: body.siteContext || '', actor: actor.user.id || 'local-development-token' }) });
+        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'page_draft', inputChars: String(body.prompt || '').length + String(body.siteContext || '').length, requestId, run: signal => ai.generatePageDraft({ prompt: body.prompt, siteContext: body.siteContext || '', actor: actor.user.id || 'local-development-token', signal }) });
         return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/content-assist') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAI({ actor, siteId, body, action: 'content_assist', inputChars: String(body.text || '').length, requestId, run: () => ai.assistContent({ text: body.text, operation: body.operation || 'make-clearer', tone: body.tone || 'clear and professional', actor: actor.user.id || 'local-development-token' }) });
+        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'content_assist', inputChars: String(body.text || '').length, requestId, run: signal => ai.assistContent({ text: body.text, operation: body.operation || 'make-clearer', tone: body.tone || 'clear and professional', actor: actor.user.id || 'local-development-token', signal }) });
         return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/seo') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAI({ actor, siteId, body, action: 'seo', inputChars: String(body.title || '').length + String(body.content || '').length, requestId, run: () => ai.generateSeo({ title: body.title, content: body.content, actor: actor.user.id || 'local-development-token' }) });
+        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'seo', inputChars: String(body.title || '').length + String(body.content || '').length, requestId, run: signal => ai.generateSeo({ title: body.title, content: body.content, actor: actor.user.id || 'local-development-token', signal }) });
         return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/translate') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAI({ actor, siteId, body, action: 'translate', inputChars: String(body.text || '').length, requestId, run: () => ai.translate({ text: body.text, targetLanguage: body.targetLanguage, actor: actor.user.id || 'local-development-token' }) });
+        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'translate', inputChars: String(body.text || '').length, requestId, run: signal => ai.translate({ text: body.text, targetLanguage: body.targetLanguage, actor: actor.user.id || 'local-development-token', signal }) });
         return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
       }
 
@@ -1906,6 +1940,16 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
       return sendJson(res, 404, { error: 'Route not found.', code: 'ERR_SYSTEMFABRIC_NOT_FOUND', requestId });
     } catch (error) {
+      if (req.aborted || res.destroyed || res.writableEnded) {
+        if (error.code === 'ERR_SYSTEMFABRIC_AI_CANCELLED') {
+          structuredLogger.emit('info', 'systemfabric.ai.request_cancelled', {
+            component: 'ai',
+            operation: 'request',
+            code: error.code
+          });
+        }
+        return;
+      }
       const status = Number.isInteger(error.statusCode) ? error.statusCode : error.code === 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT' ? 422 : 500;
       const errorPath = (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })();
       setHttpStatus(requestSpan, status);
