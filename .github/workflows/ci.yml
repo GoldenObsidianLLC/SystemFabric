@@ -54,6 +54,22 @@ jobs:
             artifacts/evidence/*.log
             package-lock.json
           if-no-files-found: error
+      - name: Stage revision-bound dependency evidence
+        if: always()
+        env:
+          SYSTEMFABRIC_CI_JOB_KEY: node-${{ matrix.node-version }}
+          SYSTEMFABRIC_CI_JOB_NAME: Unit, security, and dependency checks (Node ${{ matrix.node-version }})
+          SYSTEMFABRIC_CI_RUNTIME: v${{ matrix.node-version }}
+          SYSTEMFABRIC_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-evidence.js stage
+      - name: Upload revision-bound dependency evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemfabric-ci-evidence-node-${{ matrix.node-version }}
+          overwrite: true
+          path: artifacts/ci-evidence-stage/
+          if-no-files-found: warn
 
   postgres-memgraph-integration:
     name: PostgreSQL and Memgraph integration
@@ -165,6 +181,22 @@ jobs:
             artifacts/evidence/memgraph-outage-live.log
             artifacts/evidence/graph-rebuild-live.log
           if-no-files-found: warn
+      - name: Stage revision-bound live database evidence
+        if: always()
+        env:
+          SYSTEMFABRIC_CI_JOB_KEY: postgres-memgraph-integration
+          SYSTEMFABRIC_CI_JOB_NAME: PostgreSQL and Memgraph integration
+          SYSTEMFABRIC_CI_RUNTIME: v22.23.4
+          SYSTEMFABRIC_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-evidence.js stage
+      - name: Upload revision-bound live database evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemfabric-ci-evidence-postgres-memgraph-integration
+          overwrite: true
+          path: artifacts/ci-evidence-stage/
+          if-no-files-found: warn
 
   browser-and-accessibility:
     name: Browser editor and accessibility smoke tests
@@ -193,7 +225,11 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Exercise visual editor and accessibility smoke tests
-        run: npm run test:e2e
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/evidence
+          npm run test:e2e 2>&1 | tee artifacts/evidence/browser-smoke.log
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -201,6 +237,22 @@ jobs:
           name: systemfabric-playwright-report
           path: test-results/
           if-no-files-found: ignore
+      - name: Stage revision-bound browser evidence
+        if: always()
+        env:
+          SYSTEMFABRIC_CI_JOB_KEY: browser-and-accessibility
+          SYSTEMFABRIC_CI_JOB_NAME: Browser editor and accessibility smoke tests
+          SYSTEMFABRIC_CI_RUNTIME: v22.23.4
+          SYSTEMFABRIC_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-evidence.js stage
+      - name: Upload revision-bound browser evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemfabric-ci-evidence-browser-and-accessibility
+          overwrite: true
+          path: artifacts/ci-evidence-stage/
+          if-no-files-found: warn
 
   security-static-analysis:
     name: CodeQL security analysis
@@ -218,3 +270,65 @@ jobs:
       - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:javascript"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.23.4"
+      - name: Stage revision-bound CodeQL evidence
+        if: always()
+        env:
+          SYSTEMFABRIC_CI_JOB_KEY: security-static-analysis
+          SYSTEMFABRIC_CI_JOB_NAME: CodeQL security analysis
+          SYSTEMFABRIC_CI_RUNTIME: not-applicable
+          SYSTEMFABRIC_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-evidence.js stage
+      - name: Upload revision-bound CodeQL evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemfabric-ci-evidence-security-static-analysis
+          overwrite: true
+          path: artifacts/ci-evidence-stage/
+          if-no-files-found: warn
+
+  aggregate-release-evidence:
+    name: Consolidate candidate CI evidence
+    if: always()
+    needs:
+      - unit-security-and-dependencies
+      - postgres-memgraph-integration
+      - browser-and-accessibility
+      - security-static-analysis
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.23.4"
+      - name: Download this run's revision-bound evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: systemfabric-ci-evidence-*
+          path: artifacts/ci-evidence
+          merge-multiple: false
+      - name: Verify workflow jobs, revisions and evidence checksums
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          SYSTEMFABRIC_CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci-evidence.js aggregate
+      - name: Upload consolidated CI evidence report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemfabric-release-readiness-ci
+          overwrite: true
+          path: |
+            artifacts/release-readiness-ci.json
+            artifacts/release-readiness-ci.md
+          if-no-files-found: warn

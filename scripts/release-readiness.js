@@ -15,7 +15,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { loadEnvFile } = require('./load-env');
 const { configureReleaseRedisIntegrationEnv } = require('./release-integration-env');
-const { hasSuccessfulPlaywrightSummary, isFreshMigrationEvidence } = require('./release-readiness-validation');
+const { assessSourceTreeStatus, hasSuccessfulPlaywrightSummary, isFreshMigrationEvidence } = require('./release-readiness-validation');
 const { validateObservabilityDeploymentManifest } = require('../packages/observability/src/deployment-contract');
 const { readRegularFile } = require('./configure-otel-dev');
 
@@ -118,15 +118,32 @@ function evidenceFileStatus(id, title, evidenceFile) {
 }
 
 const gitSafeDirectory = root.replace(/\\/g, '/');
+// Refresh Git's cached stat data after deterministic postinstall file copies.
+// This does not stage or rewrite content: changed blobs remain visible to the
+// following status check, while byte-identical files no longer look dirty just
+// because their timestamps changed.
+spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'update-index', '--refresh'], { cwd: root, encoding: 'utf8', windowsHide: true });
 const gitHeadResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true });
-const gitStatusResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'status', '--porcelain'], { cwd: root, encoding: 'utf8', windowsHide: true });
+const gitStatusResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'], { cwd: root, encoding: 'utf8', windowsHide: true });
 const gitHead = gitHeadResult.status === 0 ? gitHeadResult.stdout.trim() : null;
-const workingChanges = gitStatusResult.status === 0 ? gitStatusResult.stdout.trim().split(/\r?\n/).filter(Boolean) : null;
-const sourceTreeClean = Array.isArray(workingChanges) && workingChanges.length === 0;
-addCheck('clean-source-tree', 'Clean, revision-identified release source tree', sourceTreeClean && Boolean(gitHead) ? 'PASS' : 'BLOCKED',
-  !gitHead || !Array.isArray(workingChanges) ? 'Could not establish Git HEAD and working-tree state.'
-    : sourceTreeClean ? `Clean source tree at ${gitHead}.`
-      : `HEAD ${gitHead}; ${workingChanges.length} tracked/untracked path(s) are modified. Release evidence must be regenerated for a clean, committed target revision.`);
+let sourceTreeInspection = null;
+try {
+  if (gitStatusResult.status === 0) sourceTreeInspection = assessSourceTreeStatus(gitStatusResult.stdout);
+} catch {}
+const sourceTreeClean = Boolean(gitHead) && Boolean(sourceTreeInspection) && sourceTreeInspection.clean;
+report.sourceRevision = gitHead;
+report.sourceTree = {
+  clean: sourceTreeClean,
+  changedPaths: sourceTreeInspection?.changedPaths || [],
+  approvedGeneratedPaths: sourceTreeInspection?.generatedPaths || [],
+  blockingPaths: sourceTreeInspection?.sourcePaths || [],
+};
+const sourceTreeDetails = !gitHead || !sourceTreeInspection
+  ? 'Could not establish Git HEAD and a safely parsed Git working-tree state.'
+  : sourceTreeClean
+    ? `Clean source tree at ${gitHead}.`
+    : `HEAD ${gitHead}; blocking paths: ${sourceTreeInspection.sourcePaths.join(', ') || 'none'}; explicitly approved generated outputs: ${sourceTreeInspection.generatedPaths.join(', ') || 'none'}.`;
+addCheck('clean-source-tree', 'Clean, revision-identified release source tree', sourceTreeClean ? 'PASS' : 'BLOCKED', sourceTreeDetails);
 
 const minimumNode = String(pkg.engines?.node || '>=22.23.4').replace(/^>=?/, '').split(' ')[0];
 const runtimeOk = compareVersions(process.versions.node, minimumNode) >= 0;
