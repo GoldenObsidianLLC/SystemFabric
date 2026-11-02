@@ -64,19 +64,19 @@ async function main() {
 
     const migrationFiles = fs.readdirSync(path.join(root, 'database', 'migrations'))
       .filter(file => /^\d+_[a-z0-9_-]+\.sql$/i.test(file)).sort();
-    if (migrationFiles.length !== 15) throw new Error('Expected 15 versioned migrations; found ' + migrationFiles.length + '.');
+    if (migrationFiles.length !== 16) throw new Error('Expected 16 versioned migrations; found ' + migrationFiles.length + '.');
     evidence.migrationCount = migrationFiles.length;
 
     const firstOutput = runMigrations(targetUrl.toString(), 'Fresh database migration pass');
     if (!migrationFiles.every(file => firstOutput.includes('OK   ' + file))) throw new Error('First migration pass did not report every migration as applied.');
-    evidence.firstPass = '15/15 migrations applied';
+    evidence.firstPass = '16/16 migrations applied';
 
     const verifyPool = new Pool({ connectionString: targetUrl.toString(), connectionTimeoutMillis: 4000, max: 1 });
     try {
       const rows = await verifyPool.query('SELECT version FROM systemfabric_schema_migrations ORDER BY version');
       const actual = rows.rows.map(row => row.version);
       if (actual.length !== migrationFiles.length || actual.some((value, index) => value !== migrationFiles[index])) {
-        throw new Error('Migration ledger mismatch: expected 15 ordered versions; found ' + actual.length + '.');
+        throw new Error('Migration ledger mismatch: expected 16 ordered versions; found ' + actual.length + '.');
       }
     } finally { await verifyPool.end(); }
 
@@ -84,7 +84,7 @@ async function main() {
     if (!migrationFiles.every(file => secondOutput.includes('SKIP ' + file + ' (already applied)'))) {
       throw new Error('Second migration pass did not skip every previously applied migration.');
     }
-    evidence.secondPass = '15/15 migrations skipped as already applied';
+    evidence.secondPass = '16/16 migrations skipped as already applied';
     evidence.status = 'PASS';
     log('FRESH MIGRATION RESULT: PASS');
   } finally {

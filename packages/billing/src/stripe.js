@@ -178,6 +178,106 @@ async function createStripeRefund({
   };
 }
 
+/**
+ * Retrieves the current Stripe subscription snapshot.
+ *
+ * Webhook snapshots are immutable and Stripe does not guarantee delivery order.
+ * Call this after locking the locally bound membership row so concurrent event
+ * handlers serialize and each applies the provider's current state, not a stale
+ * event-time snapshot.
+ */
+async function retrieveStripeSubscription({
+  secretKey,
+  subscriptionId,
+  fetchImpl = fetch,
+  timeoutMs = 5000
+}) {
+  if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) {
+    throw billingError('STRIPE_SECRET_KEY is required to reconcile subscription events.', 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 503);
+  }
+  if (typeof subscriptionId !== 'string' || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) {
+    throw billingError('A valid Stripe subscription ID is required.', 'ERR_SYSTEMFABRIC_BILLING_WEBHOOK_INVALID', 400);
+  }
+  if (typeof fetchImpl !== 'function' || !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
+    throw billingError('Stripe subscription retrieval is not configured.', 'ERR_SYSTEMFABRIC_BILLING_CONFIG', 503);
+  }
+
+  let response;
+  try {
+    response = await fetchImpl(
+      'https://api.stripe.com/v1/subscriptions/' + encodeURIComponent(subscriptionId),
+      {
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer ' + secretKey,
+          accept: 'application/json'
+        },
+        signal: AbortSignal.timeout(timeoutMs)
+      }
+    );
+  } catch (cause) {
+    const error = billingError(
+      'Stripe subscription state could not be retrieved. The webhook will be retried.',
+      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      503
+    );
+    error.cause = cause;
+    throw error;
+  }
+
+  let raw;
+  try {
+    raw = await response.text();
+  } catch (cause) {
+    const error = billingError(
+      'Stripe subscription response was interrupted. The webhook will be retried.',
+      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      503
+    );
+    error.cause = cause;
+    throw error;
+  }
+
+  if (!response.ok) {
+    const temporary = Number(response.status) === 429 || Number(response.status) >= 500;
+    throw billingError(
+      'Stripe subscription state could not be retrieved. The webhook will be retried.',
+      temporary ? 'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE' : 'ERR_SYSTEMFABRIC_BILLING_PROVIDER',
+      temporary ? 503 : 502
+    );
+  }
+
+  let subscription;
+  try {
+    subscription = JSON.parse(raw);
+  } catch {
+    throw billingError(
+      'Stripe returned an unreadable subscription response. The webhook will be retried.',
+      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      503
+    );
+  }
+
+  if (
+    !subscription ||
+    typeof subscription !== 'object' ||
+    Array.isArray(subscription) ||
+    subscription.id !== subscriptionId ||
+    typeof subscription.status !== 'string' ||
+    !subscription.metadata ||
+    typeof subscription.metadata !== 'object' ||
+    Array.isArray(subscription.metadata)
+  ) {
+    throw billingError(
+      'Stripe returned a subscription response that did not match the requested resource.',
+      'ERR_SYSTEMFABRIC_BILLING_PROVIDER',
+      502
+    );
+  }
+
+  return subscription;
+}
+
 function normalizeStripeRefundStatus(status) {
   if (status === 'succeeded') return 'succeeded';
   if (status === 'failed') return 'failed';
@@ -190,6 +290,7 @@ module.exports = {
   verifyStripeSignature,
   createStripeCheckoutSession,
   createStripeRefund,
+  retrieveStripeSubscription,
   normalizeStripeRefundStatus,
   digestWebhookBody,
   billingError

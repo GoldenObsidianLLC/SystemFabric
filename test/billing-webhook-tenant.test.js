@@ -9,7 +9,7 @@ const WEBHOOK_SECRET = 'whsec_systemfabric_tenant_test';
 const SITE_A = '11111111-1111-4111-8111-111111111111';
 const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PLAN_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-const SUBSCRIPTION_ID = 'sub_shared_provider_identifier';
+const SUBSCRIPTION_ID = 'sub_sharedprovideridentifier';
 
 function signedPayload(event) {
   const rawBody = Buffer.from(JSON.stringify(event));
@@ -24,111 +24,226 @@ function signedPayload(event) {
   };
 }
 
-test('Stripe subscription updates require and apply the full site/user/plan provider binding', async t => {
-  const clientQueries = [];
-  const poolQueries = [];
+function membershipMetadata(overrides = {}) {
+  return {
+    purchase_type: 'membership',
+    site_id: SITE_A,
+    user_id: USER_A,
+    membership_plan_id: PLAN_A,
+    ...overrides
+  };
+}
+
+function createSubscriptionWebhookHarness(t, {
+  currentSubscription = {
+    id: SUBSCRIPTION_ID,
+    status: 'active',
+    cancel_at_period_end: true,
+    current_period_start: 1_800_000_000,
+    current_period_end: 1_802_592_000,
+    metadata: membershipMetadata()
+  },
+  membershipRows = [{ id: 'membership-row-1', provider_subscription_id: SUBSCRIPTION_ID }],
+  providerError = null
+} = {}) {
+  const state = {
+    currentSubscription,
+    membershipRows,
+    providerCalls: [],
+    queries: [],
+    commits: 0,
+    rollbacks: 0,
+    updates: []
+  };
   const client = {
     async query(sql, params = []) {
-      clientQueries.push({ sql, params });
-      if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 };
+      state.queries.push({ sql, params });
+      if (sql === 'BEGIN') return { rows: [] };
+      if (sql === 'COMMIT') { state.commits += 1; return { rows: [] }; }
+      if (sql === 'ROLLBACK') { state.rollbacks += 1; return { rows: [] }; }
       if (sql.includes('INSERT INTO billing_webhook_events')) return { rows: [{ provider_event_id: params[0] }], rowCount: 1 };
-      if (sql.includes('UPDATE paid_memberships')) return { rows: [], rowCount: 1 };
+      if (sql.includes('FROM paid_memberships') && sql.includes('FOR UPDATE')) {
+        return { rows: state.membershipRows.map(row => ({ ...row })) };
+      }
+      if (sql.includes('UPDATE paid_memberships')) {
+        state.updates.push({ sql, params });
+        return { rows: [{ id: 'membership-row-1' }], rowCount: 1 };
+      }
       if (sql.includes('UPDATE billing_webhook_events')) return { rows: [], rowCount: 1 };
       throw new Error('Unexpected transaction query: ' + sql);
     },
     release() {}
   };
   const pool = {
-    async query(sql, params = []) {
-      poolQueries.push({ sql, params });
+    async query(sql) {
       if (sql.includes('FROM firewall_rules WHERE enabled=true')) return { rows: [] };
       throw new Error('Unexpected non-transaction query: ' + sql);
     },
     async connect() { return client; },
     async end() {}
   };
-
+  const stripeFetch = async (url, options) => {
+    state.providerCalls.push({ url: String(url), options });
+    if (providerError) throw providerError;
+    return {
+      ok: true,
+      status: 200,
+      async text() { return JSON.stringify(state.currentSubscription); }
+    };
+  };
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
       AI_PROVIDER: 'mock',
       STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
+      STRIPE_SECRET_KEY: 'sk_test_systemfabric_fixture',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
     pool,
+    stripeFetch,
     logger: { error() {} }
   });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(async () => {
-    await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      t.after(async () => {
+        await new Promise(done => server.close(done));
+        await server.systemfabric.close();
+      });
+      resolve({ state, base: 'http://127.0.0.1:' + server.address().port });
+    });
   });
+}
 
-  const base = 'http://127.0.0.1:' + server.address().port;
-  assert.equal((await fetch(base + '/health')).status, 200);
-  const firewallQueriesAfterWarmup = poolQueries.length;
+async function sendSubscriptionWebhook(base, event) {
+  const signed = signedPayload(event);
+  return fetch(base + '/api/v1/billing/stripe/webhook', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'stripe-signature': signed.signature },
+    body: signed.rawBody
+  });
+}
 
-  const validEvent = {
+test('Stripe subscription webhooks reconcile the current provider state, not stale event snapshots', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t);
+  const accepted = await sendSubscriptionWebhook(base, {
     id: 'evt_subscription_tenant_a',
+    created: 1,
     type: 'customer.subscription.updated',
     data: {
       object: {
         id: SUBSCRIPTION_ID,
         status: 'past_due',
-        cancel_at_period_end: true,
-        current_period_start: 1_800_000_000,
-        current_period_end: 1_802_592_000,
-        metadata: {
-          purchase_type: 'membership',
-          site_id: SITE_A,
-          user_id: USER_A,
-          membership_plan_id: PLAN_A
-        }
+        cancel_at_period_end: false,
+        metadata: membershipMetadata()
       }
     }
-  };
-  const valid = signedPayload(validEvent);
-  const accepted = await fetch(base + '/api/v1/billing/stripe/webhook', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'stripe-signature': valid.signature },
-    body: valid.rawBody
   });
   assert.equal(accepted.status, 200);
+  assert.equal(state.providerCalls.length, 1);
+  assert.equal(state.providerCalls[0].url, 'https://api.stripe.com/v1/subscriptions/' + SUBSCRIPTION_ID);
+  assert.equal(state.providerCalls[0].options.method, 'GET');
+  assert.equal(state.providerCalls[0].options.headers.authorization, 'Bearer sk_test_systemfabric_fixture');
 
-  const scopedUpdate = clientQueries.find(query => query.sql.includes('UPDATE paid_memberships'));
-  assert.ok(scopedUpdate, 'valid membership metadata must allow a subscription status update');
-  assert.match(scopedUpdate.sql, /WHERE site_id=\$1 AND provider='stripe' AND provider_subscription_id=\$2 AND user_id=\$3 AND plan_id=\$4/);
+  const scopedUpdate = state.updates[0];
+  assert.ok(scopedUpdate, 'a tenant-bound membership must be updated');
+  assert.match(scopedUpdate.sql, /WHERE id=\$1 AND site_id=\$2 AND user_id=\$3 AND plan_id=\$9/);
   assert.deepEqual(scopedUpdate.params, [
-    SITE_A, SUBSCRIPTION_ID, USER_A, PLAN_A, 'past_due', true, 1_800_000_000, 1_802_592_000
+    'membership-row-1', SITE_A, USER_A, SUBSCRIPTION_ID, 'active', true,
+    1_800_000_000, 1_802_592_000, PLAN_A
   ]);
+});
 
-  const beforeUnboundEvent = clientQueries.length;
-  const unboundEvent = {
+test('Basil and legacy invoice subscription metadata both trigger canonical state reconciliation', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t, {
+    currentSubscription: {
+      id: SUBSCRIPTION_ID,
+      status: 'paused',
+      cancel_at_period_end: false,
+      items: {
+        data: [
+          { id: 'si_monthly', current_period_start: 1_800_000_000, current_period_end: 1_802_592_000 },
+          { id: 'si_annual', current_period_start: 1_800_300_000, current_period_end: 1_900_000_000 }
+        ]
+      },
+      metadata: membershipMetadata()
+    }
+  });
+  for (const [eventId, details] of [
+    ['evt_invoice_basil', { parent: { subscription_details: { subscription: SUBSCRIPTION_ID, metadata: membershipMetadata() } } }],
+    ['evt_invoice_legacy', { subscription_details: { metadata: membershipMetadata() }, subscription: SUBSCRIPTION_ID }]
+  ]) {
+    const response = await sendSubscriptionWebhook(base, {
+      id: eventId,
+      type: 'invoice.payment_failed',
+      created: 2,
+      data: { object: { id: 'in_fixture', ...details } }
+    });
+    assert.equal(response.status, 200);
+    assert.equal(state.updates.at(-1).params[4], 'paused', 'the current Stripe subscription state is authoritative');
+    assert.equal(state.updates.at(-1).params[6], 1_800_300_000, 'Basil item periods use the latest item start');
+    assert.equal(state.updates.at(-1).params[7], 1_802_592_000, 'Basil item periods use the earliest item end');
+  }
+  assert.equal(state.providerCalls.length, 2);
+});
+
+test('unbound subscription events are ignored without provider reads or tenant mutations', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t);
+  const ignored = await sendSubscriptionWebhook(base, {
     id: 'evt_subscription_without_tenant_binding',
     type: 'customer.subscription.deleted',
-    data: {
-      object: {
-        id: SUBSCRIPTION_ID,
-        status: 'canceled',
-        cancel_at_period_end: false,
-        current_period_start: 0,
-        current_period_end: 0
-      }
-    }
-  };
-  const unbound = signedPayload(unboundEvent);
-  const ignored = await fetch(base + '/api/v1/billing/stripe/webhook', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'stripe-signature': unbound.signature },
-    body: unbound.rawBody
+    data: { object: { id: SUBSCRIPTION_ID, status: 'canceled' } }
   });
   assert.equal(ignored.status, 200);
-  assert.equal(
-    clientQueries.slice(beforeUnboundEvent).some(query => query.sql.includes('UPDATE paid_memberships')),
-    false,
-    'a signed subscription event without tenant binding must not update any tenant membership'
-  );
-  assert.equal(poolQueries.length, firewallQueriesAfterWarmup, 'subscription processing must not perform tenant reads outside the transaction');
+  assert.equal(state.providerCalls.length, 0);
+  assert.equal(state.updates.length, 0);
+});
+
+test('provider read failures roll back the webhook receipt so delivery can be retried', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t, {
+    providerError: new Error('test provider unavailable')
+  });
+  const response = await sendSubscriptionWebhook(base, {
+    id: 'evt_subscription_provider_unavailable',
+    type: 'customer.subscription.updated',
+    data: { object: { id: SUBSCRIPTION_ID, metadata: membershipMetadata() } }
+  });
+  assert.equal(response.status, 503);
+  assert.equal(state.commits, 0);
+  assert.equal(state.rollbacks, 1);
+  assert.equal(state.updates.length, 0);
+});
+
+test('subscription events received before the local membership row are retried, not acknowledged', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t, { membershipRows: [] });
+  const response = await sendSubscriptionWebhook(base, {
+    id: 'evt_subscription_before_membership_insert',
+    type: 'customer.subscription.created',
+    data: { object: { id: SUBSCRIPTION_ID, metadata: membershipMetadata() } }
+  });
+  assert.equal(response.status, 503);
+  assert.equal(state.providerCalls.length, 0);
+  assert.equal(state.commits, 0);
+  assert.equal(state.rollbacks, 1);
+  assert.equal(state.updates.length, 0);
+});
+
+test('mismatched current provider metadata cannot be rebound through an older signed event', async t => {
+  const { state, base } = await createSubscriptionWebhookHarness(t, {
+    currentSubscription: {
+      id: SUBSCRIPTION_ID,
+      status: 'active',
+      metadata: membershipMetadata({ user_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' })
+    }
+  });
+  const response = await sendSubscriptionWebhook(base, {
+    id: 'evt_subscription_mismatched_current_metadata',
+    type: 'customer.subscription.updated',
+    data: { object: { id: SUBSCRIPTION_ID, metadata: membershipMetadata() } }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(state.providerCalls.length, 1);
+  assert.equal(state.updates.length, 0);
 });
 
 const ORDER_A = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
