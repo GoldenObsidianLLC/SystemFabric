@@ -4,10 +4,12 @@ const path = require('node:path');
 const { loadEnvFile } = require('../../../scripts/load-env');
 const { createPostgresPool, createPostgresStore } = require('../../../packages/db/src/postgres-store');
 const { reconcileExpiredStripeCheckouts } = require('../../../packages/billing/src/checkout-reconciliation');
+const { initializeTracing, withSpan } = require('../../../packages/observability/src/tracing');
 
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL must be configured for scheduled publishing.');
+  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-scheduler', serviceVersion: require('../../../package.json').version });
   const pool = createPostgresPool(process.env); const store = createPostgresStore({ pool });
   const interval = Math.max(1000, Math.min(60_000, Number(process.env.SYSTEMFABRIC_SCHEDULER_INTERVAL_MS || 5000)));
   const controller = new AbortController(); process.on('SIGINT', () => controller.abort()); process.on('SIGTERM', () => controller.abort());
@@ -16,16 +18,28 @@ async function main() {
   try {
     while (!controller.signal.aborted) {
       try {
-        const published = await store.publishDue({ limit: 25 });
+        const published = await withSpan('scheduler.publish_due', {
+          'systemfabric.component': 'scheduler',
+          'systemfabric.operation': 'publish_due'
+        }, () => store.publishDue({ limit: 25 }));
         if (published.length) console.log(JSON.stringify({ type: 'systemfabric.scheduler.published', count: published.length, contentIds: published.map(row => row.id) }));
         if (process.env.STRIPE_SECRET_KEY) {
-          const reconciliation = await reconcileExpiredStripeCheckouts(pool, { secretKey: process.env.STRIPE_SECRET_KEY, batchSize: 100 });
+          const reconciliation = await withSpan('scheduler.checkout_reconciliation', {
+            'systemfabric.component': 'scheduler',
+            'systemfabric.operation': 'checkout_reconciliation'
+          }, () => reconcileExpiredStripeCheckouts(pool, { secretKey: process.env.STRIPE_SECRET_KEY, batchSize: 100 }));
           if (reconciliation.checked || reconciliation.errors || reconciliation.unlinked) console.log(JSON.stringify({ type: 'systemfabric.scheduler.checkout_reconciliation', ...reconciliation }));
         }
       } catch (error) { console.error(JSON.stringify({ type: 'systemfabric.scheduler.error', code: error.code || 'ERR_SCHEDULER', message: error.message })); }
       await new Promise(resolve => { const timer = setTimeout(resolve, interval); controller.signal.addEventListener('abort', () => { clearTimeout(timer); resolve(); }, { once: true }); });
     }
-  } finally { await pool.end(); }
+  } finally {
+    try {
+      await pool.end();
+    } finally {
+      await tracingRuntime.shutdown().catch(() => {});
+    }
+  }
 }
 if (require.main === module) main().catch(error => { console.error(`Scheduler failed: ${error.message}`); process.exitCode = 1; });
 module.exports = { main };

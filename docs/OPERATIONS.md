@@ -5,7 +5,7 @@
 1. Use Node.js `>=22.23.4`.
 2. Copy `.env.example` to `.env`; replace all example secrets.
 3. Start PostgreSQL: `docker compose up -d postgres`. Optional local Memgraph: `docker compose --profile graph up -d memgraph`.
-4. Run `npm install` after generating a reviewed package lockfile in a network-enabled environment. The lockfile is absent from this source snapshot because generation timed out in the build environment; production should use `npm ci`.
+4. Run `npm ci` to install the exact reviewed dependency graph in the tracked `package-lock.json`. Use `npm install` only when intentionally changing dependencies, then review the lockfile diff and run the full check suite.
 5. Run `npm run migrate`.
 6. Set `SYSTEMFABRIC_ADMIN_EMAIL`, `SYSTEMFABRIC_ADMIN_PASSWORD`, and the site name/slug; run `npm run bootstrap:owner` once.
 7. Start API with `npm start`, then open `http://127.0.0.1:8787/admin`.

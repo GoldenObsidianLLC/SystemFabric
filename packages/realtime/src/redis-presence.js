@@ -1,5 +1,6 @@
 'use strict';
 
+const { instrumentRedisClient } = require('../../observability/src/tracing');
 const { createHash } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
 const { createPresenceService, AVAILABILITY } = require('./presence');
@@ -266,7 +267,7 @@ async function createRedisPresenceService({
     throw new TypeError('onExpired and onError must be functions.');
   }
   const createClient = createClientOverride || require('redis').createClient;
-  const client = createClient({
+  const client = instrumentRedisClient(createClient({
     url,
     socket: {
       connectTimeout: 5_000,
@@ -276,7 +277,7 @@ async function createRedisPresenceService({
         return Math.min(100 * retries, 2_000);
       }
     }
-  });
+  }));
   client.on?.('error', error => {
     try { metrics?.increment?.('redis_errors_total'); } catch {}
     try { onError({ errorCode: String(error?.code || 'ERR_REDIS_CONNECTION').slice(0, 100) }); } catch {}

@@ -4,8 +4,9 @@ const http = require('node:http');
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { createContainerPluginRunner } = require('../../../packages/plugins/src/container-runner');
 const { validatePinnedImageDigest } = require('../../../packages/plugins/src/manifest');
-const { createTraceContext, runWithTraceContext } = require('../../../packages/observability/src/trace-context');
+const { createTraceContext } = require('../../../packages/observability/src/trace-context');
 const { createStructuredLogger } = require('../../../packages/observability/src/structured-logger');
+const { initializeTracing, runWithServerSpan, setHttpStatus } = require('../../../packages/observability/src/tracing');
 
 function sameSecret(candidate, expected) {
   if (typeof candidate !== 'string' || typeof expected !== 'string' || expected.length < 32) return false;
@@ -51,8 +52,13 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console 
       incomingTraceparent: req.headers.traceparent,
       trustRemote: true
     });
-    res.setHeader('x-trace-id', traceContext.traceId);
-    return runWithTraceContext(traceContext, async () => {
+    return runWithServerSpan(traceContext, async invocationSpan => {
+      res.setHeader('x-trace-id', traceContext.traceId);
+      const originalWriteHead = res.writeHead;
+      res.writeHead = function (statusCode, ...args) {
+        setHttpStatus(invocationSpan, statusCode);
+        return originalWriteHead.call(this, statusCode, ...args);
+      };
       const started = Date.now();
       let statusCode = 500;
       let outcome = 'failure';
@@ -77,6 +83,7 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console 
         errorType = error.name || 'Error';
         return json(statusCode, { error: error.message || 'Invocation failed.', code });
       } finally {
+        setHttpStatus(invocationSpan, statusCode);
         structuredLogger.emit(statusCode >= 500 ? 'error' : 'info', 'systemfabric.plugin_runner.invocation_completed', {
           method: req.method,
           route: '/v1/invoke',
@@ -88,6 +95,10 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console 
           component: 'plugin-runner'
         });
       }
+    }, {
+      'systemfabric.component': 'plugin_runner',
+      'systemfabric.operation': 'invoke',
+      'http.request.method': req.method
     });
   });
   return server;
@@ -95,7 +106,10 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console 
 if (require.main === module) {
   const token = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN;
   if (!token || token.length < 32) { console.error('Set SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN to at least 32 characters.'); process.exit(1); }
+  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-plugin-runner', serviceVersion: require('../../../package.json').version });
   const server = createPluginRunnerServer(); const host = process.env.PLUGIN_RUNNER_HOST || '127.0.0.1'; const port = Number(process.env.PLUGIN_RUNNER_PORT || 9090);
   server.listen(port, host, () => console.error(JSON.stringify({ type:'systemfabric.plugin_runner.started', host, port })));
+  const shutdown = () => server.close(async () => { await tracingRuntime.shutdown().catch(() => {}); process.exit(0); });
+  process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
 }
 module.exports = { createPluginRunnerServer, sameSecret };

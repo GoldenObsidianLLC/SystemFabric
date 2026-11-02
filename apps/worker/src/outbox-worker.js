@@ -6,6 +6,7 @@ const { loadEnvFile } = require('../../../scripts/load-env');
 const { createPostgresPool } = require('../../../packages/db/src/postgres-store');
 const { createOutboxDeliveryWorker } = require('../../../packages/db/src/outbox-delivery');
 const { createMemgraphDriver, createMemgraphProjector } = require('../../../packages/graph/src/memgraph-store');
+const { initializeTracing, withSpan } = require('../../../packages/observability/src/tracing');
 
 const DEFAULT_GRAPH_CONSUMER_GROUP = 'graph.projection.v1';
 const GRAPH_PROJECTION_EVENT_TYPES = Object.freeze([
@@ -49,12 +50,12 @@ function createGraphProjectionWorker({
     leaseMs,
     maxAttempts,
     onError,
-    handler: ({ type, payload, envelope, delivery }) => projector.apply({
-      type,
-      payload,
-      envelope,
-      delivery
-    })
+    handler: ({ type, payload, envelope, delivery }) => withSpan('graph.projection.apply', {
+      'systemfabric.component': 'graph',
+      'systemfabric.operation': type,
+      'db.system': 'memgraph',
+      'db.operation.name': 'write'
+    }, () => projector.apply({ type, payload, envelope, delivery }))
   });
 }
 
@@ -65,6 +66,7 @@ async function main() {
   }
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL must be configured for the outbox worker.');
   if (process.env.MEMGRAPH_ENABLED !== 'true') throw new Error('MEMGRAPH_ENABLED=true is required to run the graph projection worker.');
+  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-outbox-worker', serviceVersion: require('../../../package.json').version });
 
   const pool = createPostgresPool(process.env);
   const driver = createMemgraphDriver({
@@ -112,8 +114,8 @@ async function main() {
   try {
     await worker.run({ signal: controller.signal, pollMs });
   } finally {
-    await driver.close();
-    await pool.end();
+    await Promise.allSettled([driver.close(), pool.end()]);
+    await tracingRuntime.shutdown().catch(() => {});
   }
 }
 

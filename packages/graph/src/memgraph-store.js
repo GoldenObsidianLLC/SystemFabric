@@ -1,5 +1,7 @@
 'use strict';
 
+const { withClientSpan } = require('../../observability/src/tracing');
+
 const ALLOWED_RELATIONSHIPS = new Set(['HAS_TERM', 'PARENT_OF', 'RELATED_TO', 'LOCALIZED_AS', 'NAVIGATES_TO']);
 const NODE_LABELS = new Set(['content', 'term']);
 const CONTENT_STATUS_EVENT_TYPES = new Set([
@@ -30,8 +32,14 @@ function createMemgraphProjector({ driver }) {
 
   async function execute(cypher, params) {
     const session = driver.session();
-    try { return await session.executeWrite(tx => tx.run(cypher, params)); }
-    finally { await session.close(); }
+    try {
+      return await withClientSpan('db.memgraph.write', {
+        'systemfabric.component': 'graph',
+        'systemfabric.operation': 'write',
+        'db.system': 'memgraph',
+        'db.operation.name': 'write'
+      }, () => session.executeWrite(tx => tx.run(cypher, params)));
+    } finally { await session.close(); }
   }
 
   return Object.freeze({
@@ -154,10 +162,15 @@ function createMemgraphProjector({ driver }) {
         : 20;
       const session = driver.session();
       try {
-        const result = await session.run(
+        const result = await withClientSpan('db.memgraph.query', {
+          'systemfabric.component': 'graph',
+          'systemfabric.operation': 'query',
+          'db.system': 'memgraph',
+          'db.operation.name': 'read'
+        }, () => session.run(
           `MATCH (s:Content {id:$id,siteId:$siteId})-[r:${kind}]->(t:Content {siteId:$siteId}) WHERE s.status='published' AND t.status='published' AND coalesce(r.status,'active') <> 'deleted' RETURN t.id AS id,t.slug AS slug,t.contentType AS contentType,t.locale AS locale,t.status AS status,t.version AS version LIMIT ${safeLimit}`,
           { id, siteId }
-        );
+        ));
         return result.records.map(record => Object.fromEntries(['id','slug','contentType','locale','status','version'].map(key => [key, record.get(key)])));
       } finally { await session.close(); }
     },

@@ -1,5 +1,6 @@
 'use strict';
 
+const { instrumentRedisClient } = require('../../observability/src/tracing');
 const { randomUUID } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
 const { validateCollaborationOperation } = require('../../collaboration/src');
@@ -175,8 +176,8 @@ async function createRedisRealtimeBridge({
       }
     }
   };
-  const publisher = createClient(clientOptions);
-  const subscriber = createClient(clientOptions);
+  const publisher = instrumentRedisClient(createClient(clientOptions));
+  const subscriber = instrumentRedisClient(createClient(clientOptions));
   const instanceId = randomUUID();
   const presencePattern = channelPrefix + ':*:presence';
   const authorizationPattern = channelPrefix + ':authorization';

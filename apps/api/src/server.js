@@ -29,8 +29,9 @@ const { validateMenuItems } = require('../../../packages/domain/src/navigation')
 const { validateContentTypeDefinition, validateRecordValues, NAME_RE: CONTENT_TYPE_NAME_RE } = require('../../../packages/domain/src/content-types');
 const { renderPageDocument, rendererInfo } = require('../../../packages/render/src');
 const { createRequestMetrics, createRealtimeMetrics } = require('../../../packages/observability/src/metrics');
-const { createTraceContext, runWithTraceContext } = require('../../../packages/observability/src/trace-context');
+const { createTraceContext } = require('../../../packages/observability/src/trace-context');
 const { createStructuredLogger } = require('../../../packages/observability/src/structured-logger');
+const { initializeTracing, runWithServerSpan, setHttpStatus } = require('../../../packages/observability/src/tracing');
 const { createRealtimeHub } = require('../../../packages/realtime/src/event-hub');
 const { createMemoryPresenceAdapter, createPresenceService } = require('../../../packages/realtime/src/presence');
 const { createRedisPresenceService } = require('../../../packages/realtime/src/redis-presence');
@@ -512,9 +513,15 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     res.setHeader('x-frame-options', 'SAMEORIGIN'); res.setHeader('permissions-policy', 'camera=(), microphone=(), geolocation=(), payment=()');
     res.setHeader('cross-origin-opener-policy', 'same-origin'); res.setHeader('x-permitted-cross-domain-policies', 'none');
     if (env.NODE_ENV === 'production' && secureCookies) res.setHeader('strict-transport-security', `max-age=${boundedInt(env.SYSTEMFABRIC_HSTS_MAX_AGE, 15552000, 0, 63072000, 'SYSTEMFABRIC_HSTS_MAX_AGE')}; includeSubDomains`);
-    return runWithTraceContext(traceContext, async () => {
+    return runWithServerSpan(traceContext, async requestSpan => {
       const started = Date.now();
+      const originalWriteHead = res.writeHead;
+      res.writeHead = function (statusCode, ...args) {
+        setHttpStatus(requestSpan, statusCode);
+        return originalWriteHead.call(this, statusCode, ...args);
+      };
       res.once('finish', () => {
+        setHttpStatus(requestSpan, res.statusCode);
         const pathname = (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })();
         const durationMs = Date.now() - started;
         requestMetrics.record({ method: req.method, pathname, statusCode: res.statusCode, durationMs });
@@ -1592,6 +1599,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     } catch (error) {
       const status = Number.isInteger(error.statusCode) ? error.statusCode : error.code === 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT' ? 422 : 500;
       const errorPath = (() => { try { return new URL(req.url, 'http://localhost').pathname; } catch { return '/other'; } })();
+      setHttpStatus(requestSpan, status);
       structuredLogger.emit('error', 'systemfabric.http.error', {
         requestId,
         method: req.method,
@@ -1605,6 +1613,10 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       if (status === 429 && error.retryAfterSeconds) res.setHeader('retry-after', String(error.retryAfterSeconds));
       return sendJson(res, status, { error: error.message, code: error.code || 'ERR_SYSTEMFABRIC_REQUEST', details: error.details, requestId });
       }
+    }, {
+      'systemfabric.component': 'api',
+      'systemfabric.operation': 'http_request',
+      'http.request.method': req.method
     });
   }
 
@@ -1635,7 +1647,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       incomingTraceparent: req.headers.traceparent,
       trustRemote: env.SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE === 'true'
     });
-    void runWithTraceContext(traceContext, async () => {
+    void runWithServerSpan(traceContext, async upgradeSpan => {
       const started = Date.now();
       let upgradePath = '/other';
       try {
@@ -1690,9 +1702,11 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         siteId,
         topic: 'presence'
       });
+      setHttpStatus(upgradeSpan, 101);
       structuredLogger.requestCompleted({ requestId, method: req.method, route: requestMetrics.normalizeRoute(upgradePath), statusCode: 101, elapsedMs: Date.now() - started });
     } catch (error) {
       const status = Number.isInteger(error.statusCode) ? error.statusCode : 500;
+      setHttpStatus(upgradeSpan, status);
       structuredLogger.emit('warn', 'systemfabric.http.websocket_upgrade_rejected', {
         requestId,
         method: req.method,
@@ -1704,6 +1718,10 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
       });
       rejectWebSocketUpgrade(socket, error);
     }
+    }, {
+      'systemfabric.component': 'realtime',
+      'systemfabric.operation': 'websocket_upgrade',
+      'http.request.method': req.method
     });
   });
 
@@ -1738,6 +1756,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
+  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-api', serviceVersion: SYSTEMFABRIC_VERSION });
   let presenceService = null;
   let realtimeBridge = null;
   let realtimeConnectionLimiter = null;
@@ -1804,7 +1823,7 @@ async function main() {
   }
   const host = process.env.HOST || '127.0.0.1'; const port = Number(process.env.PORT || 8787);
   server.listen(port, host, () => console.error(JSON.stringify({ type: 'systemfabric.api.started', host, port, version: SYSTEMFABRIC_VERSION, aiProvider: server.systemfabric ? 'configured' : 'unknown', realtimeMode: server.systemfabric.realtimeMode, presenceStore: server.systemfabric.presenceStore })));
-  const shutdown = async () => { server.close(async () => { await server.systemfabric.close().catch(() => {}); process.exit(0); }); setTimeout(() => process.exit(1), 5000).unref(); };
+  const shutdown = async () => { server.close(async () => { await server.systemfabric.close().catch(() => {}); await tracingRuntime.shutdown().catch(() => {}); process.exit(0); }); setTimeout(() => process.exit(1), 5000).unref(); };
   process.on('SIGINT', shutdown); process.on('SIGTERM', shutdown);
 }
 if (require.main === module) void main().catch(error => { console.error(`SystemFabric failed to start: ${error.message}`); process.exitCode = 1; });

@@ -20,7 +20,7 @@ This directory contains task-oriented documentation. The root [README](../README
 | Understand the proposed real-time, collaboration and AI architecture | [Real-Time and AI Architecture](REALTIME-AI-ARCHITECTURE.md) |
 | Review the implemented developer-preview presence foundation and its limits | [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) |
 | Operate and troubleshoot the real-time preview without overstating its guarantees | [Real-Time Operations Runbook](REALTIME-OPERATIONS.md) |
-| Understand trace correlation, trusted trace context, and safe structured logs | [Observability and Trace Correlation](OBSERVABILITY.md) |
+| Understand trace correlation, opt-in OpenTelemetry spans/OTLP export, trust boundaries and safe attributes | [Observability and Trace Correlation](OBSERVABILITY.md) |
 | Review the CRDT/OT evaluation and collaborative editing recommendation | [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) |
 | Review existing AI provider adapters and integration boundaries | [AI Integration](AI-INTEGRATION.md) |
 | Review recorded architecture trade-offs | [Architecture Decisions](ARCHITECTURE-DECISIONS.md) |

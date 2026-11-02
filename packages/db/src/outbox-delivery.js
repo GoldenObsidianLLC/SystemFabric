@@ -2,6 +2,7 @@
 
 const { randomUUID } = require('node:crypto');
 const { eventEnvelopeFromOutboxRow } = require('../../realtime/src/event-contract');
+const { withSpan } = require('../../observability/src/tracing');
 
 const CONSUMER_GROUP_PATTERN = /^[a-z][a-z0-9._-]{0,99}$/;
 const EVENT_TYPE_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
@@ -156,12 +157,15 @@ function createOutboxDeliveryWorker({
     let envelope;
     try {
       envelope = eventEnvelopeFromOutboxRow(event);
-      await handler({
+      await withSpan('outbox.process_event', {
+        'systemfabric.component': 'outbox',
+        'systemfabric.operation': event.event_type
+      }, () => handler({
         type: event.event_type,
         payload: event.payload,
         envelope,
         delivery: { consumerGroup, attempt: Number(event.delivery_attempts) }
-      });
+      }));
       const acknowledged = await pool.query(
         `UPDATE outbox_deliveries
             SET status = 'processed',
@@ -209,12 +213,17 @@ function createOutboxDeliveryWorker({
 
   return Object.freeze({
     async runOnce() {
-      await ensureConsumerGroup();
-      const dispatched = await dispatchBatch();
-      const claim = await claimBatch();
-      const results = [];
-      for (const event of claim.rows) results.push(await processOne(event, claim.claimToken));
-      return { dispatched, claimed: claim.rows.length, results };
+      return withSpan('outbox.run_once', {
+        'systemfabric.component': 'outbox',
+        'systemfabric.operation': 'run_once'
+      }, async () => {
+        await ensureConsumerGroup();
+        const dispatched = await dispatchBatch();
+        const claim = await claimBatch();
+        const results = [];
+        for (const event of claim.rows) results.push(await processOne(event, claim.claimToken));
+        return { dispatched, claimed: claim.rows.length, results };
+      });
     },
     async run({ signal, pollMs = 1000 } = {}) {
       if (!Number.isInteger(pollMs) || pollMs < 0) throw new RangeError('pollMs must be a non-negative integer.');
