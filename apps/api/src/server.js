@@ -19,7 +19,7 @@ const { createClamDScanScanner } = require('../../../packages/security/src/malwa
 const { createCloudStorageAdapterFromEnv } = require('../../../packages/cloud/src/storage-adapters');
 const { createFirewall } = require('../../../packages/security/src/firewall');
 const { handlePlatformRoute } = require('./platform-routes');
-const { verifyStripeSignature, digestWebhookBody } = require('../../../packages/billing/src/stripe');
+const { verifyStripeSignature, digestWebhookBody, normalizeStripeRefundStatus } = require('../../../packages/billing/src/stripe');
 const { releaseOrderStockReservations, commitOrderStockReservations } = require('../../../packages/commerce/src/stock-reservations');
 const { validatePluginManifest, validatePinnedImageDigest } = require('../../../packages/plugins/src/manifest');
 const { createWidgetRegistry } = require('../../../packages/widgets/src/registry');
@@ -905,6 +905,70 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
                 orderId: row.id,
                 status: 'released'
               });
+            }
+          }
+          if (['refund.created', 'refund.updated', 'refund.failed'].includes(event.type)) {
+            const md = object.metadata || {};
+            const siteId = ID_RE.test(md.site_id || '') ? md.site_id : null;
+            const orderId = ID_RE.test(md.order_id || '') ? md.order_id : null;
+            const refundId = ID_RE.test(md.refund_id || '') ? md.refund_id : null;
+            const providerRefundId = typeof object.id === 'string' && /^re_[A-Za-z0-9]+$/.test(object.id)
+              ? object.id
+              : null;
+            const paymentIntentId = typeof object.payment_intent === 'string'
+              ? object.payment_intent
+              : object.payment_intent && typeof object.payment_intent.id === 'string'
+                ? object.payment_intent.id
+                : null;
+            const amountMinor = Number.isSafeInteger(object.amount) && object.amount > 0
+              ? object.amount
+              : null;
+            const currency = typeof object.currency === 'string' && /^[a-zA-Z]{3}$/.test(object.currency)
+              ? object.currency.toUpperCase()
+              : null;
+            const providerStatus = event.type === 'refund.failed' ? 'failed' : object.status;
+            const refundStatus = normalizeStripeRefundStatus(providerStatus);
+
+            // All refund mutations acquire locks in the same order as the API:
+            // order first, refund row second. This prevents an API retry and a
+            // webhook from deadlocking while each tries to update the other row.
+            // Provider IDs alone are never used as tenant selectors.
+            if (siteId && orderId && refundId && providerRefundId && paymentIntentId && amountMinor && currency) {
+              const boundOrder = await client.query(
+                `SELECT id,site_id,total_minor,status
+                   FROM commerce_orders
+                  WHERE site_id=$1 AND id=$2 AND provider='stripe' AND provider_payment_id=$3
+                  FOR UPDATE`,
+                [siteId, orderId, paymentIntentId]
+              );
+              const order = boundOrder.rows[0];
+              if (order) {
+                const applied = await client.query(
+                `UPDATE commerce_refunds
+                    SET provider_refund_id=COALESCE(provider_refund_id,$1),
+                        status=CASE WHEN status IN ('succeeded','failed','cancelled') THEN status ELSE $7 END,
+                        updated_at=now()
+                  WHERE site_id=$2 AND order_id=$3 AND provider='stripe'
+                    AND amount_minor=$4 AND upper(currency)=$5
+                    AND (provider_refund_id=$1 OR (provider_refund_id IS NULL AND id=$6))
+                  RETURNING id,site_id,order_id,status`,
+                [providerRefundId, siteId, orderId, amountMinor, currency, refundId, refundStatus]
+              );
+              const refund = applied.rows[0];
+              if (refund?.status === 'succeeded') {
+                await client.query(
+                  `UPDATE commerce_orders
+                      SET status='refunded',updated_at=now()
+                    WHERE site_id=$1 AND id=$2 AND provider='stripe'
+                      AND status IN ('paid','processing','fulfilled')
+                      AND (SELECT COALESCE(SUM(r.amount_minor),0)
+                             FROM commerce_refunds r
+                            WHERE r.site_id=$1 AND r.order_id=$2
+                              AND r.provider='stripe' AND r.status='succeeded') >= total_minor`,
+                  [refund.site_id, refund.order_id]
+                );
+                }
+              }
             }
           }
           if (event.type.startsWith('customer.subscription.') && typeof object.id === 'string') {

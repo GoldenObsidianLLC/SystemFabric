@@ -7,7 +7,7 @@ const { normalizeCart, validateProduct, calculateLineTotal } = require('../../..
 const { validateProfile, validateGroup, cleanText } = require('../../../packages/community/src/validation');
 const { validateIpPattern } = require('../../../packages/security/src/firewall');
 const { cloudConfigStatus, createCloudStorageAdapterFromEnv, probeCloudStorageAdapter, resolveCloudCredentialReference, cloudEndpointAllowed } = require('../../../packages/cloud/src/storage-adapters');
-const { createStripeCheckoutSession } = require('../../../packages/billing/src/stripe');
+const { createStripeCheckoutSession, createStripeRefund, normalizeStripeRefundStatus } = require('../../../packages/billing/src/stripe');
 const { validateMenuItems } = require('../../../packages/domain/src/navigation');
 const { randomUUID } = require('node:crypto');
 const { handleCommunityWorkflowRoute } = require('../../../packages/community/src/workflows');
@@ -103,6 +103,226 @@ async function handlePlatformRoute(ctx) {
     // Admin-created orders are possible, but payment checkout is handled through the customer-facing endpoint below.
     throw fail(409,'ERR_SYSTEMFABRIC_CHECKOUT_ENDPOINT','Use the public checkout endpoint; administrators cannot set order totals directly.');
   }
+  const orderRefunds = pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/commerce\/orders\/([0-9a-f-]{36})\/refunds$/i);
+  if (method === 'POST' && orderRefunds) {
+    if (!localPool) throw fail(503, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED', 'Refunds require PostgreSQL.');
+    const siteId = orderRefunds[1];
+    const orderId = orderRefunds[2];
+    const body = await readJson(req, Math.min(maxBody, 16_000));
+    await siteIdFor({ req, url, body, actor, routeSiteId: siteId });
+    await requireCapability(actor, siteId, 'commerce:manage');
+
+    if (typeof env.STRIPE_SECRET_KEY !== 'string' || !env.STRIPE_SECRET_KEY.startsWith('sk_')) {
+      throw fail(503, 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 'Stripe refunds are not configured.');
+    }
+    if (!safeObject(body, 16_000)) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_REFUND_REQUEST_INVALID', 'Refund request must be a JSON object.');
+    }
+    const amountMinor = body.amountMinor;
+    const reason = body.reason === undefined ? 'requested_by_customer' : body.reason;
+    const bodyIdempotencyKey = body.idempotencyKey;
+    const headerIdempotencyKey = req.headers?.['idempotency-key'];
+    if (bodyIdempotencyKey && headerIdempotencyKey && bodyIdempotencyKey !== headerIdempotencyKey) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_REFUND_IDEMPOTENCY', 'The body and Idempotency-Key header must match when both are supplied.');
+    }
+    const idempotencyKey = headerIdempotencyKey || bodyIdempotencyKey;
+    if (!Number.isSafeInteger(amountMinor) || amountMinor < 1) {
+      throw fail(422, 'ERR_SYSTEMFABRIC_REFUND_AMOUNT', 'Refund amount must be a positive safe integer in the order currency minor unit.');
+    }
+    if (!['duplicate', 'fraudulent', 'requested_by_customer'].includes(reason)) {
+      throw fail(422, 'ERR_SYSTEMFABRIC_REFUND_REASON', 'Refund reason is invalid.');
+    }
+    if (typeof idempotencyKey !== 'string' || !/^[A-Za-z0-9_-]{8,120}$/.test(idempotencyKey)) {
+      throw fail(400, 'ERR_SYSTEMFABRIC_REFUND_IDEMPOTENCY', 'A valid refund idempotency key is required.');
+    }
+
+    let refund;
+    let paymentIntentId;
+    let refundIsReplay = false;
+    const client = await localPool.connect();
+    try {
+      await client.query('BEGIN');
+      const orderResult = await client.query(
+        'SELECT id,status,currency,total_minor,provider,provider_payment_id FROM commerce_orders WHERE site_id=$1 AND id=$2 FOR UPDATE',
+        [siteId, orderId]
+      );
+      const order = orderResult.rows[0];
+      if (!order) throw fail(404, 'ERR_SYSTEMFABRIC_ORDER_NOT_FOUND', 'Order not found.');
+      if (order.provider !== 'stripe' || typeof order.provider_payment_id !== 'string' || !/^pi_[A-Za-z0-9]+$/.test(order.provider_payment_id)) {
+        throw fail(409, 'ERR_SYSTEMFABRIC_REFUND_PAYMENT_UNAVAILABLE', 'This order has no confirmed Stripe payment available for refund.');
+      }
+      paymentIntentId = order.provider_payment_id;
+      const currency = String(order.currency || '').toUpperCase();
+
+      const existingResult = await client.query(
+        'SELECT id,site_id,order_id,provider,provider_refund_id,amount_minor,currency,reason,status,created_at,updated_at FROM commerce_refunds WHERE site_id=$1 AND order_id=$2 AND idempotency_key=$3 FOR UPDATE',
+        [siteId, orderId, idempotencyKey]
+      );
+      refund = existingResult.rows[0] || null;
+      if (refund) {
+        refundIsReplay = true;
+        if (
+          refund.provider !== 'stripe' ||
+          BigInt(refund.amount_minor) !== BigInt(amountMinor) ||
+          String(refund.currency).toUpperCase() !== currency ||
+          String(refund.reason) !== reason
+        ) {
+          throw fail(409, 'ERR_SYSTEMFABRIC_REFUND_IDEMPOTENCY_CONFLICT', 'This refund idempotency key was already used with different refund parameters.');
+        }
+        if (['succeeded', 'failed', 'cancelled'].includes(refund.status)) {
+          await client.query('COMMIT');
+          return sendJson(res, 200, {
+            refund: {
+              id: refund.id,
+              providerRefundId: refund.provider_refund_id || null,
+              amountMinor: Number(refund.amount_minor),
+              currency: String(refund.currency).toUpperCase(),
+              reason: refund.reason,
+              status: refund.status
+            },
+            idempotentReplay: true,
+            requestId
+          });
+        }
+      } else {
+        if (!['paid', 'processing', 'fulfilled'].includes(order.status)) {
+          throw fail(409, 'ERR_SYSTEMFABRIC_REFUND_ORDER_STATE', 'Only a paid, processing, or fulfilled order can be refunded.');
+        }
+        const reservedResult = await client.query(
+          "SELECT COALESCE(SUM(amount_minor),0)::text AS reserved_minor FROM commerce_refunds WHERE site_id=$1 AND order_id=$2 AND status IN ('requested','pending','succeeded')",
+          [siteId, orderId]
+        );
+        const alreadyReserved = BigInt(reservedResult.rows[0]?.reserved_minor || '0');
+        const orderTotal = BigInt(order.total_minor);
+        if (alreadyReserved + BigInt(amountMinor) > orderTotal) {
+          throw fail(409, 'ERR_SYSTEMFABRIC_REFUND_EXCEEDS_BALANCE', 'Refund amount exceeds the remaining refundable order balance.');
+        }
+        const inserted = await client.query(
+          "INSERT INTO commerce_refunds(site_id,order_id,provider,amount_minor,currency,reason,status,created_by,idempotency_key) VALUES($1,$2,'stripe',$3,$4,$5,'requested',$6,$7) RETURNING id,site_id,order_id,provider,provider_refund_id,amount_minor,currency,reason,status,created_at,updated_at",
+          [siteId, orderId, amountMinor, currency, reason, actor?.user?.id || null, idempotencyKey]
+        );
+        refund = inserted.rows[0];
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    let providerRefund;
+    try {
+      providerRefund = await createStripeRefund({
+        secretKey: env.STRIPE_SECRET_KEY,
+        paymentIntentId,
+        amountMinor: Number(refund.amount_minor),
+        reason: refund.reason,
+        idempotencyKey: `sf_refund_${refund.id}`,
+        metadata: { site_id: siteId, order_id: orderId, refund_id: refund.id }
+      });
+    } catch (error) {
+      if (error.code !== 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN') {
+        const update = await localPool.connect();
+        try {
+          await update.query('BEGIN');
+          await update.query(
+            "UPDATE commerce_refunds SET status='failed',updated_at=now() WHERE site_id=$1 AND order_id=$2 AND id=$3 AND provider='stripe' AND status IN ('requested','pending')",
+            [siteId, orderId, refund.id]
+          );
+          await update.query('COMMIT');
+        } catch {
+          await update.query('ROLLBACK').catch(() => {});
+          throw fail(502, 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 'Refund rejection could not be recorded; retry with the same idempotency key.');
+        } finally {
+          update.release();
+        }
+      }
+      if (error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN') {
+        throw fail(502, error.code, 'Refund provider outcome is unknown. Retry with the same idempotency key to recover the existing refund.');
+      }
+      throw fail(502, error.code || 'ERR_SYSTEMFABRIC_BILLING_PROVIDER', 'Stripe rejected the refund request.');
+    }
+
+    if (providerRefund.currency !== String(refund.currency).toUpperCase()) {
+      throw fail(502, 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 'Stripe refund currency did not match the order. Reconcile before retrying with the same idempotency key.');
+    }
+
+    const internalStatus = normalizeStripeRefundStatus(providerRefund.status);
+    const persist = await localPool.connect();
+    let savedRefund;
+    try {
+      await persist.query('BEGIN');
+      // Match the webhook and request-reservation lock order (order, then refund)
+      // so an in-flight webhook cannot deadlock local provider-response persistence.
+      const persistOrder = await persist.query(
+        `SELECT id
+           FROM commerce_orders
+          WHERE site_id=$1 AND id=$2 AND provider='stripe' AND provider_payment_id=$3
+          FOR UPDATE`,
+        [siteId, orderId, paymentIntentId]
+      );
+      if (!persistOrder.rows[0]) {
+        throw fail(502, 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 'Stripe accepted the refund but the local order binding changed. Reconcile before retrying.');
+      }
+      const saved = await persist.query(
+        `UPDATE commerce_refunds
+            SET provider_refund_id=COALESCE(provider_refund_id,$4),
+                status=CASE WHEN status IN ('succeeded','failed','cancelled') THEN status ELSE $5 END,
+                updated_at=now()
+          WHERE site_id=$1 AND order_id=$2 AND id=$3 AND provider='stripe'
+            AND (provider_refund_id IS NULL OR provider_refund_id=$4)
+          RETURNING id,provider_refund_id,amount_minor,currency,reason,status`,
+        [siteId, orderId, refund.id, providerRefund.id, internalStatus]
+      );
+      savedRefund = saved.rows[0] || null;
+      if (!savedRefund) {
+        throw fail(502, 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 'Stripe created a refund but its local provider binding did not match. Reconcile before retrying.');
+      }
+      if (savedRefund.status === 'succeeded') {
+        await persist.query(
+          `UPDATE commerce_orders
+              SET status='refunded',updated_at=now()
+            WHERE site_id=$1 AND id=$2 AND provider='stripe'
+              AND status IN ('paid','processing','fulfilled')
+              AND (SELECT COALESCE(SUM(r.amount_minor),0)
+                     FROM commerce_refunds r
+                    WHERE r.site_id=$1 AND r.order_id=$2 AND r.provider='stripe' AND r.status='succeeded') >= total_minor`,
+          [siteId, orderId]
+        );
+      }
+      await persist.query('COMMIT');
+    } catch (error) {
+      await persist.query('ROLLBACK').catch(() => {});
+      if (error.code) throw error;
+      throw fail(502, 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 'Stripe accepted the refund but local status persistence did not complete. Retry with the same idempotency key.');
+    } finally {
+      persist.release();
+    }
+
+    await identity?.audit({
+      siteId,
+      actorId: actor?.user?.id || null,
+      action: 'commerce.refund_requested',
+      targetType: 'commerce-refund',
+      targetId: savedRefund.id,
+      requestId,
+      details: { amountMinor: Number(savedRefund.amount_minor), currency: String(savedRefund.currency).toUpperCase(), status: savedRefund.status }
+    });
+    return sendJson(res, 200, {
+      refund: {
+        id: savedRefund.id,
+        providerRefundId: savedRefund.provider_refund_id,
+        amountMinor: Number(savedRefund.amount_minor),
+        currency: String(savedRefund.currency).toUpperCase(),
+        reason: savedRefund.reason,
+        status: savedRefund.status
+      },
+      idempotentReplay: refundIsReplay,
+      requestId
+    });
+  }
+
   const orderCheckout = pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/commerce\/checkout$/i);
   if (method === 'POST' && orderCheckout) {
     if (!localPool) throw fail(503, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED', 'Checkout requires PostgreSQL.');
