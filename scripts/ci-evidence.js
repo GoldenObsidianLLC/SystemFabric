@@ -221,9 +221,32 @@ function validateManifestDirectory(directory, expected) {
       throw new Error('Artifact root must be a real directory, not a symbolic link.');
     }
     const manifestFile = path.join(directory, 'manifest.json');
-    const stat = fs.lstatSync(manifestFile);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Manifest must be a regular file.');
-    manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+    // O_NOFOLLOW rejects symlinks atomically where the platform supports it.
+    // On platforms without it, bind a pre-open lstat identity to the descriptor.
+    const noFollow = fs.constants.O_NOFOLLOW || 0;
+    let pathStat = null;
+    if (!noFollow) {
+      pathStat = fs.lstatSync(manifestFile);
+      if (!pathStat.isFile() || pathStat.isSymbolicLink()) throw new Error('Manifest must be a regular file.');
+    }
+    const descriptor = fs.openSync(manifestFile, fs.constants.O_RDONLY | noFollow);
+    let manifestSource;
+    try {
+      const before = fs.fstatSync(descriptor);
+      if (!before.isFile() || (pathStat && (before.dev !== pathStat.dev || before.ino !== pathStat.ino))) {
+        throw new Error('Manifest changed before it could be opened safely.');
+      }
+      const beforeSignature = before.size + ':' + before.mtimeMs + ':' + before.ctimeMs;
+      manifestSource = fs.readFileSync(descriptor, 'utf8');
+      const after = fs.fstatSync(descriptor);
+      const afterSignature = after.size + ':' + after.mtimeMs + ':' + after.ctimeMs;
+      if (!after.isFile() || beforeSignature !== afterSignature) {
+        throw new Error('Manifest changed while it was being read.');
+      }
+    } finally {
+      fs.closeSync(descriptor);
+    }
+    manifest = JSON.parse(manifestSource);
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
       throw new Error('Manifest root must be a JSON object.');
     }
@@ -433,7 +456,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
     jobName: jobConfig.jobName,
     runtime: jobConfig.runtime,
     status: errors.length === 0 ? 'PASS' : 'BLOCKED',
-    jobId: apiJob?.id || null,
+    // The exact API job ID is verified above; reports retain only the local job key/name.
     artifactCount: validation.artifacts.length,
     artifacts: validation.artifacts,
     serviceLessIntegration,
@@ -525,9 +548,9 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
       runAttempt: expected.runAttempt,
       headSha: expected.headSha,
       mergeSha: expected.mergeSha,
-      url: run?.html_url || null,
-      status: run?.status || 'unknown',
-      conclusion: run?.conclusion ?? null,
+      // Persist only the allow-listed state, never raw strings from the Actions API.
+      status: runInProgress ? 'in_progress' : runCompletedSuccessfully ? 'completed' : 'unknown',
+      conclusion: runCompletedSuccessfully ? 'success' : null,
     },
     ciStatus,
     checks,
@@ -680,7 +703,8 @@ async function main() {
       apiUrl,
     }));
   } catch (error) {
-    apiError = String(error.message || error);
+    // Do not write arbitrary network/API error text into the local evidence artifact.
+    apiError = 'GitHub Actions run/job verification was unavailable.';
   }
 
   let report = evaluateCiEvidence({ artifactRoot, expected, run, jobs });

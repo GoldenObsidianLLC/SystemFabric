@@ -172,6 +172,72 @@ test('stages files with SHA-256 and exact run, attempt, source and job identity'
   assert.ok(result.artifacts.length >= JOBS[0].requiredFiles.length);
 });
 
+test('reads the manifest through its opened descriptor when the path is replaced', t => {
+  if (process.platform === 'win32') return t.skip('Open-file rename semantics differ on Windows.');
+  const { artifactRoot } = createFixtures(t);
+  const config = JOBS[0];
+  const directory = path.join(artifactRoot, config.artifactName);
+  const manifestFile = path.join(directory, 'manifest.json');
+  const backupFile = manifestFile + '.original';
+  const originalOpenSync = fs.openSync;
+  const originalReadFileSync = fs.readFileSync;
+  let replaced = false;
+
+  fs.openSync = function patchedOpenSync(filePath, ...args) {
+    const descriptor = originalOpenSync.call(fs, filePath, ...args);
+    if (!replaced && typeof filePath === 'string' && path.resolve(filePath) === path.resolve(manifestFile)) {
+      fs.renameSync(manifestFile, backupFile);
+      fs.writeFileSync(manifestFile, 'not valid JSON');
+      replaced = true;
+    }
+    return descriptor;
+  };
+  fs.readFileSync = function patchedReadFileSync(filePath, ...args) {
+    try {
+      return originalReadFileSync.call(fs, filePath, ...args);
+    } finally {
+      if (replaced) {
+        fs.rmSync(manifestFile, { force: true });
+        fs.renameSync(backupFile, manifestFile);
+        replaced = false;
+      }
+    }
+  };
+
+  try {
+    const result = validateManifestDirectory(directory, {
+      ...expected,
+      workflowFile: WORKFLOW_FILE,
+      jobKey: config.key,
+      jobName: config.jobName,
+      runtime: config.runtime,
+    });
+    assert.equal(result.valid, true, result.errors.join('; '));
+  } finally {
+    fs.openSync = originalOpenSync;
+    fs.readFileSync = originalReadFileSync;
+    if (fs.existsSync(backupFile)) {
+      fs.rmSync(manifestFile, { force: true });
+      fs.renameSync(backupFile, manifestFile);
+    }
+  }
+});
+
+test('does not persist raw fields returned by the GitHub Actions API', t => {
+  const { artifactRoot, jobApi, runApi } = createFixtures(t);
+  runApi.html_url = 'https://attacker.invalid/untrusted-network-value';
+  jobApi[0].id = 'untrusted-job-id';
+
+  const report = evaluateCiEvidence({ artifactRoot, expected, run: runApi, jobs: jobApi });
+  const serialized = JSON.stringify(report);
+  assert.equal(report.workflowRun.status, 'in_progress');
+  assert.equal(report.workflowRun.conclusion, null);
+  assert.equal(Object.hasOwn(report.workflowRun, 'url'), false);
+  assert.ok(report.jobs.every(job => !Object.hasOwn(job, 'jobId')));
+  assert.ok(!serialized.includes('attacker.invalid'));
+  assert.ok(!serialized.includes('untrusted-job-id'));
+});
+
 test('consolidates all successful producers but never marks production certified', t => {
   const { artifactRoot, jobApi, runApi } = createFixtures(t);
   const report = evaluateCiEvidence({ artifactRoot, expected, run: runApi, jobs: jobApi });
