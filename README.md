@@ -150,6 +150,7 @@ Read [Security policy](SECURITY.md) before reporting vulnerabilities.
 | Live database integration | `npm run test:integration:live` | Does not replace fresh-install, upgrade, backup/restore, or load rehearsals. |
 | Dependency audit | `npm audit` | Does not find every code, configuration, or supply-chain risk. |
 | Secret scanning | `gitleaks dir ...` and `gitleaks git ...` | A clean scan reduces risk but cannot guarantee that every sensitive-data pattern was detected. |
+| Production observability evidence | `npm run observability:deployment:validate` | Checks the approved manifest structure and declared evidence; does not deploy or independently verify providers or external evidence. |
 
 See [Testing and validation](docs/TESTING.md) for the validation matrix and evidence requirements. Treat CI as authoritative for the commit currently under review; local historical results can become stale after changes.
 
@@ -163,6 +164,7 @@ Start at **[the documentation index](docs/README.md)**.
 | [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md) | Project mission and human-AI symbiosis vision. |
 | [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) | Human agency, consent, accountability and engineering constraints. |
 | [Real-Time Foundation 1](docs/REALTIME-FOUNDATION-F1.md) | Developer-preview presence and event streaming foundation, with limitations. |
+| [Observability deployment contract](docs/OBSERVABILITY-DEPLOYMENT.md) | Vendor-neutral production OTLP deployment evidence and fail-closed validation. |
 | [Contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) | First clone, dependency install, basic checks, and service requirements. |
 | [Development](docs/DEVELOPMENT.md) | Local setup, configuration, and contributor workflow. |
 | [Testing](docs/TESTING.md) | Test commands, prerequisites, scope, and validation caveats. |

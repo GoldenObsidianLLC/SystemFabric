@@ -7,9 +7,10 @@ SystemFabric separates source-level checks from production evidence. A passing u
 ```bash
 npm run release:readiness
 npm run release:assert-ready
+npm run observability:deployment:validate
 ```
 
-`release:readiness` runs the source artifact/syntax check, SystemFabric unit/security tests, vendored EnginEx tests, and available integration tests. It writes:
+`release:readiness` runs the source artifact/syntax check, SystemFabric unit/security tests, vendored EnginEx tests, available integration tests, and the production-observability evidence gate. It writes:
 
 - `artifacts/release-readiness.json` — machine-readable gate snapshot.
 - `artifacts/release-readiness.md` — human-readable gate snapshot.
@@ -56,5 +57,6 @@ Every path under `artifacts` must be relative to the repository root and point t
 | `load-backup-restore.json` | Reproducible load/soak/fault tests plus backup/restore and graph rebuild drills. |
 | `independent-security-review.json` | Independent assessment, findings, severity, owners and remediation verification. |
 | `operations-release-approval.json` | Deployment/rollback runbooks, secret rotation, monitoring/alerting, incident response and explicit release approval. |
+| `observability-production.json` (deployment-controlled, Git-ignored local copy) | Approved production collector/backend, exact source revision, TLS/authentication/network controls, access/retention/deletion/legal-hold policies, named owners, durable retry/dead-letter delivery, capacity/load evidence, and outage/recovery evidence. See [Production Observability Deployment Contract](OBSERVABILITY-DEPLOYMENT.md). |
 
-An evidence file is not sufficient merely because it exists: the report validates its schema and referenced artifact paths. Human review of the evidence and release scope remains mandatory. Never change the release state to certified while any required gate is missing or blocked.
+A normal evidence file is not sufficient merely because it exists: the report validates its schema and referenced artifact paths. The observability deployment manifest is validated by its dedicated strict contract and must match the exact Git HEAD; its opaque evidence references still require independent human verification in the deployment's controlled evidence system. The local manifest path is ignored by Git intentionally and must not contain secret material. Human review of the evidence and release scope remains mandatory. Never change the release state to certified while any required gate is missing or blocked.
