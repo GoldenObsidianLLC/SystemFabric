@@ -4,12 +4,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApiServer, sameSecret } = require('../apps/api/src/server');
 
-test('configured bearer secrets use exact constant-time byte comparison', () => {
+test('shared secret comparison is byte-safe, constant-time for equal lengths, and rejects mismatches', () => {
+  assert.equal(sameSecret('test-secret', 'test-secret'), true);
+  assert.equal(sameSecret('test-secret', 'wrong-secret'), false);
+  assert.equal(sameSecret('short', 'longer-secret'), false);
+  assert.equal(sameSecret('', 'non-empty'), false);
+  assert.equal(sameSecret('expected', ''), false);
   assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-01'), true);
   assert.equal(sameSecret('high-entropy-token-01', 'high-entropy-token-02'), false);
-  assert.equal(sameSecret('short', 'longer'), false);
-  assert.equal(sameSecret('', 'expected'), false);
-  assert.equal(sameSecret('expected', ''), false);
+  const unicodeSecret = 'h' + String.fromCharCode(0x00e9) + 'llo';
+  assert.equal(sameSecret(unicodeSecret, unicodeSecret), true);
   assert.equal(sameSecret('🔐token', '🔐token'), true);
 });
 
@@ -164,6 +168,83 @@ test('session cookie writes require CSRF validation, same-origin context, and Ht
   }
 });
 
+
+test('secure-cookie configuration marks the session and CSRF cookies Secure', async () => {
+  const fakeIdentity = {
+    async login() {
+      return {
+        token: 's'.repeat(43), csrf: 'c'.repeat(43),
+        expiresAt: new Date(Date.now() + 3600_000),
+        user: { id: 'u1', email: 'admin@example.com', displayName: 'Admin', status: 'active' }
+      };
+    }
+  };
+  const server = createApiServer({
+    env: { NODE_ENV: 'test', SESSION_COOKIE_SECURE: 'true', AI_PROVIDER: 'mock', RATE_LIMIT_MAX_REQUESTS: '100' },
+    identityService: fakeIdentity,
+    logger: { error() {} }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const login = await fetch(`${base}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@example.com', password: 'not-used-by-fake-identity' })
+    });
+    assert.equal(login.status, 200);
+    const setCookie = login.headers.get('set-cookie') || '';
+    const sessionCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('sf_session='));
+    const csrfCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('sf_csrf='));
+    assert.ok(sessionCookie);
+    assert.ok(csrfCookie);
+    assert.match(sessionCookie, /; HttpOnly/i);
+    assert.match(sessionCookie, /; Secure/i);
+    assert.match(csrfCookie, /; Secure/i);
+    assert.doesNotMatch(csrfCookie, /; HttpOnly/i, 'CSRF token remains readable for the double-submit header');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await server.systemfabric.close();
+  }
+});
+
+test('MFA challenge cookie is HttpOnly, Secure when configured, path-limited and short-lived', async () => {
+  const fakeIdentity = {
+    async login() {
+      return {
+        mfaRequired: true, challengeToken: 'm'.repeat(43),
+        expiresAt: new Date(Date.now() + 300_000),
+        user: { id: 'u2', email: 'mfa@example.com', displayName: 'MFA User', status: 'active' }
+      };
+    }
+  };
+  const server = createApiServer({
+    env: { NODE_ENV: 'test', SESSION_COOKIE_SECURE: 'true', AI_PROVIDER: 'mock', RATE_LIMIT_MAX_REQUESTS: '100' },
+    identityService: fakeIdentity,
+    logger: { error() {} }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const response = await fetch(`${base}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'mfa@example.com', password: 'not-used-by-fake-identity' })
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).mfaRequired, true);
+    const challengeCookie = response.headers.get('set-cookie') || '';
+    assert.match(challengeCookie, /sf_mfa_challenge=/);
+    assert.match(challengeCookie, /; HttpOnly/i);
+    assert.match(challengeCookie, /; Secure/i);
+    assert.match(challengeCookie, /; SameSite=Strict/i);
+    assert.match(challengeCookie, /; Path=\/api\/v1\/auth\/mfa/i);
+    assert.match(challengeCookie, /; Max-Age=300/i);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    await server.systemfabric.close();
+  }
+});
 
 test('Platform Hub and its static assets are served without exposing database-backed data', async () => {
   await withServer(async base => {

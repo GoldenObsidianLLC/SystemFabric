@@ -44,9 +44,10 @@ test('MFA secrets are encrypted with authenticated encryption and require a 32-b
 });
 
 test('notification templates escape untrusted HTML and disabled delivery fails closed', async () => {
-  const email = messageFor('site-invitation', { siteName: '<SCRIPT>site</SCRIPT>', inviteUrl: 'https://example.test/?q="x"', expiresAt: '<b>soon</b>' });
+  const email = messageFor('site-invitation', { siteName: '<script>site</script><SCRIPT>upper</SCRIPT>', inviteUrl: 'https://example.test/?q="x"', expiresAt: '<b>soon</b>' });
   assert.doesNotMatch(email.html, /<script\b/i);
-  assert.match(email.html, /&lt;SCRIPT&gt;/);
+  assert.match(email.html, /&lt;script&gt;site&lt;\/script&gt;/);
+  assert.match(email.html, /&lt;SCRIPT&gt;upper&lt;\/SCRIPT&gt;/);
   assert.match(email.html, /&quot;x&quot;/);
   await assert.rejects(() => sendEmail({ recipient: 'person@example.test', template: 'generic', payload: {} }, { SYSTEMFABRIC_MAIL_PROVIDER: 'disabled' }), { code: 'ERR_SYSTEMFABRIC_MAIL_DISABLED' });
 });

@@ -311,14 +311,17 @@ function cacheGet(cacheKey) {
 }
 
 async function readTemplateSource(templatePath, limits, attempt = 0) {
-  // Open once and perform all size/content checks against the same descriptor.
-  // Replacing the pathname during the read cannot redirect the file operation.
+  // Keep the file descriptor open across metadata checks and the read so a path
+  // replacement cannot redirect the read to a different file between calls.
   const handle = await fsp.open(templatePath, 'r');
+  let before;
+  let after;
+  let source;
+  let sourceBytes;
   try {
-    const before = await handle.stat();
+    before = await handle.stat();
     const pathEntry = await fsp.lstat(templatePath);
-    if (!before.isFile() || !pathEntry.isFile() ||
-        before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
       throw new TemplateError('Template path must resolve to the opened regular file.', {
         code: 'ERR_ENGINEX_TEMPLATE_PATH_CHANGED', templatePath
       });
@@ -328,24 +331,24 @@ async function readTemplateSource(templatePath, limits, attempt = 0) {
         code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
       });
     }
-    const source = await handle.readFile('utf8');
-    const sourceBytes = Buffer.byteLength(source, 'utf8');
+    source = await handle.readFile({ encoding: 'utf8' });
+    sourceBytes = Buffer.byteLength(source, 'utf8');
     if (sourceBytes > limits.maxTemplateBytes) {
       throw new TemplateError(`Template exceeds maxTemplateBytes (${limits.maxTemplateBytes}).`, {
         code: 'ERR_ENGINEX_TEMPLATE_LIMIT', templatePath
       });
     }
-    const after = await handle.stat();
-    if (getSignature(before) !== getSignature(after)) {
-      if (attempt < 2) return readTemplateSource(templatePath, limits, attempt + 1);
-      throw new TemplateError('Template changed repeatedly while being read; retry rendering.', {
-        code: 'ERR_ENGINEX_TEMPLATE_CHANGED_DURING_READ', templatePath
-      });
-    }
-    return { source, sourceBytes, stats: after };
+    after = await handle.stat();
   } finally {
     await handle.close();
   }
+  if (getSignature(before) !== getSignature(after)) {
+    if (attempt < 2) return readTemplateSource(templatePath, limits, attempt + 1);
+    throw new TemplateError('Template changed repeatedly while being read; retry rendering.', {
+      code: 'ERR_ENGINEX_TEMPLATE_CHANGED_DURING_READ', templatePath
+    });
+  }
+  return { source, sourceBytes, stats: after };
 }
 
 async function loadTemplateAst(templatePath, options, limits) {
@@ -2832,26 +2835,30 @@ engine.writeManifest = async function writeManifest(rootDirectory, outputPath, o
 engine.loadPrecompiled = async function loadPrecompiled(manifestPath, options = {}) {
   if (typeof manifestPath !== 'string' || !manifestPath) throw new TypeError('manifestPath must be a JSON file path.');
   const fullPath = path.resolve(manifestPath);
-  const manifestHandle = await fsp.open(fullPath, 'r');
-  let manifest;
+  const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
+  const handle = await fsp.open(fullPath, 'r');
+  let manifestSource;
   try {
-    // Validate and read the manifest through one descriptor to avoid a
-    // pathname replacement between the size check and content read.
-    const stat = await manifestHandle.stat();
+    // Read through the descriptor whose metadata was checked; do not re-resolve
+    // the path between stat and read.
+    const before = await handle.stat();
     const pathEntry = await fsp.lstat(fullPath);
-    if (!stat.isFile() || !pathEntry.isFile() ||
-        stat.dev !== pathEntry.dev || stat.ino !== pathEntry.ino) {
-      throw new TemplateError('Precompiled manifest path must resolve to the opened regular file.', {
-        code: 'ERR_ENGINEX_MANIFEST_PATH'
-      });
+    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Precompiled manifest path must resolve to the opened regular file.', { code: 'ERR_ENGINEX_MANIFEST_PATH' });
     }
-    const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
-    if (stat.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
-    try { manifest = JSON.parse(await manifestHandle.readFile('utf8')); }
-    catch (cause) { throw new TemplateError('Unable to parse precompiled manifest JSON.', { code: 'ERR_ENGINEX_MANIFEST_JSON', cause }); }
+    if (before.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+    manifestSource = await handle.readFile({ encoding: 'utf8' });
+    if (Buffer.byteLength(manifestSource, 'utf8') > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
+    const after = await handle.stat();
+    if (getSignature(before) !== getSignature(after)) {
+      throw new TemplateError('Precompiled manifest changed while being read; retry loading.', { code: 'ERR_ENGINEX_MANIFEST_CHANGED_DURING_READ' });
+    }
   } finally {
-    await manifestHandle.close();
+    await handle.close();
   }
+  let manifest;
+  try { manifest = JSON.parse(manifestSource); }
+  catch (cause) { throw new TemplateError('Unable to parse precompiled manifest JSON.', { code: 'ERR_ENGINEX_MANIFEST_JSON', cause }); }
   if (!manifest || manifest.format !== MANIFEST_FORMAT || manifest.engineVersion !== VERSION || !Array.isArray(manifest.templates) || !Array.isArray(manifest.dependencies)) {
     throw new TemplateError('Unsupported or incompatible precompiled manifest.', { code: 'ERR_ENGINEX_MANIFEST_VERSION' });
   }

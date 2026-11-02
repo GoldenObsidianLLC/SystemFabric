@@ -1,6 +1,9 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { validateContentTypeDefinition, validateRecordValues } = require('../packages/domain/src/content-types');
 const { validatePluginManifest, validatePinnedImageDigest } = require('../packages/plugins/src/manifest');
 const { createContainerPluginRunner } = require('../packages/plugins/src/container-runner');
@@ -48,12 +51,31 @@ test('media type checks are based on file signatures, not client MIME labels', (
   assert.equal(detectImageType(Buffer.from('<svg></svg>')), null);
 });
 
+test('local media files are created exclusively with owner-only permissions', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-permissions-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+  const image = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
+  let insertedValues;
+  const store = createLocalMediaStore({
+    pool: { async query(_sql, values) { insertedValues = values; return { rows: [{ storage_key: values[2], mime_type: values[3] }] }; } },
+    root
+  });
+  const asset = await store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: image.toString('base64'), mimeType: 'image/png' });
+  assert.equal(asset.storage_key, insertedValues[2]);
+  const filePath = path.join(root, asset.storage_key);
+  assert.deepEqual(await fs.promises.readFile(filePath), image);
+  if (process.platform !== 'win32') {
+    const rootStats = await fs.promises.stat(root);
+    const fileStats = await fs.promises.stat(filePath);
+    assert.equal(rootStats.mode & 0o777, 0o700);
+    assert.equal(fileStats.mode & 0o777, 0o600);
+  }
+  await assert.rejects(() => fs.promises.open(filePath, 'wx', 0o600), { code: 'EEXIST' });
+});
+
 test('media upload rejects SVG and unsupported files before touching storage', async t => {
-  const fs = require('node:fs/promises');
-  const os = require('node:os');
-  const path = require('node:path');
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-tests-'));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-invalid-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const calls = [];
   const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root });
   await assert.rejects(() => store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: Buffer.from('<svg></svg>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_SYSTEMFABRIC_MEDIA_INVALID' });

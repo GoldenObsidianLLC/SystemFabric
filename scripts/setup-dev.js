@@ -8,30 +8,49 @@ const root = path.resolve(__dirname, '..');
 const envExample = path.join(root, '.env.example');
 const envFile = path.join(root, '.env');
 
-function main() {
+function updateEnvFile({ target = envFile, template = envExample } = {}) {
+  // COPYFILE_EXCL is the atomic create guard; avoid an existsSync/copy TOCTOU.
+  let created = false;
   try {
-    // COPYFILE_EXCL is the atomic create-if-absent operation. Do not use an
-    // existsSync check followed by a copy, which leaves a pathname race.
-    fs.copyFileSync(envExample, envFile, fs.constants.COPYFILE_EXCL);
-    console.log('Created .env from .env.example. Review the development-only values before use.');
+    fs.copyFileSync(template, target, fs.constants.COPYFILE_EXCL);
+    created = true;
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;
-    console.log('.env already exists; preserving configured values.');
   }
 
-  // Add test-only endpoints without replacing existing credentials or endpoints.
-  // Read and update through one descriptor so a later pathname swap cannot
-  // redirect the write to a different file.
-  const envHandle = fs.openSync(envFile, 'r+');
+  // Open once and operate exclusively through the resulting descriptor.
+  // O_NOFOLLOW prevents symlink traversal on POSIX; Windows does not expose that
+  // flag through Node's fs API, but descriptor-bound I/O still prevents path
+  // replacement between the open and subsequent reads/writes from redirecting I/O.
+  // On platforms with O_NOFOLLOW, the open itself rejects symlink traversal.
+  // Where that flag is unavailable, capture the non-following path identity
+  // before opening and compare it to fstat() to detect a replacement before
+  // the descriptor was acquired. After open, all I/O stays descriptor-bound;
+  // a later path rename/replacement must not redirect those operations.
+  let pathStats = null;
+  if (!fs.constants.O_NOFOLLOW) {
+    pathStats = fs.lstatSync(target);
+    if (!pathStats.isFile()) {
+      throw new Error('.env must be a regular file; symbolic links are not accepted.');
+    }
+  }
+  const descriptorFlags = fs.constants.O_RDWR | (fs.constants.O_NOFOLLOW || 0);
+  const descriptor = fs.openSync(target, descriptorFlags);
   try {
-    const openedFile = fs.fstatSync(envHandle);
-    const pathEntry = fs.lstatSync(envFile);
-    if (!openedFile.isFile() || !pathEntry.isFile() ||
-        openedFile.dev !== pathEntry.dev || openedFile.ino !== pathEntry.ino) {
-      throw new Error('The .env path must be a regular, non-symlink file.');
+    const descriptorStats = fs.fstatSync(descriptor);
+    if (!descriptorStats.isFile() || descriptorStats.nlink > 1) {
+      throw new Error('.env must be a regular, single-link file; symbolic links are not accepted where O_NOFOLLOW is supported.');
+    }
+    if (pathStats && (descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino)) {
+      throw new Error('.env path changed while opening; refusing to use an unexpected file.');
     }
 
-    let envText = fs.readFileSync(envHandle, 'utf8');
+    // Environment files may contain credentials. On POSIX, constrain access
+    // to the owning account before reading or updating them.
+    if (process.platform !== 'win32') fs.fchmodSync(descriptor, 0o600);
+
+    // Add test-only endpoints without replacing existing credentials/endpoints.
+    let envText = fs.readFileSync(descriptor, 'utf8');
     const defaults = {
       TEST_DATABASE_URL: 'postgres://systemfabric:systemfabric_dev@127.0.0.1:5432/systemfabric_test',
       MEMGRAPH_TEST_URL: 'bolt://127.0.0.1:7687'
@@ -42,15 +61,26 @@ function main() {
       if (!existing.test(envText)) { envText += `\n${key}=${value}`; changed = true; }
     }
     if (changed) {
-      const updated = envText.replace(/\s*$/, '') + '\n';
-      fs.ftruncateSync(envHandle, 0);
-      fs.writeSync(envHandle, updated, 0, 'utf8');
-      fs.ftruncateSync(envHandle, Buffer.byteLength(updated, 'utf8'));
-      fs.fsyncSync(envHandle);
+      const nextText = Buffer.from(envText.replace(/\s*$/, '') + '\n', 'utf8');
+      let written = 0;
+      while (written < nextText.length) {
+        const count = fs.writeSync(descriptor, nextText, written, nextText.length - written, written);
+        if (count === 0) throw new Error('Unable to finish updating .env.');
+        written += count;
+      }
+      fs.ftruncateSync(descriptor, nextText.length);
+      fs.fsyncSync(descriptor);
     }
+    return { created, changed };
   } finally {
-    fs.closeSync(envHandle);
+    fs.closeSync(descriptor);
   }
+}
+
+function main() {
+  const envUpdate = updateEnvFile({ target: envFile, template: envExample });
+  if (envUpdate.created) console.log('Created .env from .env.example. Review the development-only values before use.');
+  else console.log('.env already exists; preserving configured values.');
 
   fs.mkdirSync(path.join(root, 'artifacts', 'evidence'), { recursive: true });
   fs.mkdirSync(path.join(root, 'var', 'media'), { recursive: true });
@@ -65,7 +95,11 @@ function main() {
   console.log('Safety:    external AI content remains opt-in; production secrets must never be copied here.');
 }
 
-try { main(); } catch (error) {
-  console.error(`Development setup failed: ${error.message}`);
-  process.exitCode = 1;
+if (require.main === module) {
+  try { main(); } catch (error) {
+    console.error(`Development setup failed: ${error.message}`);
+    process.exitCode = 1;
+  }
 }
+
+module.exports = { updateEnvFile };
