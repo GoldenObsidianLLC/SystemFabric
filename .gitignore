@@ -2,7 +2,6 @@
 .env.*.local
 node_modules/
 coverage/
-*.log
 .DS_Store
 .tmp/
 artifacts/private/
@@ -11,7 +10,28 @@ artifacts/private/
 playwright-report/
 test-results/
 blob-report/
-artifacts/evidence/*.log
+# Exact generated outputs captured by release-readiness and live CI checks.
+/artifacts/evidence/artifact-check.log
+/artifacts/evidence/unit-tests.tap.log
+/artifacts/evidence/enginex-tests.tap.log
+/artifacts/evidence/integration-tests.tap.log
+/artifacts/evidence/integration-migrations.log
+/artifacts/evidence/fresh-migrations.json
+/artifacts/evidence/fresh-migrations.log
+/artifacts/evidence/integration-live.json
+/artifacts/evidence/memgraph-outage-live.log
+/artifacts/evidence/graph-rebuild-live.log
+/artifacts/evidence/browser-smoke.log
+/artifacts/evidence/npm-audit-all.log
+/artifacts/evidence/npm-audit.log
+/artifacts/evidence/sbom-generation.log
+/artifacts/ci-evidence/
+/artifacts/ci-evidence-stage/
+/artifacts/release-readiness.json
+/artifacts/release-readiness.md
+/artifacts/release-readiness-ci.json
+/artifacts/release-readiness-ci.md
+/artifacts/systemfabric.sbom.cdx.json
 # Deployment-specific observability evidence stays in the deployment's controlled evidence store.
 /artifacts/evidence/observability-production.json
 

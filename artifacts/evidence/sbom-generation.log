@@ -1,3 +1,0 @@
-Command: npm run sbom
-Executed: npm sbom --sbom-format=cyclonedx --omit=dev
-Result: completed. Retained artifact: artifacts/systemfabric.sbom.cdx.json (CycloneDX 1.5; 163 components; 164 dependency records).

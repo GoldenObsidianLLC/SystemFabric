@@ -150,6 +150,7 @@ Read [Security policy](SECURITY.md) before reporting vulnerabilities.
 | Live database integration | `npm run test:integration:live` | Does not replace fresh-install, upgrade, backup/restore, or load rehearsals. |
 | Dependency audit | `npm audit` | Does not find every code, configuration, or supply-chain risk. |
 | Secret scanning | `gitleaks dir ...` and `gitleaks git ...` | A clean scan reduces risk but cannot guarantee that every sensitive-data pattern was detected. |
+| Consolidated CI evidence | `artifacts/release-readiness-ci.md` in the `systemfabric-release-readiness-ci` workflow artifact | Binds producer jobs, source revisions, run attempts, and SHA-256 evidence; remains a CI report, not production certification. |
 | Production observability evidence | `npm run observability:deployment:validate` | Checks the approved manifest structure and declared evidence; does not deploy or independently verify providers or external evidence. |
 
 See [Testing and validation](docs/TESTING.md) for the validation matrix and evidence requirements. Treat CI as authoritative for the commit currently under review; local historical results can become stale after changes.

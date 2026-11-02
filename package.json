@@ -29,6 +29,8 @@
     "reconcile:library": "node scripts/reconcile-library-objects.js",
     "release:readiness": "node scripts/release-readiness.js",
     "release:assert-ready": "node scripts/release-readiness.js --strict",
+    "ci:evidence:stage": "node scripts/ci-evidence.js stage",
+    "ci:evidence:aggregate": "node scripts/ci-evidence.js aggregate",
     "dev:setup": "node scripts/setup-dev.js",
     "dev:bootstrap": "node scripts/bootstrap-dev.js",
     "dev:doctor": "node scripts/dev-doctor.js",
