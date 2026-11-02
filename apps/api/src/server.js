@@ -19,7 +19,7 @@ const { createClamDScanScanner } = require('../../../packages/security/src/malwa
 const { createCloudStorageAdapterFromEnv } = require('../../../packages/cloud/src/storage-adapters');
 const { createFirewall } = require('../../../packages/security/src/firewall');
 const { handlePlatformRoute } = require('./platform-routes');
-const { verifyStripeSignature, digestWebhookBody, normalizeStripeRefundStatus } = require('../../../packages/billing/src/stripe');
+const { verifyStripeSignature, digestWebhookBody, normalizeStripeRefundStatus, retrieveStripeSubscription } = require('../../../packages/billing/src/stripe');
 const { releaseOrderStockReservations, commitOrderStockReservations } = require('../../../packages/commerce/src/stock-reservations');
 const { validatePluginManifest, validatePinnedImageDigest } = require('../../../packages/plugins/src/manifest');
 const { createWidgetRegistry } = require('../../../packages/widgets/src/registry');
@@ -163,7 +163,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
+function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, stripeFetch = fetch, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -877,10 +877,54 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
                 orderId: paidOrder.rows[0].id
               });
             }
-            if (md.purchase_type === 'membership' && md.site_id && md.user_id && md.membership_plan_id && (event.type !== 'checkout.session.completed' || ['paid','no_payment_required'].includes(object.payment_status))) {
-              const existing=await client.query("SELECT id FROM paid_memberships WHERE site_id=$1 AND user_id=$2 AND plan_id=$3 AND status='pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",[md.site_id,md.user_id,md.membership_plan_id]);
-              if (existing.rows[0]) await client.query("UPDATE paid_memberships SET status='active',provider='stripe',provider_customer_id=$2,provider_subscription_id=$3,updated_at=now() WHERE id=$1",[existing.rows[0].id,typeof object.customer==='string'?object.customer:null,typeof object.subscription==='string'?object.subscription:null]);
-              else await client.query("INSERT INTO paid_memberships(site_id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id) VALUES($1,$2,$3,'active','stripe',$4,$5)",[md.site_id,md.user_id,md.membership_plan_id,typeof object.customer==='string'?object.customer:null,typeof object.subscription==='string'?object.subscription:null]);
+            if (
+              md.purchase_type === 'membership' &&
+              ID_RE.test(md.site_id || '') &&
+              ID_RE.test(md.user_id || '') &&
+              ID_RE.test(md.membership_plan_id || '') &&
+              (event.type !== 'checkout.session.completed' || ['paid','no_payment_required'].includes(object.payment_status))
+            ) {
+              const customerId = typeof object.customer === 'string' ? object.customer : null;
+              const subscriptionId = typeof object.subscription === 'string'
+                ? object.subscription
+                : object.subscription && typeof object.subscription.id === 'string'
+                  ? object.subscription.id
+                  : null;
+              const candidates = await client.query(
+                `SELECT id,provider_subscription_id
+                   FROM paid_memberships
+                  WHERE site_id=$1 AND user_id=$2 AND plan_id=$3
+                    AND (provider_subscription_id=$4 OR status='pending')
+                  ORDER BY CASE WHEN provider_subscription_id=$4 THEN 0 ELSE 1 END,created_at DESC
+                  LIMIT 2 FOR UPDATE`,
+                [md.site_id, md.user_id, md.membership_plan_id, subscriptionId]
+              );
+              const exact = candidates.rows.find(row => row.provider_subscription_id === subscriptionId);
+              const existing = exact || (
+                candidates.rows.length === 1 && candidates.rows[0].provider_subscription_id === null
+                  ? candidates.rows[0]
+                  : null
+              );
+              if (existing) {
+                // Never let a delayed Checkout event revive a membership whose
+                // authoritative subscription event already moved it past pending.
+                await client.query(
+                  `UPDATE paid_memberships
+                      SET status=CASE WHEN status='pending' THEN 'active' ELSE status END,
+                          provider='stripe',provider_customer_id=COALESCE($2,provider_customer_id),
+                          provider_subscription_id=COALESCE($3,provider_subscription_id),
+                          updated_at=now()
+                    WHERE id=$1`,
+                  [existing.id, customerId, subscriptionId]
+                );
+              } else {
+                await client.query(
+                  `INSERT INTO paid_memberships(
+                     site_id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id
+                   ) VALUES($1,$2,$3,'active','stripe',$4,$5)`,
+                  [md.site_id, md.user_id, md.membership_plan_id, customerId, subscriptionId]
+                );
+              }
             }
           }
           if (['checkout.session.expired','checkout.session.async_payment_failed'].includes(event.type)) {
@@ -971,18 +1015,146 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
               }
             }
           }
-          if (event.type.startsWith('customer.subscription.') && typeof object.id === 'string') {
-            const md = object.metadata || {};
-            // Checkout stores these tenant binding fields on subscription metadata.
-            // Require the complete binding before applying an asynchronous provider
-            // update so a provider ID alone cannot select rows across site boundaries.
-            if (md.purchase_type === 'membership' && ID_RE.test(md.site_id || '') &&
-                ID_RE.test(md.user_id || '') && ID_RE.test(md.membership_plan_id || '')) {
-              const status = object.status==='active'||object.status==='trialing'?'active':object.status==='past_due'?'past_due':object.status==='canceled'?'cancelled':'pending';
-              await client.query(
-                "UPDATE paid_memberships SET status=$5,cancel_at_period_end=$6,current_period_start=to_timestamp(NULLIF($7,0)),current_period_end=to_timestamp(NULLIF($8,0)),updated_at=now() WHERE site_id=$1 AND provider='stripe' AND provider_subscription_id=$2 AND user_id=$3 AND plan_id=$4",
-                [md.site_id, object.id, md.user_id, md.membership_plan_id, status, object.cancel_at_period_end===true, Number(object.current_period_start||0), Number(object.current_period_end||0)]
+          const isSubscriptionLifecycleEvent = event.type.startsWith('customer.subscription.');
+          const isSubscriptionInvoiceEvent = [
+            'invoice.paid',
+            'invoice.payment_succeeded',
+            'invoice.payment_failed',
+            'invoice.payment_action_required'
+          ].includes(event.type);
+          if (isSubscriptionLifecycleEvent || isSubscriptionInvoiceEvent) {
+            // Snapshot events are immutable and can arrive out of order. Use the
+            // event only to identify the tenant-bound subscription; after locking
+            // that membership row, retrieve the provider's current subscription
+            // before changing access state.
+            const invoiceDetails = object.parent?.subscription_details ||
+              object.subscription_details || {};
+            const subscriptionReference = isSubscriptionLifecycleEvent
+              ? object.id
+              : (invoiceDetails.subscription || object.subscription);
+            const subscriptionId = typeof subscriptionReference === 'string'
+              ? subscriptionReference
+              : subscriptionReference && typeof subscriptionReference.id === 'string'
+                ? subscriptionReference.id
+                : null;
+            const md = isSubscriptionLifecycleEvent
+              ? (object.metadata || {})
+              : (invoiceDetails.metadata || {});
+
+            if (
+              /^sub_[A-Za-z0-9]+$/.test(subscriptionId || '') &&
+              md.purchase_type === 'membership' &&
+              ID_RE.test(md.site_id || '') &&
+              ID_RE.test(md.user_id || '') &&
+              ID_RE.test(md.membership_plan_id || '')
+            ) {
+              const candidates = await client.query(
+                `SELECT id,provider_subscription_id
+                   FROM paid_memberships
+                  WHERE site_id=$1 AND user_id=$2 AND plan_id=$3 AND provider='stripe'
+                    AND (provider_subscription_id=$4 OR (provider_subscription_id IS NULL AND status='pending'))
+                  ORDER BY (provider_subscription_id=$4) DESC,created_at DESC
+                  LIMIT 2
+                  FOR UPDATE`,
+                [md.site_id, md.user_id, md.membership_plan_id, subscriptionId]
               );
+              const exact = candidates.rows.find(row => row.provider_subscription_id === subscriptionId);
+              const target = exact || (
+                candidates.rows.length === 1 && candidates.rows[0].provider_subscription_id === null
+                  ? candidates.rows[0]
+                  : null
+              );
+              if (!target) {
+                // Stripe may deliver customer.subscription.created before the
+                // Checkout Session completion has persisted its local membership.
+                // Roll back the webhook receipt and return a retryable response so
+                // the event is not permanently acknowledged without updating access.
+                throw fail(
+                  503,
+                  'ERR_SYSTEMFABRIC_MEMBERSHIP_NOT_READY',
+                  'The tenant-bound membership record is not ready for this subscription event. Retry the webhook.'
+                );
+              }
+
+              {
+                // Retrieve while holding the row lock. This serializes concurrent
+                // webhook handlers so a delayed snapshot cannot roll back a newer
+                // provider state. A provider read failure throws and rolls back the
+                // event receipt, allowing Stripe to retry instead of losing it.
+                const current = await retrieveStripeSubscription({
+                  secretKey: env.STRIPE_SECRET_KEY,
+                  subscriptionId,
+                  fetchImpl: stripeFetch
+                });
+                const currentMetadata = current.metadata || {};
+                const bindingMatches = current.id === subscriptionId &&
+                  currentMetadata.purchase_type === 'membership' &&
+                  currentMetadata.site_id === md.site_id &&
+                  currentMetadata.user_id === md.user_id &&
+                  currentMetadata.membership_plan_id === md.membership_plan_id;
+
+                const status = current.status === 'canceled'
+                  ? 'cancelled'
+                  : ['active', 'trialing'].includes(current.status)
+                    ? 'active'
+                    : current.status === 'past_due'
+                      ? 'past_due'
+                      : current.status === 'paused'
+                        ? 'paused'
+                        : ['unpaid', 'incomplete_expired'].includes(current.status)
+                          ? 'expired'
+                          : current.status === 'incomplete'
+                            ? 'pending'
+                            : null;
+                // Stripe API 2025-03-31.basil moved billing periods from the
+                // Subscription object to each Subscription Item. Keep support for
+                // older API versions and summarize mixed intervals using the
+                // subscription's latest start and earliest end.
+                const subscriptionItems = Array.isArray(current.items?.data)
+                  ? current.items.data
+                  : [];
+                const itemPeriodStarts = subscriptionItems
+                  .map(item => item?.current_period_start)
+                  .filter(value => Number.isSafeInteger(value) && value > 0);
+                const itemPeriodEnds = subscriptionItems
+                  .map(item => item?.current_period_end)
+                  .filter(value => Number.isSafeInteger(value) && value > 0);
+                const periodStart = Number.isSafeInteger(current.current_period_start) && current.current_period_start > 0
+                  ? current.current_period_start
+                  : itemPeriodStarts.length ? Math.max(...itemPeriodStarts) : 0;
+                const periodEnd = Number.isSafeInteger(current.current_period_end) && current.current_period_end > 0
+                  ? current.current_period_end
+                  : itemPeriodEnds.length ? Math.min(...itemPeriodEnds) : 0;
+                const cancelAtPeriodEnd = typeof current.cancel_at_period_end === 'boolean'
+                  ? current.cancel_at_period_end
+                  : null;
+
+                if (bindingMatches && status) {
+                  await client.query(
+                    `UPDATE paid_memberships
+                        SET provider='stripe',provider_subscription_id=$4,status=$5,
+                            cancel_at_period_end=COALESCE($6,cancel_at_period_end),
+                            current_period_start=COALESCE(to_timestamp(NULLIF($7,0)),current_period_start),
+                            current_period_end=COALESCE(to_timestamp(NULLIF($8,0)),current_period_end),
+                            updated_at=now()
+                      WHERE id=$1 AND site_id=$2 AND user_id=$3 AND plan_id=$9
+                        AND provider='stripe'
+                        AND (provider_subscription_id IS NULL OR provider_subscription_id=$4)
+                      RETURNING id`,
+                    [
+                      target.id,
+                      md.site_id,
+                      md.user_id,
+                      subscriptionId,
+                      status,
+                      cancelAtPeriodEnd,
+                      periodStart,
+                      periodEnd,
+                      md.membership_plan_id
+                    ]
+                  );
+                }
+              }
             }
           }
           await client.query("UPDATE billing_webhook_events SET status='processed',processed_at=now() WHERE provider='stripe' AND provider_event_id=$1",[event.id]);

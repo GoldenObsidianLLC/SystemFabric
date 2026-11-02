@@ -437,7 +437,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
             tap.cancelled !== 0 || tap.skipped !== 0 || tap.todo !== 0) {
           errors.push('Dedicated live integration TAP summary is missing, inconsistent, or contains skips/failures.');
         }
-        if (!isFreshMigrationEvidence(migrations, 15)) errors.push('Fresh migration evidence does not validate all 15 migrations and the idempotent rerun.');
+        if (!isFreshMigrationEvidence(migrations, 16)) errors.push('Fresh migration evidence does not validate all 16 migrations and the idempotent rerun.');
         const outage = readEvidenceFile(directory, 'artifacts/evidence/memgraph-outage-live.log').toString('utf8');
         const rebuild = readEvidenceFile(directory, 'artifacts/evidence/graph-rebuild-live.log').toString('utf8');
         if (!outage.includes('REAL MEMGRAPH OUTAGE RESULT: PASS')) errors.push('Memgraph outage/recovery evidence lacks its success marker.');
