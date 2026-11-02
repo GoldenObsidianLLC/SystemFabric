@@ -855,8 +855,27 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
           const object = event.data.object;
           if (['checkout.session.completed','checkout.session.async_payment_succeeded'].includes(event.type)) {
             const md = object.metadata || {};
-            if (md.order_id && md.site_id && (event.type !== 'checkout.session.completed' || ['paid','no_payment_required'].includes(object.payment_status))) {
-              const paidOrder=await client.query("UPDATE commerce_orders SET status='paid',provider='stripe',provider_session_id=$3,provider_payment_id=$4,updated_at=now() WHERE site_id=$1 AND id=$2 AND status IN ('pending_payment','processing') RETURNING id,site_id",[md.site_id,md.order_id,object.id,typeof object.payment_intent==='string'?object.payment_intent:null]);if(paidOrder.rows[0])await commitOrderStockReservations(client,{siteId:paidOrder.rows[0].site_id,orderId:paidOrder.rows[0].id});
+            const orderSiteId = ID_RE.test(md.site_id || '') ? md.site_id : null;
+            const orderId = ID_RE.test(md.order_id || '') ? md.order_id : null;
+            const sessionId = typeof object.id === 'string' && object.id.length > 0 ? object.id : null;
+            if (sessionId && (event.type !== 'checkout.session.completed' || ['paid','no_payment_required'].includes(object.payment_status))) {
+              // A checkout event may arrive before the API saves provider_session_id.
+              // In that case, use the complete site/order metadata tuple only while the
+              // local order is still unlinked. A different linked session must never
+              // pay this order, even when its metadata names the same order.
+              const paidOrder = await client.query(
+                `UPDATE commerce_orders
+                    SET status='paid',provider='stripe',provider_session_id=$3,
+                        provider_payment_id=$4,updated_at=now()
+                  WHERE provider='stripe' AND status IN ('pending_payment','processing')
+                    AND (provider_session_id=$3 OR (provider_session_id IS NULL AND site_id=$1 AND id=$2))
+                  RETURNING id,site_id`,
+                [orderSiteId, orderId, sessionId, typeof object.payment_intent === 'string' ? object.payment_intent : null]
+              );
+              if (paidOrder.rows[0]) await commitOrderStockReservations(client, {
+                siteId: paidOrder.rows[0].site_id,
+                orderId: paidOrder.rows[0].id
+              });
             }
             if (md.purchase_type === 'membership' && md.site_id && md.user_id && md.membership_plan_id && (event.type !== 'checkout.session.completed' || ['paid','no_payment_required'].includes(object.payment_status))) {
               const existing=await client.query("SELECT id FROM paid_memberships WHERE site_id=$1 AND user_id=$2 AND plan_id=$3 AND status='pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE",[md.site_id,md.user_id,md.membership_plan_id]);
@@ -865,8 +884,28 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
             }
           }
           if (['checkout.session.expired','checkout.session.async_payment_failed'].includes(event.type)) {
-            const md=object.metadata||{};const found=await client.query("UPDATE commerce_orders SET status='failed',updated_at=now() WHERE status='pending_payment' AND (($1::text IS NOT NULL AND provider_session_id=$1) OR ($2::uuid IS NOT NULL AND id=$2)) AND ($3::uuid IS NULL OR site_id=$3) RETURNING id,site_id",[typeof object.id==='string'?object.id:null,md.order_id||null,md.site_id||null]);
-            for(const row of found.rows) await releaseOrderStockReservations(client,{siteId:row.site_id,orderId:row.id,status:'released'});
+            const md = object.metadata || {};
+            const orderSiteId = ID_RE.test(md.site_id || '') ? md.site_id : null;
+            const orderId = ID_RE.test(md.order_id || '') ? md.order_id : null;
+            const sessionId = typeof object.id === 'string' && object.id.length > 0 ? object.id : null;
+            if (sessionId) {
+              // Match the provider's exact session, or the signed metadata tuple when
+              // the session ID has not yet been persisted. Never let a mismatched
+              // session ID or incomplete site binding release another order's stock.
+              const found = await client.query(
+                `UPDATE commerce_orders
+                    SET status='failed',provider='stripe',provider_session_id=COALESCE(provider_session_id,$1),updated_at=now()
+                  WHERE provider='stripe' AND status='pending_payment'
+                    AND (provider_session_id=$1 OR (provider_session_id IS NULL AND site_id=$2 AND id=$3))
+                  RETURNING id,site_id`,
+                [sessionId, orderSiteId, orderId]
+              );
+              for (const row of found.rows) await releaseOrderStockReservations(client, {
+                siteId: row.site_id,
+                orderId: row.id,
+                status: 'released'
+              });
+            }
           }
           if (event.type.startsWith('customer.subscription.') && typeof object.id === 'string') {
             const md = object.metadata || {};
