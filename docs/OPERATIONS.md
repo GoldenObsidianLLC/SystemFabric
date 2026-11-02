@@ -24,6 +24,19 @@ Use different database identities for migration and runtime. Grant the runtime o
 - **Scheduler** (`npm run start:scheduler`): publishes due approved content. Multiple workers use row locking and `SKIP LOCKED`; still verify concurrency under your deployment configuration.
 - **Plugin runner** (`npm run start:plugin-runner`): run only on a separate private host or isolated execution environment. Configure `PLUGIN_RUNNER_TOKEN` with at least 32 random characters and `SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES` with explicit immutable image references. Only expose it to the API over private TLS or private network. Do not expose the runner port (default 9090) publicly.
 
+## Local observability collector (development only)
+
+The optional OTLP collector is disabled by default. To start the loopback-only, bearer-authenticated development fixture:
+
+1. Run `npm run otel:dev:setup`. This creates a local token in the Git-ignored `var/secrets/` directory and updates the OTLP entries in `.env`; it does not print the token.
+2. Run `docker compose --profile observability up -d otel-collector`.
+3. Start the API and any workers/scheduler normally. They read the matching token from `.env` and export traces to `127.0.0.1:4318`.
+4. Run `npm run otel:dev:smoke` to verify unauthenticated requests are rejected and an authenticated OTLP span is accepted. Inspect the local, redacted span summary with `docker compose --profile observability logs -f otel-collector`.
+
+Rotate the token with `npm run otel:dev:setup -- --rotate`, then restart the collector and every running SystemFabric process so both sides reload the new secret. Stop the fixture with `docker compose --profile observability stop otel-collector`.
+
+The profile publishes OTLP/HTTP on loopback only, requires a bearer token, runs the pinned Collector Contrib image with reduced container privileges and bounded CPU/memory, and sends traces to an ephemeral debug exporter. It has no durable storage or query UI. Do not use this profile as a production deployment; production needs a separately selected TLS-protected collector and persistent trace backend.
+
 ## Plugin runner isolation
 
 The execution runner invokes Docker/Podman with no network, read-only root, `cap-drop=ALL`, `no-new-privileges`, non-root UID, pids limit, memory/CPU limits, bounded tmpfs, timeout, and bounded JSON input/output. These controls reduce exposure but do not eliminate container-escape risk. Do not mount the Docker socket into the public API service. Use a hardened runtime (e.g. gVisor/Kata where appropriate), dedicated host/VM, deny-by-default egress, minimal host filesystem, per-image allowlist, image provenance/signature checks and security monitoring. The archive inspection library is not an automatic archive-to-OCI builder.
@@ -32,7 +45,7 @@ The execution runner invokes Docker/Podman with no network, read-only root, `cap
 
 Collect request IDs, response status, latency, content IDs, workflow transitions, outbox queue age/depth, projection retry/failure count, scheduled-publish failures, plugin invocation duration/timeout, AI provider error and quota events, cache hit/miss and database pool metrics. Redact content, passwords, cookies, session tokens, invitation tokens and provider keys. Prompt logging is disabled by default; do not enable it without data classification and retention approval.
 
-For realtime presence, SSE/WebSocket, Redis relay, and collaborative-document synchronization, use the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). It catalogs the fixed low-cardinality metric registry, safe scrape boundary, incident triage, and known preview limitations. It does not authorize production deployment or define production SLOs. For request/trace correlation and the redacted structured logging contract, see [Observability and Trace Correlation](OBSERVABILITY.md). Trace propagation is not yet an exported OpenTelemetry tracing deployment.
+For realtime presence, SSE/WebSocket, Redis relay, and collaborative-document synchronization, use the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). It catalogs the fixed low-cardinality metric registry, safe scrape boundary, incident triage, and known preview limitations. It does not authorize production deployment or define production SLOs. For request/trace correlation, the redacted structured logging contract, and the authenticated local OTLP collector profile, see [Observability and Trace Correlation](OBSERVABILITY.md). The local debug exporter is a development fixture, not a production trace store.
 
 ## Before each release
 
