@@ -67,8 +67,34 @@ services:
       - systemfabric-clamav-db:/var/lib/clamav
     restart: unless-stopped
 
+  # Local-only, authenticated OTLP/HTTP collector. Debug exporter is ephemeral.
+  # Configure the shared token first: npm run otel:dev:setup
+  otel-collector:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.50
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    secrets:
+      - otel_receiver_token
+    restart: unless-stopped
+
 volumes:
   systemfabric-postgres:
   systemfabric-memgraph:
   systemfabric-minio:
   systemfabric-clamav-db:
+
+secrets:
+  otel_receiver_token:
+    file: ${SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE:-./var/secrets/otel-collector-token.txt}

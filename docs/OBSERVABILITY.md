@@ -1,6 +1,6 @@
 # Observability and Trace Correlation
 
-**Status:** Optional OpenTelemetry tracing is implemented; collector deployment and production observability certification remain deployment responsibilities.
+**Status:** Optional OpenTelemetry tracing and an authenticated local-only Collector profile are implemented; production collector/backend deployment and observability certification remain open.
 **Scope:** API request handling, WebSocket upgrades, authenticated API-to-plugin-runner calls, PostgreSQL, Redis, outbox delivery, Memgraph projection, and scheduler operations.
 
 ## 1. Implemented capabilities
@@ -35,9 +35,38 @@ The plugin runner accepts the API's `traceparent` only after validating its exis
 
 ## 3. Enable OTLP trace export
 
-Tracing is opt-in and disabled by default. Installations must supply a private OTLP/HTTP collector endpoint; SystemFabric does not install or operate a collector.
+Tracing is opt-in and disabled by default. SystemFabric now includes a **local development collector profile**. Production deployments must still select, deploy, and operate their own collector and trace backend.
 
-Example:
+### Local development collector
+
+Configure a fresh bearer token and matching application settings:
+
+~~~sh
+npm run otel:dev:setup
+docker compose --profile observability up -d otel-collector
+npm run otel:dev:smoke
+~~~
+
+The setup command creates `var/secrets/otel-collector-token.txt` (ignored by Git) and updates only the OTLP settings in the local `.env`. Run it after your normal local environment setup; when no `.env` exists, it creates a collector-only file rather than copying the rest of `.env.example`. It reuses the generated token on subsequent runs. Rotate it with:
+
+~~~sh
+npm run otel:dev:setup -- --rotate
+docker compose --profile observability restart otel-collector
+~~~
+
+Restart the API, plugin runner, worker, and scheduler after changing `.env` so each process reads the new token. View local spans with:
+
+~~~sh
+docker compose --profile observability logs -f otel-collector
+~~~
+
+The reference collector uses the OpenTelemetry Collector Contrib `0.164.0` release image from the [official GHCR release repository](https://github.com/open-telemetry/opentelemetry-collector-releases/pkgs/container/opentelemetry-collector-contrib). The setup script selects a pinned architecture-specific image tag (for example, `0.164.0-amd64` or `0.164.0-arm64`) and fails closed on unsupported architectures. It listens on OTLP/HTTP only, requires bearer authentication, and is published on host loopback `127.0.0.1:4318`. The Compose profile drops capabilities, disables privilege escalation, runs as UID/GID `10001:10001`, mounts configuration and the token read-only, and applies CPU/memory limits. The collector applies a memory limiter before batching and exports to the `debug` exporter only.
+
+This local profile is deliberately **ephemeral and development-only**. It does not persist spans, provide a query UI, forward telemetry to a SaaS vendor, or create a production retention policy. It uses HTTP because the receiver is authenticated and bound to host loopback; do not widen this port binding or use the profile on a public host.
+
+### External / production collector
+
+For a deployment-managed collector, configure a private OTLP/HTTP endpoint:
 
 ~~~dotenv
 SYSTEMFABRIC_OTEL_ENABLED=true
@@ -48,11 +77,13 @@ SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS=5000
 SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=false
 ~~~
 
-An endpoint with no path is normalized to `/v1/traces`. Other paths, URL credentials, query strings, and fragments are rejected. HTTPS is required unless `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true` is explicitly set for a controlled private development environment. Do not expose an unauthenticated OTLP receiver on a public network.
+An endpoint with no path is normalized to `/v1/traces`. Other paths, URL credentials, query strings, and fragments are rejected. HTTPS is required unless `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true` is explicitly set for the isolated local profile.
 
-When collector authentication is required, inject `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` through the deployment's secret manager. The value must be a JSON object and supports only `authorization` and `x-api-key` headers; do not commit credentials to `.env.example` or source control.
+When collector authentication is required, inject `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` through the deployment's secret manager. The value must be a JSON object and supports only `authorization` and `x-api-key` headers. Never commit credentials to `.env.example` or source control. The local setup script creates this value automatically; production should use the approved secret-delivery mechanism.
 
-Configure the same exporter endpoint and authentication policy independently for each process that should emit spans: API, plugin runner, outbox worker, and scheduler. Each process advertises a stable service name: `systemfabric-api`, `systemfabric-plugin-runner`, `systemfabric-outbox-worker`, or `systemfabric-scheduler`.
+Configure the same endpoint and authentication policy independently for each process that should emit spans: API, plugin runner, outbox worker, and scheduler. Each process advertises a stable service name: `systemfabric-api`, `systemfabric-plugin-runner`, `systemfabric-outbox-worker`, or `systemfabric-scheduler`.
+
+A production collector should use TLS (prefer mTLS for service identity where supported), explicit receiver authentication, restricted network ingress, bounded memory, batching, an approved durable/retry queue, and an exporter to the deployment's selected backend. Restrict collector health/diagnostic endpoints to management networks. Do not use the local debug exporter as a production backend.
 
 ## 4. Configuration reference
 
@@ -61,6 +92,7 @@ Configure the same exporter endpoint and authentication policy independently for
 | `SYSTEMFABRIC_OTEL_ENABLED` | `false` | Initialize the OpenTelemetry trace provider and OTLP/HTTP exporter. |
 | `SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP endpoint; required when tracing is enabled. |
 | `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` | unset | Secret-injected JSON object limited to `authorization` and `x-api-key`. |
+| `SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE` | `./var/secrets/otel-collector-token.txt` | Local Compose profile secret source path; created by `npm run otel:dev:setup`. |
 | `SYSTEMFABRIC_OTEL_SAMPLE_RATIO` | `0.1` | Root trace sampling ratio from 0 to 1; parent-based sampling respects the upstream sampled flag. |
 | `SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS` | `5000` | Bounded export timeout (250–30,000 ms). |
 | `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP` | `false` | Explicitly permit HTTP transport; use only on isolated private networks. |
@@ -69,7 +101,7 @@ Configure the same exporter endpoint and authentication policy independently for
 | `SYSTEMFABRIC_METRICS_ENABLED` | `false` | Existing protected metrics endpoint switch. |
 | `SYSTEMFABRIC_METRICS_TOKEN` | unset | Dedicated bearer token for the private `/metrics` endpoint. |
 
-The SDK is configured for tracing only. Metrics and logs continue to use the existing SystemFabric mechanisms; this change does not add OTLP metrics or log exporters. Sampling uses a bounded batch queue and batch size. Export is asynchronous so collector/network failures do not become application request dependencies; process shutdown attempts to flush the trace queue.
+The SDK is configured for tracing only. Metrics and logs continue to use the existing SystemFabric mechanisms; this change does not add OTLP metrics or log exporters. Sampling uses a bounded batch queue and batch size. Export is asynchronous so collector/network failures do not become application request dependencies; process shutdown attempts to flush the trace queue. The local Compose collector uses only a debug exporter; it stores no trace history.
 
 ## 5. Attribute and data-safety policy
 
@@ -99,14 +131,17 @@ Automated tests verify:
 - Server, PostgreSQL promise/callback, Redis, outbox, graph-projection, and Memgraph span creation and parent-child relationships.
 - Error status/code recording without the exception message.
 - Callback-style PostgreSQL queries remain functional when tracing is disabled.
+- Local collector setup is idempotent, stores the generated token outside source control, supports explicit rotation, preserves unrelated `.env` values, and rejects malformed/duplicate configuration.
+- The collector smoke command verifies that unauthenticated OTLP requests receive HTTP 401 and a valid local OTLP JSON span receives HTTP 200; it refuses non-loopback destinations and mismatched credentials.
+- The Compose collector reference is checked for bearer authentication, loopback-only publishing, least-privilege container settings, bounded memory, batching, and a trace-only debug pipeline.
 - F1.13 tests continue to verify W3C v00 validation, remote-parent trust gating, request isolation, structured-log redaction, and authenticated plugin-runner trace propagation.
 
-These are local automated tests. A real PostgreSQL/Redis/Memgraph deployment, trusted ingress, OTLP collector, cross-process sampling policy, throughput/queue behavior, and production network path still require environment-specific verification.
+The repository validation and local Docker-host smoke test pass. A real PostgreSQL/Redis/Memgraph deployment, trusted ingress, production OTLP receiver/backend, cross-process sampling policy, throughput/queue behavior, durable storage, and production network path still require environment-specific verification.
 
 ## 8. Remaining work and production boundary
 
-- Select, deploy, secure, and load-test a deployment-approved OTLP collector and receiver authentication policy.
-- Validate exporter retries, queue saturation, sampling, TLS, secret rotation, retention, and shutdown behavior in the actual deployment topology.
+- Select, deploy, secure, and load-test the production OTLP collector and trace backend; define durable delivery and the receiving service's ownership.
+- Validate exporter retries, queue saturation, sampling, TLS/mTLS, secret rotation, retention, and shutdown behavior in the actual deployment topology.
 - Add centralized redacted log transport with access controls, retention/deletion, and named ownership.
 - Add additional spans only where they provide actionable operational value without exporting business payloads.
 

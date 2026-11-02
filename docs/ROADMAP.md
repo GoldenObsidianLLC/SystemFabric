@@ -73,7 +73,8 @@ This track establishes reusable infrastructure before individual screens and fea
 - [x] Document real-time subsystem operating boundaries, current metrics, privacy rules, triage and recovery procedures in the [Real-Time Operations Runbook](REALTIME-OPERATIONS.md). This is a developer-preview operating baseline, not deployment approval.
 - [x] Add request-scoped W3C Trace Context v00, AsyncLocalStorage correlation, trusted-ingress guard, internal plugin-runner propagation, and allow-listed API/plugin-runner structured logs. See [Observability and Trace Correlation](OBSERVABILITY.md); no exporter or centralized log transport is claimed.
 - [x] Add opt-in OpenTelemetry manual span instrumentation and OTLP/HTTP export for API, authenticated plugin runner, PostgreSQL, Redis, outbox/worker, graph projection and scheduler. See [Observability and Trace Correlation](OBSERVABILITY.md); tracing is disabled by default.
-- [ ] Select, deploy, secure and load-test a deployment-approved OTLP collector; validate export behavior, retention and access policy on the target topology.
+- [x] Add an authenticated, loopback-only local OTLP/HTTP Collector development profile with bounded memory, batch processing, a pinned contrib image, and an ephemeral debug exporter. See [Observability and Trace Correlation](OBSERVABILITY.md); this is not a production backend.
+- [ ] Select, deploy, secure and load-test a production OTLP collector/backend; validate TLS, durable queueing, retry behavior, retention and access policy on the target topology.
 - [ ] Centralize redacted logs with approved transport, access controls, retention/deletion, and named ownership; do not collect prompt/content/token payloads.
 - [x] Validate cross-site/document subscription and delivery isolation with adversarial integration tests; no separate tenantId is modeled yet.
 
