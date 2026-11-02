@@ -15,7 +15,7 @@ const required = [
   'packages/ai/src/service.js', 'packages/ai/src/provider-factory.js', 'packages/ai/src/config.js',
   'packages/db/src/postgres-store.js', 'packages/db/src/outbox-worker.js', 'packages/db/src/outbox-delivery.js', 'packages/db/src/relationship-store.js',
   'packages/realtime/src/index.js', 'packages/realtime/src/event-hub.js', 'packages/realtime/src/presence.js', 'packages/realtime/src/redis-presence.js', 'packages/realtime/src/redis-realtime.js', 'packages/realtime/src/sse-gateway.js', 'packages/realtime/src/event-contract.js',
-  'test/migrations.test.js', 'test/realtime.test.js', 'test/redis-presence.test.js', 'test/redis-realtime.test.js', 'test/integration/redis-presence.integration.test.js', 'test/outbox-contract.test.js', 'test/outbox-delivery.test.js', 'test/graph-projection-worker.test.js', 'test/memgraph-projector.test.js', 'docs/REALTIME-FOUNDATION-F1.md', 'docs/REALTIME-AI-ARCHITECTURE.md',
+  'test/migrations.test.js', 'test/realtime.test.js', 'test/realtime-tenant-isolation.test.js', 'test/redis-presence.test.js', 'test/redis-realtime.test.js', 'test/integration/redis-presence.integration.test.js', 'test/outbox-contract.test.js', 'test/outbox-delivery.test.js', 'test/graph-projection-worker.test.js', 'test/memgraph-projector.test.js', 'docs/REALTIME-FOUNDATION-F1.md', 'docs/REALTIME-AI-ARCHITECTURE.md',
   'packages/graph/src/memgraph-store.js', 'packages/graph/src/rebuild-projection.js', 'apps/api/src/server.js', 'apps/mcp/src/server.mjs',
   'apps/admin/index.html', 'apps/admin/platform.html', 'apps/admin/assets/platform.js', 'apps/admin/assets/platform.css', 'vendor/enginex/package.json'
 ];

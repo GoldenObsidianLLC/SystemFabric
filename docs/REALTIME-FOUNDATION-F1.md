@@ -507,3 +507,17 @@ All live Redis scenarios used a unique random Pub/Sub prefix and loopback URL wi
 ### Remaining production gates
 
 F1.11 adds local fault-recovery, sustained relay fan-out and reconnect-storm evidence only. It does not certify Redis Cluster slot behavior/failover, TCP/network partitions, broker restart, actual orchestrator node loss or rolling deployment, PostgreSQL failover, autoscaling, representative peak production load or a multi-hour soak. Still required: run the complete browser suite on clean CI infrastructure; deployment-specific sustained/peak load and reconnect soak; Redis Cluster/partition/failover review; node-loss/rolling-deploy rehearsal in the target orchestrator; independent authorization/security and accessibility reviews; backup/retention verification; and named alert/runbook ownership. Production remains NO-GO.
+
+
+## 12. Tenant-bound real-time route regression coverage (F1.24)
+
+F1.24 adds an adversarial API regression for a principal whose only membership and `content:read` capability are scoped to Site A. The test uses an active server-side session and exercises the same authenticated principal against both sites.
+
+The regression verifies that:
+- Site A presence heartbeat and snapshot access succeed for the authorized member.
+- Site B presence heartbeat and snapshot access return `403 ERR_SYSTEMFABRIC_FORBIDDEN`.
+- The Site A SSE presence stream can be established, while a Site B SSE request is rejected before an event-stream response is opened.
+- A Site A WebSocket upgrade succeeds, while the same credentials cannot upgrade against the Site B route.
+- Authorization is evaluated against the requested site and the authenticated principal; the test does not accept a client-supplied identity or infer access from a different site's membership.
+
+This is targeted application-level regression coverage for the real-time route boundary. It does **not** establish that every application, worker, database, cache, storage or provider path is tenant-isolated; it does not replace independent security assessment or the full two-tenant review required by [issue #14](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14). That issue remains open until an independent reviewer assesses the exact candidate revision and the required evidence is retained. Production remains NO-GO pending all applicable release and deployment gates.
