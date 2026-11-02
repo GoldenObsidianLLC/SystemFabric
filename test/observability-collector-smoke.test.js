@@ -14,7 +14,7 @@ function temporaryRoot(t) {
   return root;
 }
 
-test('collector smoke test proves auth rejection and authenticated OTLP span acceptance', async t => {
+test('collector smoke test proves auth rejection and OTLP acceptance for traces and logs', async t => {
   const root = temporaryRoot(t);
   const token = 'f'.repeat(43);
   configureLocalCollector({ root, tokenFactory: () => token });
@@ -30,30 +30,41 @@ test('collector smoke test proves auth rejection and authenticated OTLP span acc
   });
 
   assert.deepEqual(result, {
-    endpoint: 'http://127.0.0.1:4318/v1/traces',
-    unauthenticatedStatus: 401,
-    authenticatedStatus: 200,
-    spansSubmitted: 1
+    traceEndpoint: 'http://127.0.0.1:4318/v1/traces',
+    logsEndpoint: 'http://127.0.0.1:4318/v1/logs',
+    unauthenticatedTraceStatus: 401,
+    authenticatedTraceStatus: 200,
+    unauthenticatedLogsStatus: 401,
+    authenticatedLogsStatus: 200,
+    spansSubmitted: 1,
+    logsSubmitted: 1
   });
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 4);
+  assert.equal(requests[0].url, 'http://127.0.0.1:4318/v1/traces');
   assert.equal(requests[0].options.headers.authorization, undefined);
   assert.equal(requests[1].options.headers.authorization, 'Bearer ' + token);
+  assert.equal(requests[2].url, 'http://127.0.0.1:4318/v1/logs');
+  assert.equal(requests[2].options.headers.authorization, undefined);
+  assert.equal(requests[3].options.headers.authorization, 'Bearer ' + token);
   assert.equal(requests[0].options.signal instanceof AbortSignal, true);
 
-  const payload = JSON.parse(requests[1].options.body);
-  assert.equal(payload.resourceSpans[0].scopeSpans[0].spans[0].name, 'collector.authenticated_smoke');
-  assert.equal(payload.resourceSpans[0].scopeSpans[0].spans.length, 1);
+  const tracePayload = JSON.parse(requests[1].options.body);
+  assert.equal(tracePayload.resourceSpans[0].scopeSpans[0].spans[0].name, 'collector.authenticated_smoke');
+  assert.equal(tracePayload.resourceSpans[0].scopeSpans[0].spans.length, 1);
+  const logsPayload = JSON.parse(requests[3].options.body);
+  assert.equal(logsPayload.resourceLogs[0].scopeLogs[0].logRecords[0].body.stringValue, 'systemfabric.observability.logs_smoke');
+  assert.equal(logsPayload.resourceLogs[0].scopeLogs[0].logRecords.length, 1);
   assert.equal(JSON.stringify(result).includes(token), false);
 });
 
-test('collector smoke test never sends traces to an endpoint other than loopback', async t => {
+test('collector smoke test never sends traces or logs to endpoints other than loopback', async t => {
   const root = temporaryRoot(t);
   configureLocalCollector({ root, tokenFactory: () => 'g'.repeat(43) });
   const envFile = path.join(root, '.env');
   const env = fs.readFileSync(envFile, 'utf8');
   fs.writeFileSync(envFile, env.replace(
-    'SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT=http://127.0.0.1:4318/v1/traces',
-    'SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT=https://external.example/v1/traces'
+    'SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=http://127.0.0.1:4318/v1/logs',
+    'SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=https://external.example/v1/logs'
   ));
 
   let calls = 0;

@@ -7,6 +7,7 @@ const { validatePinnedImageDigest } = require('../../../packages/plugins/src/man
 const { createTraceContext } = require('../../../packages/observability/src/trace-context');
 const { createStructuredLogger } = require('../../../packages/observability/src/structured-logger');
 const { initializeTracing, runWithServerSpan, setHttpStatus } = require('../../../packages/observability/src/tracing');
+const { initializeLogExport } = require('../../../packages/observability/src/otel-logs');
 
 function sameSecret(candidate, expected) {
   if (typeof candidate !== 'string' || typeof expected !== 'string' || expected.length < 32) return false;
@@ -18,14 +19,15 @@ async function readJson(req, max = 300_000) {
   for await (const chunk of req) { size += chunk.length; if (size > max) throw Object.assign(new Error('Request too large.'), { statusCode: 413, code: 'ERR_SYSTEMFABRIC_PLUGIN_REQUEST_TOO_LARGE' }); chunks.push(chunk); }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw Object.assign(new Error('Invalid JSON.'), { statusCode: 400, code: 'ERR_SYSTEMFABRIC_PLUGIN_INVALID_JSON' }); }
 }
-function createPluginRunnerServer({ env = process.env, runner, logger = console } = {}) {
+function createPluginRunnerServer({ env = process.env, runner, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
   const token = env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN;
   if (env.NODE_ENV === 'production' && (!token || token.length < 32)) throw new Error('A strong SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN is required.');
   const allowlist = String(env.SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES || '').split(',').map(x => x.trim()).filter(Boolean);
   for (const image of allowlist) if (!validatePinnedImageDigest(image)) throw new Error('Every allowlisted plugin image must be pinned with @sha256:<digest>.');
   const execute = runner || createContainerPluginRunner({ runtime: env.SYSTEMFABRIC_CONTAINER_RUNTIME || 'docker', timeoutMs: Number(env.PLUGIN_TIMEOUT_MS || 5000), allowedImages: allowlist });
-  const structuredLogger = createStructuredLogger({
+  const structuredLogger = suppliedStructuredLogger || createStructuredLogger({
     logger,
+    otelLogger,
     service: 'systemfabric-plugin-runner',
     environment: env.NODE_ENV || 'development'
   });
@@ -105,11 +107,88 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console 
 }
 if (require.main === module) {
   const token = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN;
-  if (!token || token.length < 32) { console.error('Set SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN to at least 32 characters.'); process.exit(1); }
-  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-plugin-runner', serviceVersion: require('../../../package.json').version });
-  const server = createPluginRunnerServer(); const host = process.env.PLUGIN_RUNNER_HOST || '127.0.0.1'; const port = Number(process.env.PLUGIN_RUNNER_PORT || 9090);
-  server.listen(port, host, () => console.error(JSON.stringify({ type:'systemfabric.plugin_runner.started', host, port })));
-  const shutdown = () => server.close(async () => { await tracingRuntime.shutdown().catch(() => {}); process.exit(0); });
-  process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
+  if (!token || token.length < 32) {
+    console.error('Set SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN to at least 32 characters.');
+    process.exitCode = 1;
+  } else {
+    const serviceVersion = require('../../../package.json').version;
+    let tracingRuntime = null;
+    let logRuntime = null;
+    let structuredLogger = null;
+    let server = null;
+    let stopping = false;
+
+    const flushTelemetry = async () => {
+      await Promise.all([
+        tracingRuntime?.shutdown?.().catch(() => {}),
+        logRuntime?.shutdown?.().catch(() => {})
+      ]);
+    };
+    const shutdown = async () => {
+      if (stopping) return;
+      stopping = true;
+      if (server?.listening) {
+        await new Promise(resolve => server.close(resolve));
+      }
+      await flushTelemetry();
+    };
+
+    void (async () => {
+      try {
+        tracingRuntime = initializeTracing({
+          env: process.env,
+          serviceName: 'systemfabric-plugin-runner',
+          serviceVersion
+        });
+        try {
+          logRuntime = initializeLogExport({
+            env: process.env,
+            serviceName: 'systemfabric-plugin-runner',
+            serviceVersion
+          });
+        } catch (error) {
+          await tracingRuntime.shutdown().catch(() => {});
+          throw error;
+        }
+        structuredLogger = createStructuredLogger({
+          logger: console,
+          otelLogger: logRuntime.logger,
+          service: 'systemfabric-plugin-runner',
+          environment: process.env.NODE_ENV || 'development'
+        });
+        server = createPluginRunnerServer({ structuredLogger });
+        const host = process.env.PLUGIN_RUNNER_HOST || '127.0.0.1';
+        const port = Number(process.env.PLUGIN_RUNNER_PORT || 9090);
+        await new Promise((resolve, reject) => {
+          server.once('error', reject);
+          server.listen(port, host, () => {
+            server.off('error', reject);
+            structuredLogger.emit('info', 'systemfabric.plugin_runner.started', {
+              component: 'plugin-runner',
+              operation: 'startup',
+              outcome: 'success'
+            });
+            resolve();
+          });
+        });
+        process.once('SIGINT', () => { void shutdown(); });
+        process.once('SIGTERM', () => { void shutdown(); });
+      } catch (error) {
+        const bootstrapLogger = structuredLogger || createStructuredLogger({
+          service: 'systemfabric-plugin-runner',
+          environment: process.env.NODE_ENV || 'development'
+        });
+        bootstrapLogger.emit('error', 'systemfabric.plugin_runner.start_failed', {
+          component: 'plugin-runner',
+          operation: 'startup',
+          outcome: 'failure',
+          code: error?.code,
+          errorType: error?.name || 'Error'
+        });
+        await shutdown();
+        process.exitCode = 1;
+      }
+    })();
+  }
 }
 module.exports = { createPluginRunnerServer, sameSecret };
