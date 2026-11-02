@@ -204,11 +204,12 @@ test(
       'INSERT INTO social_conversation_members(conversation_id,site_id,user_id) VALUES($1,$2,$3),($1,$2,$4)',
       [conversationB, siteB, actorB.id, userB2.id]
     );
-    await pool.query(
+    const messageBResult = await pool.query(
       `INSERT INTO social_messages(site_id,conversation_id,sender_id,body)
-       VALUES($1,$2,$3,'Site B message control')`,
+       VALUES($1,$2,$3,'Site B message control') RETURNING id`,
       [siteB, conversationB, userB2.id]
     );
+    const messageB = messageBResult.rows[0].id;
 
     await pool.query(
       'INSERT INTO social_blocks(site_id,blocker_id,blocked_id,reason) VALUES($1,$2,$3,$4)',
@@ -244,7 +245,7 @@ test(
       `INSERT INTO social_notifications(site_id,user_id,notification_type,payload)
        VALUES($1,$2,'community.message.new',jsonb_build_object('messageId',$3::text))
        RETURNING id`,
-      [siteB, actorB.id, messageA]
+      [siteB, actorB.id, messageB]
     );
     const notificationB = notificationBResult.rows[0].id;
 
