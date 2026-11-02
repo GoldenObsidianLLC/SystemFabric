@@ -6,6 +6,7 @@ const { createOpenAIResponsesProvider } = require('../packages/ai/src/providers/
 const { createOpenAICompatibleProvider } = require('../packages/ai/src/providers/openai-compatible');
 const { createAnthropicProvider } = require('../packages/ai/src/providers/anthropic');
 const { createGeminiProvider } = require('../packages/ai/src/providers/gemini');
+const { postJson } = require('../packages/ai/src/providers/utils');
 
 const schema = { type: 'object', additionalProperties: false, required: ['text'], properties: { text: { type: 'string' } } };
 
@@ -67,4 +68,81 @@ test('Anthropic and Gemini adapters use headers rather than logging provider key
     assert.equal(calls[1].body.generation_config.max_output_tokens, 6000);
     assert.ok(!calls[1].url.includes('gemini-secret'));
   } finally { global.fetch = originalFetch; }
+});
+
+
+test('provider transport distinguishes caller cancellation from its own timeout', async () => {
+  const controller = new AbortController();
+  let startedResolve;
+  const started = new Promise(resolve => { startedResolve = resolve; });
+  let transportSignal;
+
+  const pending = postJson(
+    'https://example.invalid/v1/generate',
+    {},
+    { prompt: 'test' },
+    5_000,
+    {
+      signal: controller.signal,
+      fetchImpl: async (_url, options) => {
+        transportSignal = options.signal;
+        startedResolve();
+        return new Promise((resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+        });
+      }
+    }
+  );
+  await started;
+  controller.abort(new Error('test client disconnect'));
+
+  await assert.rejects(pending, { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 });
+  assert.equal(transportSignal.aborted, true);
+
+  await assert.rejects(
+    postJson(
+      'https://example.invalid/v1/generate',
+      {},
+      { prompt: 'timeout test' },
+      10,
+      {
+        fetchImpl: async (_url, options) => new Promise((resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+        })
+      }
+    ),
+    { code: 'ERR_SYSTEMFABRIC_AI_TIMEOUT' }
+  );
+});
+
+test('OpenAI Responses provider forwards caller cancellation into its HTTP request', async () => {
+  const controller = new AbortController();
+  let startedResolve;
+  const started = new Promise(resolve => { startedResolve = resolve; });
+  let transportSignal;
+  const provider = createOpenAIResponsesProvider({
+    apiKey: 'test-key',
+    baseUrl: 'https://example.invalid/v1',
+    model: 'test-model',
+    fetchImpl: async (_url, options) => {
+      transportSignal = options.signal;
+      startedResolve();
+      return new Promise((resolve, reject) => {
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+      });
+    }
+  });
+
+  const pending = provider.generate({
+    system: 'Return JSON',
+    input: 'cancel this request',
+    schemaName: 'test_schema',
+    schema,
+    signal: controller.signal
+  });
+  await started;
+  controller.abort(new Error('caller disconnected'));
+
+  await assert.rejects(pending, { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 });
+  assert.equal(transportSignal.aborted, true);
 });

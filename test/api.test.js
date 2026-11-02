@@ -17,10 +17,11 @@ test('shared secret comparison is byte-safe, constant-time for equal lengths, an
   assert.equal(sameSecret('🔐token', '🔐token'), true);
 });
 
-async function withServer(fn, envExtra = {}) {
+async function withServer(fn, envExtra = {}, serverOptions = {}) {
   const server = createApiServer({
     env: { NODE_ENV: 'test', SYSTEMFABRIC_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock', MAX_REQUEST_BYTES: '16384', RATE_LIMIT_MAX_REQUESTS: '100', ...envExtra },
-    logger: { error() {} }
+    logger: { error() {} },
+    ...serverOptions
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try { await fn(`http://127.0.0.1:${server.address().port}`); }
@@ -59,6 +60,52 @@ test('page-draft endpoint returns validated proposal, not a published record', a
     assert.equal(data.published, false);
     assert.equal(data.document.type, 'page');
   });
+});
+
+test('client disconnect cancels the governed AI task and releases the request handler', async () => {
+  let startedResolve;
+  let cancelledResolve;
+  let providerSignal = null;
+  const started = new Promise(resolve => { startedResolve = resolve; });
+  const cancelled = new Promise(resolve => { cancelledResolve = resolve; });
+  const aiService = {
+    providerInfo() {
+      return { provider: 'mock', model: 'disconnect-test-model', mock: true, publishToolsEnabled: false };
+    },
+    async generatePageDraft({ signal }) {
+      providerSignal = signal;
+      startedResolve();
+      return new Promise((resolve, reject) => {
+        const abort = () => {
+          cancelledResolve();
+          reject(Object.assign(new Error('cancelled by client disconnect'), {
+            code: 'ERR_SYSTEMFABRIC_AI_CANCELLED',
+            statusCode: 499
+          }));
+        };
+        if (signal.aborted) abort();
+        else signal.addEventListener('abort', abort, { once: true });
+      });
+    }
+  };
+
+  await withServer(async base => {
+    const controller = new AbortController();
+    const pending = fetch(`${base}/api/v1/ai/page-draft`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { authorization: 'Bearer test-secret-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'A request that will be cancelled.' })
+    });
+
+    await started;
+    assert.ok(providerSignal instanceof AbortSignal);
+    controller.abort(new Error('test client disconnected'));
+
+    await assert.rejects(pending);
+    await cancelled;
+    assert.equal(providerSignal.aborted, true);
+  }, {}, { aiService });
 });
 
 test('preview endpoint returns HTML with restrictive CSP', async () => {

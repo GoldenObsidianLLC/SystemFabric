@@ -86,7 +86,8 @@ This track establishes reusable infrastructure before individual screens and fea
 
 - [ ] Define a central AI task lifecycle and orchestration contract across the existing provider adapters.
 - [ ] Build an authorization-aware context assembly layer; enforce tenant/site and object-level access before data reaches a model.
-- [ ] Define AI task budgets, quotas, timeouts, cancellation, provider fallback and model/provider policy by tenant and use case.
+- [ ] Define AI task budgets, quotas, cancellation policies, provider fallback and model/provider policy by tenant and use case.
+- [x] Propagate HTTP client cancellation through the governed AI service and all provider adapters, abort in-flight provider fetches on disconnect, and distinguish caller cancellation from provider timeout in sanitized audit outcomes. This is request-cancellation plumbing only; durable task state, resumability, tenant quotas and fallback policy remain open.
 - [ ] Add structured output validation, prompt/tool versioning, correlation IDs, traceability and safe error handling.
 - [ ] Define an explicit human-approval contract for publishing, role changes, firewall/security changes, moderation actions and workflow execution.
 - [ ] Define risk tiers so low-risk, reversible and explicitly delegated tasks can be automated proportionately, while consequential or privileged actions require authorized human review.
