@@ -311,8 +311,15 @@ function cacheGet(cacheKey) {
 }
 
 async function readTemplateSource(templatePath, limits, attempt = 0) {
-  // Keep the file descriptor open across metadata checks and the read so a path
-  // replacement cannot redirect the read to a different file between calls.
+  // Inspect the path before opening it, then bind that identity to the descriptor.
+  // Once open, the descriptor is authoritative: a later path replacement must
+  // not redirect the read or cause safe reads from the original file to fail.
+  const pathEntry = await fsp.lstat(templatePath);
+  if (!pathEntry.isFile() || pathEntry.isSymbolicLink()) {
+    throw new TemplateError('Template path must resolve to a regular file.', {
+      code: 'ERR_ENGINEX_TEMPLATE_PATH_CHANGED', templatePath
+    });
+  }
   const handle = await fsp.open(templatePath, 'r');
   let before;
   let after;
@@ -320,9 +327,8 @@ async function readTemplateSource(templatePath, limits, attempt = 0) {
   let sourceBytes;
   try {
     before = await handle.stat();
-    const pathEntry = await fsp.lstat(templatePath);
-    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
-      throw new TemplateError('Template path must resolve to the opened regular file.', {
+    if (!before.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Template path changed before it could be opened safely.', {
         code: 'ERR_ENGINEX_TEMPLATE_PATH_CHANGED', templatePath
       });
     }
@@ -2836,15 +2842,18 @@ engine.loadPrecompiled = async function loadPrecompiled(manifestPath, options = 
   if (typeof manifestPath !== 'string' || !manifestPath) throw new TypeError('manifestPath must be a JSON file path.');
   const fullPath = path.resolve(manifestPath);
   const maxManifestBytes = options.maxManifestBytes ?? 64 * 1024 * 1024;
+  const pathEntry = await fsp.lstat(fullPath);
+  if (!pathEntry.isFile() || pathEntry.isSymbolicLink()) {
+    throw new TemplateError('Precompiled manifest path must resolve to a regular file.', { code: 'ERR_ENGINEX_MANIFEST_PATH' });
+  }
   const handle = await fsp.open(fullPath, 'r');
   let manifestSource;
   try {
-    // Read through the descriptor whose metadata was checked; do not re-resolve
-    // the path between stat and read.
+    // Bind the pre-open path identity to the opened descriptor. A later path
+    // replacement cannot redirect reads from this already-open file handle.
     const before = await handle.stat();
-    const pathEntry = await fsp.lstat(fullPath);
-    if (!before.isFile() || !pathEntry.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
-      throw new TemplateError('Precompiled manifest path must resolve to the opened regular file.', { code: 'ERR_ENGINEX_MANIFEST_PATH' });
+    if (!before.isFile() || before.dev !== pathEntry.dev || before.ino !== pathEntry.ino) {
+      throw new TemplateError('Precompiled manifest path changed before it could be opened safely.', { code: 'ERR_ENGINEX_MANIFEST_PATH' });
     }
     if (before.size > maxManifestBytes) throw new TemplateError('Precompiled manifest exceeds maxManifestBytes.', { code: 'ERR_ENGINEX_MANIFEST_LIMIT' });
     manifestSource = await handle.readFile({ encoding: 'utf8' });

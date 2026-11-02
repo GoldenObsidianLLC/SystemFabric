@@ -275,10 +275,17 @@ function validateManifestDirectory(directory, expected) {
       if (entry.isSymbolicLink()) throw new Error('Symbolic links are not accepted in CI evidence.');
       if (!['manifest.json', 'files'].includes(entry.name)) throw new Error('Unexpected top-level content in CI evidence artifact.');
     }
-    if (!topLevel.some(entry => entry.name === 'files' && entry.isDirectory())) {
-      throw new Error('CI evidence files directory is missing or invalid.');
+    const filesEntry = topLevel.find(entry => entry.name === 'files');
+    if (filesEntry && (!filesEntry.isDirectory() || filesEntry.isSymbolicLink())) {
+      throw new Error('CI evidence files directory is invalid.');
     }
-    const onDiskPaths = walkRegularFiles(directory, 'files').sort();
+    if (!filesEntry && seen.size > 0) {
+      throw new Error('CI evidence files directory is missing for a non-empty manifest.');
+    }
+    // Artifact uploaders omit empty directories. A zero-file manifest (such as
+    // CodeQL, whose authoritative evidence is the GitHub job record) is valid
+    // without a materialized files/ directory.
+    const onDiskPaths = filesEntry ? walkRegularFiles(directory, 'files').sort() : [];
     const listedPaths = [...seen].sort();
     if (JSON.stringify(onDiskPaths) !== JSON.stringify(listedPaths)) {
       errors.push('Artifact directory contents do not exactly match the manifest file list.');

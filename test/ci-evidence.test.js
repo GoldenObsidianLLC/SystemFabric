@@ -194,6 +194,20 @@ test('consolidates all successful producers but never marks production certified
   );
 });
 
+test('accepts an empty CodeQL evidence inventory when artifact download omits empty directories', t => {
+  const { artifactRoot, jobApi, runApi } = createFixtures(t);
+  const codeql = JOBS.find(job => job.key === 'security-static-analysis');
+  const directory = path.join(artifactRoot, codeql.artifactName);
+  const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
+  assert.deepEqual(manifest.artifacts, []);
+  fs.rmSync(path.join(directory, 'files'), { recursive: true, force: true });
+
+  const report = evaluateCiEvidence({ artifactRoot, expected, run: runApi, jobs: jobApi });
+  assert.equal(report.ciStatus, 'PASS', JSON.stringify(report.checks, null, 2));
+  assert.equal(report.jobs.find(job => job.key === codeql.key).status, 'PASS');
+  assert.equal(report.jobs.find(job => job.key === codeql.key).artifactCount, 0);
+});
+
 test('rejects unknown manifest fields and non-object manifest roots', t => {
   const { artifactRoot } = createFixtures(t);
   const directory = path.join(artifactRoot, JOBS[0].artifactName);
