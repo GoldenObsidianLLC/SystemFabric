@@ -68,6 +68,26 @@ test('client disconnect cancels the governed AI task and releases the request ha
   let providerSignal = null;
   const started = new Promise(resolve => { startedResolve = resolve; });
   const cancelled = new Promise(resolve => { cancelledResolve = resolve; });
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const taskId = '55555555-5555-4555-8555-555555555555';
+  let taskRecord = null;
+  let taskTerminalResolve;
+  const taskTerminal = new Promise(resolve => { taskTerminalResolve = resolve; });
+  const aiTaskStore = {
+    async create(input) {
+      taskRecord = { id: taskId, siteId: input.siteId, actorId: input.actorId, status: 'queued', requestId: input.requestId };
+      return taskRecord;
+    },
+    async start(input) {
+      Object.assign(taskRecord, { status: 'running', provider: input.provider, model: input.model });
+      return taskRecord;
+    },
+    async finish(input) {
+      Object.assign(taskRecord, { status: input.status, errorCode: input.errorCode || null });
+      taskTerminalResolve();
+      return taskRecord;
+    }
+  };
   const aiService = {
     providerInfo() {
       return { provider: 'mock', model: 'disconnect-test-model', mock: true, publishToolsEnabled: false };
@@ -104,8 +124,11 @@ test('client disconnect cancels the governed AI task and releases the request ha
 
     await assert.rejects(pending);
     await cancelled;
+    await taskTerminal;
     assert.equal(providerSignal.aborted, true);
-  }, {}, { aiService });
+    assert.equal(taskRecord.status, 'cancelled');
+    assert.equal(taskRecord.errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
+  }, { SYSTEMFABRIC_DEFAULT_SITE_ID: siteId }, { aiService, aiTaskStore });
 });
 
 test('preview endpoint returns HTML with restrictive CSP', async () => {
@@ -335,4 +358,206 @@ test('public commerce catalog paths are reachable without API credentials and fa
     assert.equal(plans.status, 503);
     assert.equal((await plans.json()).code, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED');
   });
+});
+
+
+test('governed AI generation returns a tenant-scoped task ID and status endpoint hides other sites', async () => {
+  const siteA = '11111111-1111-4111-8111-111111111111';
+  const siteB = '22222222-2222-4222-8222-222222222222';
+  const taskId = '33333333-3333-4333-8333-333333333333';
+  const tasks = new Map();
+  const aiTaskStore = {
+    async create(input) {
+      const task = {
+        id: taskId,
+        siteId: input.siteId,
+        actorId: input.actorId,
+        requestId: input.requestId,
+        taskType: input.taskType,
+        status: 'queued',
+        provider: null,
+        model: null,
+        inputChars: input.inputChars,
+        outputChars: 0,
+        latencyMs: 0,
+        errorCode: null,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        startedAt: null,
+        completedAt: null,
+        updatedAt: new Date().toISOString()
+      };
+      tasks.set(taskId, task);
+      return task;
+    },
+    async start(input) {
+      const task = tasks.get(input.taskId);
+      task.status = 'running';
+      task.provider = input.provider;
+      task.model = input.model;
+      task.startedAt = new Date().toISOString();
+      task.version += 1;
+      return task;
+    },
+    async finish(input) {
+      const task = tasks.get(input.taskId);
+      task.status = input.status;
+      task.outputChars = input.outputChars || 0;
+      task.latencyMs = input.latencyMs || 0;
+      task.errorCode = input.errorCode || null;
+      task.completedAt = new Date().toISOString();
+      task.version += 1;
+      return task;
+    },
+    async get(input) {
+      const task = tasks.get(input.taskId);
+      return task && task.siteId === input.siteId && task.actorId === input.actorId ? task : null;
+    }
+  };
+
+  await withServer(async base => {
+    const response = await fetch(base + '/api/v1/ai/page-draft', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-secret-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ siteId: siteA, prompt: 'Create a task-tracked landing page.' })
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.taskId, taskId);
+    assert.equal(result.status, 'draft-proposal');
+    assert.equal(tasks.get(taskId).status, 'succeeded');
+    assert.equal(tasks.get(taskId).taskType, 'page_draft');
+    const aiStatusResponse = await fetch(base + '/api/v1/ai/status', {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    const aiStatus = await aiStatusResponse.json();
+    assert.equal(aiStatus.durableTaskStatus, true);
+    assert.equal(aiStatus.capabilities.includes('task-status'), true);
+
+    const statusResponse = await fetch(base + '/api/v1/ai/tasks/' + taskId + '?siteId=' + siteA, {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(statusResponse.status, 200);
+    const status = await statusResponse.json();
+    assert.equal(status.task.status, 'succeeded');
+    assert.equal(status.task.provider, 'mock');
+    assert.equal(Object.hasOwn(status.task, 'prompt'), false);
+
+    const crossSiteResponse = await fetch(base + '/api/v1/ai/tasks/' + taskId + '?siteId=' + siteB, {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(crossSiteResponse.status, 404);
+    assert.equal((await crossSiteResponse.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_NOT_FOUND');
+  }, {}, { aiTaskStore });
+});
+
+test('governed AI remains available when the task lifecycle migration has not been applied', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const taskId = '33333333-3333-4333-8333-333333333333';
+  let createCalls = 0;
+  const aiTaskStore = {
+    async isAvailable() { return false; },
+    async create() { createCalls += 1; throw new Error('task table must not be accessed'); },
+    async get() { throw new Error('task table must not be accessed'); }
+  };
+
+  await withServer(async base => {
+    const response = await fetch(base + '/api/v1/ai/page-draft', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-secret-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Generate a simple landing page.' })
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(Object.hasOwn(result, 'taskId'), false);
+    assert.equal(createCalls, 0);
+
+    const aiStatusResponse = await fetch(base + '/api/v1/ai/status', {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    const aiStatus = await aiStatusResponse.json();
+    assert.equal(aiStatus.durableTaskStatus, false);
+    assert.equal(aiStatus.capabilities.includes('task-status'), false);
+
+    const taskResponse = await fetch(base + '/api/v1/ai/tasks/' + taskId + '?siteId=' + siteId, {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(taskResponse.status, 503);
+    assert.equal((await taskResponse.json()).code, 'ERR_SYSTEMFABRIC_AI_TASKS_DISABLED');
+  }, { SYSTEMFABRIC_DEFAULT_SITE_ID: siteId }, { aiTaskStore });
+});
+
+test('a task-status persistence failure does not discard a completed AI proposal', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const taskId = '66666666-6666-4666-8666-666666666666';
+  const terminalAttempts = [];
+  const task = { id: taskId, siteId, status: 'queued' };
+  const aiTaskStore = {
+    async create() { return task; },
+    async start() { task.status = 'running'; return task; },
+    async finish(input) {
+      terminalAttempts.push(input.status);
+      throw Object.assign(new Error('simulated task metadata write failure'), { code: 'ERR_TEST_TASK_STORE_WRITE' });
+    }
+  };
+
+  await withServer(async base => {
+    const response = await fetch(base + '/api/v1/ai/page-draft', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-secret-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ siteId, prompt: 'Create a simple, useful landing page.' })
+    });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.status, 'draft-proposal');
+    assert.equal(Object.hasOwn(result, 'taskId'), false);
+    assert.deepEqual(terminalAttempts, ['succeeded']);
+    assert.equal(task.status, 'running', 'the API must not falsely overwrite an unknown persistence outcome as failed');
+  }, {}, { aiTaskStore });
+});
+
+test('AI task state records provider failures without retaining prompt or response content', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const taskId = '44444444-4444-4444-8444-444444444444';
+  let task = null;
+  const aiTaskStore = {
+    async create(input) {
+      task = { id: taskId, siteId: input.siteId, actorId: input.actorId, status: 'queued', taskType: input.taskType };
+      return task;
+    },
+    async start(input) {
+      task.status = 'running';
+      task.provider = input.provider;
+      task.model = input.model;
+      return task;
+    },
+    async finish(input) {
+      Object.assign(task, { status: input.status, errorCode: input.errorCode || null });
+      return task;
+    }
+  };
+  const aiService = {
+    providerInfo() {
+      return { provider: 'mock', model: 'failure-test-model', mock: true, publishToolsEnabled: false };
+    },
+    async generatePageDraft() {
+      throw Object.assign(new Error('simulated provider outage'), {
+        code: 'ERR_SYSTEMFABRIC_TEST_PROVIDER_UNAVAILABLE',
+        statusCode: 503
+      });
+    }
+  };
+
+  await withServer(async base => {
+    const response = await fetch(base + '/api/v1/ai/page-draft', {
+      method: 'POST',
+      headers: { authorization: 'Bearer test-secret-token', 'content-type': 'application/json' },
+      body: JSON.stringify({ siteId, prompt: 'This prompt must not be persisted.' })
+    });
+    assert.equal(response.status, 503);
+    assert.equal(task.status, 'failed');
+    assert.equal(task.errorCode, 'ERR_SYSTEMFABRIC_TEST_PROVIDER_UNAVAILABLE');
+    assert.equal(Object.hasOwn(task, 'prompt'), false);
+    assert.equal(Object.hasOwn(task, 'response'), false);
+  }, {}, { aiTaskStore, aiService });
 });

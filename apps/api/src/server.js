@@ -7,6 +7,7 @@ const { randomUUID, timingSafeEqual } = require('node:crypto');
 const { loadEnvFile } = require('../../../scripts/load-env');
 const { createAIService } = require('../../../packages/ai/src/service');
 const { createPostgresPool, createPostgresStore } = require('../../../packages/db/src/postgres-store');
+const { createAITaskStore } = require('../../../packages/db/src/ai-task-store');
 const { createIdentityService } = require('../../../packages/auth/src/service');
 const { createAuthorizationRequest, exchangeAndVerify, configFromEnv } = require('../../../packages/auth/src/oidc');
 const { createSamlAuthenticator } = require('../../../packages/auth/src/saml');
@@ -163,7 +164,7 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
-function createApiServer({ env = process.env, aiService, contentStore, pool, identityService, pluginRunner, stripeFetch = fetch, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
+function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAITaskStore, contentStore, pool, identityService, pluginRunner, stripeFetch = fetch, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
     if (!env.DATABASE_URL && !pool) missing.push('DATABASE_URL');
@@ -205,6 +206,21 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   const registry = createWidgetRegistry();
   let localPool = pool || null; let store = contentStore || null;
   if (!store && env.DATABASE_URL) { localPool = localPool || createPostgresPool(env); store = createPostgresStore({ pool: localPool }); }
+  const aiTaskStore = injectedAITaskStore || (localPool ? createAITaskStore({ pool: localPool }) : null);
+  async function getAvailableAITaskStore() {
+    if (!aiTaskStore) return null;
+    if (typeof aiTaskStore.isAvailable !== 'function') return aiTaskStore;
+    try {
+      return await aiTaskStore.isAvailable() ? aiTaskStore : null;
+    } catch (error) {
+      structuredLogger.emit('warn', 'systemfabric.ai.task_store_unavailable', {
+        component: 'ai',
+        operation: 'task_store_availability',
+        code: error?.code || 'ERR_SYSTEMFABRIC_AI_TASKS_UNAVAILABLE'
+      });
+      return null;
+    }
+  }
   const identity = identityService || (localPool ? createIdentityService({
     pool: localPool,
     env,
@@ -489,6 +505,10 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   async function runGovernedAI({ actor, siteId, body, action, inputChars, requestId, signal, run }) {
     const started = Date.now();
     let context = null;
+    let taskStore = null;
+    let task = null;
+    let taskStatus = 'queued';
+    const providerInfo = ai.providerInfo();
     const cancellationError = cause => Object.assign(
       new Error('AI task was cancelled because the requesting client disconnected.'),
       { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499, ...(cause ? { cause } : {}) }
@@ -496,21 +516,87 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
     const throwIfCancelled = () => {
       if (signal?.aborted) throw cancellationError(signal.reason);
     };
+    const persistTaskFailure = async failure => {
+      if (!task || !taskStore || taskStatus === 'succeeded' || taskStatus === 'failed' ||
+          taskStatus === 'cancelled' || taskStatus === 'blocked') return;
+      const status = failure.code === 'ERR_SYSTEMFABRIC_AI_CANCELLED'
+        ? 'cancelled'
+        : failure.statusCode === 403 || failure.statusCode === 429 ? 'blocked' : 'failed';
+      try {
+        await taskStore.finish({
+          taskId: task.id,
+          siteId,
+          status,
+          outputChars: 0,
+          latencyMs: Date.now() - started,
+          errorCode: failure.code || 'ERR_SYSTEMFABRIC_AI_FAILURE'
+        });
+        taskStatus = status;
+      } catch (taskError) {
+        structuredLogger.emit('error', 'systemfabric.ai.task_state_persist_failed', {
+          component: 'ai',
+          operation: 'task_terminal_transition',
+          code: taskError.code || 'ERR_SYSTEMFABRIC_AI_TASK_STATE_FAILED'
+        });
+      }
+    };
     try {
       throwIfCancelled();
+      taskStore = await getAvailableAITaskStore();
+      if (taskStore && siteId) {
+        task = await taskStore.create({
+          siteId,
+          actorId: actor.user?.id || null,
+          requestId,
+          taskType: action,
+          inputChars: Math.max(0, Math.floor(Number(inputChars) || 0))
+        });
+      }
       context = await reserveAIUsage({ actor, siteId, body, action, inputChars });
       throwIfCancelled();
+      if (task) {
+        await taskStore.start({
+          taskId: task.id,
+          siteId,
+          provider: context.provider || providerInfo.provider,
+          model: context.model || providerInfo.model
+        });
+        taskStatus = 'running';
+      }
       const result = await run(signal);
       throwIfCancelled();
       const outputChars = typeof result === 'string' ? result.length : JSON.stringify(result).length;
+      let persistedTaskId = task?.id;
+      if (task) {
+        try {
+          await taskStore.finish({
+            taskId: task.id,
+            siteId,
+            status: 'succeeded',
+            outputChars,
+            latencyMs: Date.now() - started
+          });
+        } catch (taskError) {
+          // A completed provider result must not be turned into a failed generation
+          // merely because its optional status metadata could not be finalized.
+          persistedTaskId = undefined;
+          structuredLogger.emit('error', 'systemfabric.ai.task_state_persist_failed', {
+            component: 'ai',
+            operation: 'task_success_transition',
+            code: taskError.code || 'ERR_SYSTEMFABRIC_AI_TASK_STATE_FAILED'
+          });
+        }
+        taskStatus = 'succeeded';
+      }
       await recordAIUsage(context, { status: 'succeeded', outputChars, elapsedMs: Date.now() - started, requestId });
       if (identity && context.siteId && actor.user.id) await identity.audit({ siteId: context.siteId, actorId: actor.user.id, action: `ai.${action}`, targetType: 'ai-run', requestId, details: { provider: context.provider, model: context.model, classification: context.classification, inputChars: context.chars, outputChars } });
-      return result;
+      return { result, taskId: persistedTaskId };
     } catch (error) {
       const failure = signal?.aborted && error.code !== 'ERR_SYSTEMFABRIC_AI_CANCELLED'
         ? cancellationError(error)
         : error;
       if (context) await recordAIUsage(context, { status: failure.statusCode === 403 || failure.statusCode === 429 ? 'blocked' : 'failed', error: failure, elapsedMs: Date.now() - started, requestId });
+      await persistTaskFailure(failure);
       throw failure;
     }
   }
@@ -1342,7 +1428,28 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
         res.setHeader('set-cookie', [cookie('sf_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('sf_csrf', '', { secure: secureCookies, maxAge: 0 })]);
         return sendJson(res, 200, { ...result, reauthenticationRequired: true, requestId });
       }
-      if (req.method === 'GET' && url.pathname === '/api/v1/ai/status') return sendJson(res, 200, { ...ai.providerInfo(), capabilities: ['page-draft','content-assist','seo-suggestion','translation','document-validation','preview','widget-suggestion'], requiresHumanReviewForDraftPersistence: true, requestId });
+      if (req.method === 'GET' && url.pathname === '/api/v1/ai/status') {
+        const taskStatusAvailable = Boolean(await getAvailableAITaskStore());
+        return sendJson(res, 200, {
+          ...ai.providerInfo(),
+          capabilities: ['page-draft','content-assist','seo-suggestion','translation','document-validation','preview','widget-suggestion', ...(taskStatusAvailable ? ['task-status'] : [])],
+          requiresHumanReviewForDraftPersistence: true,
+          durableTaskStatus: taskStatusAvailable,
+          requestId
+        });
+      }
+      const aiTaskPrefix = '/api/v1/ai/tasks/';
+      const aiTaskId = url.pathname.startsWith(aiTaskPrefix) ? url.pathname.slice(aiTaskPrefix.length) : '';
+      const aiTaskMatch = /^[0-9a-f-]{36}$/i.test(aiTaskId) ? [null, aiTaskId] : null;
+      if (req.method === 'GET' && aiTaskMatch) {
+        const taskStore = await getAvailableAITaskStore();
+        if (!taskStore) return sendJson(res, 503, { error: 'AI task status requires PostgreSQL and the AI task migration.', code: 'ERR_SYSTEMFABRIC_AI_TASKS_DISABLED', requestId });
+        const siteId = await ensureSiteCapabilityForAI(actor, url, {}, 'ai:use');
+        if (!siteId) throw fail(400, 'ERR_SYSTEMFABRIC_SITE_REQUIRED', 'Select a site using the siteId query parameter.');
+        const task = await taskStore.get({ taskId: aiTaskMatch[1], siteId, actorId: actor.user?.id || null });
+        if (!task) return sendJson(res, 404, { error: 'AI task not found.', code: 'ERR_SYSTEMFABRIC_AI_TASK_NOT_FOUND', requestId });
+        return sendJson(res, 200, { task, requestId });
+      }
       if (req.method === 'GET' && url.pathname === '/api/v1/widgets') return sendJson(res, 200, { apiVersion: 1, widgets: registry.list(), requestId });
 
       if (req.method === 'GET' && url.pathname === '/api/v1/sites') {
@@ -1596,23 +1703,23 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
 
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/page-draft') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'page_draft', inputChars: String(body.prompt || '').length + String(body.siteContext || '').length, requestId, run: signal => ai.generatePageDraft({ prompt: body.prompt, siteContext: body.siteContext || '', actor: actor.user.id || 'local-development-token', signal }) });
-        return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
+        const { result, taskId } = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'page_draft', inputChars: String(body.prompt || '').length + String(body.siteContext || '').length, requestId, run: signal => ai.generatePageDraft({ prompt: body.prompt, siteContext: body.siteContext || '', actor: actor.user.id || 'local-development-token', signal }) });
+        return sendJson(res, 200, { ...result, requestId, taskId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/content-assist') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'content_assist', inputChars: String(body.text || '').length, requestId, run: signal => ai.assistContent({ text: body.text, operation: body.operation || 'make-clearer', tone: body.tone || 'clear and professional', actor: actor.user.id || 'local-development-token', signal }) });
-        return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
+        const { result, taskId } = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'content_assist', inputChars: String(body.text || '').length, requestId, run: signal => ai.assistContent({ text: body.text, operation: body.operation || 'make-clearer', tone: body.tone || 'clear and professional', actor: actor.user.id || 'local-development-token', signal }) });
+        return sendJson(res, 200, { ...result, requestId, taskId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/seo') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'seo', inputChars: String(body.title || '').length + String(body.content || '').length, requestId, run: signal => ai.generateSeo({ title: body.title, content: body.content, actor: actor.user.id || 'local-development-token', signal }) });
-        return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
+        const { result, taskId } = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'seo', inputChars: String(body.title || '').length + String(body.content || '').length, requestId, run: signal => ai.generateSeo({ title: body.title, content: body.content, actor: actor.user.id || 'local-development-token', signal }) });
+        return sendJson(res, 200, { ...result, requestId, taskId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/translate') {
         const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const result = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'translate', inputChars: String(body.text || '').length, requestId, run: signal => ai.translate({ text: body.text, targetLanguage: body.targetLanguage, actor: actor.user.id || 'local-development-token', signal }) });
-        return sendJson(res, 200, { ...result, requestId, humanReviewRequired: true });
+        const { result, taskId } = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'translate', inputChars: String(body.text || '').length, requestId, run: signal => ai.translate({ text: body.text, targetLanguage: body.targetLanguage, actor: actor.user.id || 'local-development-token', signal }) });
+        return sendJson(res, 200, { ...result, requestId, taskId, humanReviewRequired: true });
       }
 
       if (req.method === 'POST' && url.pathname === '/api/v1/pages/validate') {
@@ -2079,7 +2186,7 @@ function createApiServer({ env = process.env, aiService, contentStore, pool, ide
   });
 
   server.systemfabric = {
-    get contentStore() { return store; }, get pool() { return localPool; }, get identityService() { return identity; }, get libraryStore() { return libraryStore; }, get firewall() { return firewall; },
+    get contentStore() { return store; }, get pool() { return localPool; }, get identityService() { return identity; }, get aiTaskStore() { return aiTaskStore; }, get libraryStore() { return libraryStore; }, get firewall() { return firewall; },
     get realtimeHub() { return realtimeHub; }, get realtimeBridge() { return realtimeBridge; }, get presenceService() { return presence; }, get realtimeConnectionLimiter() { return realtimeConnectionLimiter; }, get realtimeMetrics() { return realtimeMetrics.snapshot(); },
     ready() { return realtimeBridgeReady; },
     get realtimeMode() {

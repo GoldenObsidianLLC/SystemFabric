@@ -220,6 +220,24 @@ paths:
       summary: AI provider status without credentials
       responses:
         '200': { description: Provider and task capability metadata }
+  /api/v1/ai/tasks/{taskId}:
+    get:
+      summary: Retrieve the caller's metadata-only AI task status
+      parameters:
+        - in: path
+          name: taskId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: siteId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Task state and bounded execution metadata; prompt and model output are not stored }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No task is visible to this actor in the selected site }
+        '503': { description: PostgreSQL or the AI task migration is unavailable }
   /api/v1/widgets:
     get:
       summary: List approved core widgets
@@ -242,7 +260,7 @@ paths:
                 prompt: { type: string, minLength: 1, maxLength: 12000 }
                 siteContext: { type: string, maxLength: 3000 }
       responses:
-        '200': { description: Validated, unsaved and unpublished page proposal }
+        '200': { description: Validated, unsaved and unpublished page proposal; includes taskId when the PostgreSQL AI task migration is available }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { description: Model output failed domain validation }
@@ -264,7 +282,7 @@ paths:
                 operation: { type: string, enum: [rewrite, proofread, shorten, expand, make-clearer, change-tone] }
                 tone: { type: string, maxLength: 120 }
       responses:
-        '200': { description: Suggestion only; not persisted }
+        '200': { description: Suggestion only; not persisted; includes taskId when the PostgreSQL AI task migration is available }
         '503': { description: AI provider unavailable or not configured }
   /api/v1/ai/seo:
     post:
@@ -282,7 +300,7 @@ paths:
                 title: { type: string, maxLength: 180 }
                 content: { type: string, maxLength: 12000 }
       responses:
-        '200': { description: SEO suggestions }
+        '200': { description: SEO suggestions; includes taskId when the PostgreSQL AI task migration is available }
   /api/v1/ai/translate:
     post:
       summary: Suggest a translation
@@ -299,7 +317,7 @@ paths:
                 text: { type: string, minLength: 1, maxLength: 12000 }
                 targetLanguage: { type: string, minLength: 2, maxLength: 80 }
       responses:
-        '200': { description: Translation suggestion }
+        '200': { description: Translation suggestion; includes taskId when the PostgreSQL AI task migration is available }
   /api/v1/pages:
     get:
       summary: List authorized site-scoped content

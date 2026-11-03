@@ -15,6 +15,7 @@
 | Media | PostgreSQL `media_assets` + object storage | site, storage key, content references | Binary data is not placed in graph nodes |
 | Widget manifest | source/config/release artifact | widget type and version | Registry validates before activation |
 | Outbox event | PostgreSQL `outbox_events` | aggregate ID/version | Durable cross-store change event |
+| AI task | PostgreSQL `ai_tasks` | site, actor, request ID | Metadata-only synchronous lifecycle; no prompt, context, or model output payload |
 | AI run audit | PostgreSQL `ai_run_audit` | optional site/actor, provider/model/action | Metadata only by default; no prompt body |
 | Audit event | PostgreSQL `audit_events` | optional site/actor/target | Authentication and business operation trail |
 
