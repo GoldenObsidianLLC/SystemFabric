@@ -252,7 +252,7 @@ test(
       assert.equal(Number(created.rows[0].total_minor), 2400);
 
       assert.equal(providerCalls.length, 1);
-      assert.equal(providerCalls[0].headers['idempotency-key'], `sf_${payload.order.id}`);
+      assert.equal(providerCalls[0].headers['idempotency-key'], `vsh_${payload.order.id}`);
       assert.equal(providerCalls[0].form.get('metadata[site_id]'), siteB);
       assert.equal(providerCalls[0].form.get('metadata[order_id]'), payload.order.id);
       assert.equal(providerCalls[0].form.get('line_items[0][price_data][unit_amount]'), '2400');

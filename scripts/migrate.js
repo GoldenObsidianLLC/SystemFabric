@@ -11,6 +11,24 @@ const MIGRATION_DIR = path.resolve(__dirname, '../database/migrations');
 const LOCK_KEY_A = 57_493_100;
 const LOCK_KEY_B = 1;
 
+async function assertFreshDatabaseForIdentity(client) {
+  const applied = await client.query('SELECT version FROM virgoscorpio_hub_schema_migrations LIMIT 1');
+  if (applied.rows.length > 0) return;
+
+  const existing = await client.query(`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_type = 'BASE TABLE'
+      AND table_name <> 'virgoscorpio_hub_schema_migrations'
+    ORDER BY table_name
+    LIMIT 1
+  `);
+  if (existing.rows[0]) {
+    throw new Error('Refusing to initialize a non-empty database without an initialized VirgoScorpio Hub migration ledger. Provision a new empty database and transfer retained data through a separately reviewed procedure.');
+  }
+}
+
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL must be set before running migrations.');
@@ -25,6 +43,7 @@ async function main() {
       sha256 text NOT NULL,
       applied_at timestamptz NOT NULL DEFAULT now()
     )`);
+    await assertFreshDatabaseForIdentity(client);
     for (const file of files) {
       const rawSql = fs.readFileSync(path.join(MIGRATION_DIR, file), 'utf8');
       const sql = normalizeMigrationSql(rawSql);
@@ -60,4 +79,4 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { MIGRATION_DIR, main, normalizeMigrationSql, migrationChecksum };
+module.exports = { MIGRATION_DIR, main, assertFreshDatabaseForIdentity, normalizeMigrationSql, migrationChecksum };

@@ -14,6 +14,9 @@ The change is intentionally comprehensive rather than alias-based:
 - The npm package identity is now virgoscorpio-hub.
 - Project-owned environment variables use the VIRGOSCORPIO_HUB_ prefix.
 - Project-owned API error identifiers, request headers, runtime properties, telemetry/service labels, metric names, Redis key/channel prefixes, local resource names, and SBOM artifact names use the new identity.
+- Browser session, CSRF, and MFA cookie names now use the vsh_ prefix; all existing browser sessions must be invalidated and users must sign in again.
+- Provider idempotency keys now use the vsh_ prefix. Drain or reconcile every pending checkout, refund, and membership-provider operation before cutover; do not replay an unresolved old provider operation with a newly generated key.
+- Legacy short-form project prefixes in client storage, CSS, and runtime keys have been replaced with VSH-based prefixes; the development-container marker is VIRGOSCORPIO_HUB_DEVCONTAINER.
 - The old short-form product monogram has been replaced with VSH.
 - No compatibility aliases for the retired identifiers are provided.
 
@@ -40,7 +43,7 @@ Before adopting this version:
 - Reconfigure deployment secrets, CI variables, Redis namespaces, object-storage buckets, observability dashboards/alerts, and external API clients.
 - Validate the new environment before directing any traffic to it.
 
-There is deliberately no fallback lookup, alias, automatic legacy database detection, or silent dual-read/dual-write behavior. This avoids accidentally binding the new runtime to legacy resources or concealing incomplete cutovers.
+There is deliberately no fallback lookup, alias, schema-specific legacy detection, or silent dual-read/dual-write behavior. Before applying migrations, the runner performs a generic public-schema emptiness check and refuses to initialize a non-empty database when the new migration ledger has no entries. This prevents an accidental replay of the new migration set against an existing database without embedding legacy identifiers in the new code.
 
 ## Verification requirements
 

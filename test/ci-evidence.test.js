@@ -66,7 +66,7 @@ function createFixtures(t) {
     if (file.endsWith('release-readiness.json')) write(root, file, readiness);
     else if (file.endsWith('.cdx.json')) write(root, file, sbom);
     else if (file.endsWith('.md')) write(root, file, '# Candidate readiness\n');
-    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'virgoscorpio_hub', version: '0.5.1', lockfileVersion: 3 });
+    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'virgoscorpio-hub', version: '0.5.1', lockfileVersion: 3 });
     else if (file.endsWith('artifact-check.log')) write(root, file, 'VirgoScorpio Hub artifact check passed (157 required paths).\n');
     else if (file.endsWith('unit-tests.tap.log') || file.endsWith('enginex-tests.tap.log')) {
       write(root, file, ['TAP version 13', '# tests 8', '# pass 8', '# fail 0', '# cancelled 0', '# skipped 0', '# todo 0'].join('\n'));

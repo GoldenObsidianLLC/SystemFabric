@@ -61,7 +61,7 @@ async function main() {
     catch { add(`${displayName} dependency`, false, `${moduleName} is not installed; run npm run dev:bootstrap.`); }
   }
 
-  const inDevcontainer = process.env.SF_DEVCONTAINER === 'true' || Boolean(process.env.REMOTE_CONTAINERS);
+  const inDevcontainer = process.env.VIRGOSCORPIO_HUB_DEVCONTAINER === 'true' || Boolean(process.env.REMOTE_CONTAINERS);
   if (inDevcontainer) add('Docker Compose control', true, 'Running inside the VS Code Dev Container; Compose services are managed by the host.');
   else {
     const dockerOk = commandOk('docker', ['--version']) && commandOk('docker', ['compose', 'version']);

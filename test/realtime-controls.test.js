@@ -31,7 +31,7 @@ class FakeRedisQuotaClient {
       for (const [member, expiry] of set) if (expiry <= now) set.delete(member);
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_ACQUIRE')) {
+    if (script.includes('VSH_REALTIME_QUOTA_ACQUIRE')) {
       const [expiresAt, maxGlobal, maxSite, maxPrincipal, connectionId, ttl] = args.slice(1).map((value, index) => index < 5 ? (index < 4 ? Number(value) : value) : Number(value));
       if (sets[0].size >= maxGlobal) return [0, 'global'];
       if (sets[1].size >= maxSite) return [0, 'site'];
@@ -40,7 +40,7 @@ class FakeRedisQuotaClient {
       return [1, sets[0].size, sets[1].size, sets[2].size, ttl];
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_RENEW')) {
+    if (script.includes('VSH_REALTIME_QUOTA_RENEW')) {
       const [expiresAt, connectionId] = args.slice(1);
       if (sets.some(set => !set.has(connectionId))) {
         for (const set of sets) set.delete(connectionId);
@@ -50,7 +50,7 @@ class FakeRedisQuotaClient {
       return 1;
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_RELEASE')) {
+    if (script.includes('VSH_REALTIME_QUOTA_RELEASE')) {
       const [connectionId] = args.slice(1);
       for (const set of sets) set.delete(connectionId);
       return 1;

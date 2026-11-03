@@ -1036,8 +1036,8 @@ components:
     SessionCookie:
       type: apiKey
       in: cookie
-      name: sf_session
-      description: Database-backed session. For unsafe methods, also provide X-CSRF-Token matching the sf_csrf cookie.
+      name: vsh_session
+      description: Database-backed session. For unsafe methods, also provide X-CSRF-Token matching the vsh_csrf cookie.
     DevelopmentBearer:
       type: http
       scheme: bearer

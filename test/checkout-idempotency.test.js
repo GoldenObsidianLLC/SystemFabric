@@ -114,7 +114,7 @@ test('pending checkout recovery replays the saved Stripe request with the same i
     assert.equal(handled, true);
     assert.equal(ctx.res.statusCode, 200);
     assert.equal(ctx.res.payload.checkoutUrl, 'https://checkout.example.test/cs_recovered');
-    assert.equal(providerHeaders['idempotency-key'], 'sf_1d69eb5b-e8c7-48d7-a041-b67438983f6a');
+    assert.equal(providerHeaders['idempotency-key'], 'vsh_1d69eb5b-e8c7-48d7-a041-b67438983f6a');
     assert.equal(providerForm.get('expires_at'), String(checkoutExpiresAt));
     assert.equal(providerForm.get('line_items[0][price_data][unit_amount]'), '123');
     assert.equal(providerForm.get('line_items[0][price_data][product_data][description]'), 'SKU RES-1');

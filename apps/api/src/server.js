@@ -400,7 +400,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if (bearerSession) {
         return { mode: 'session', sessionToken: bearer, sessionId: bearerSession.sessionId, expiresAt: bearerSession.expiresAt, user: bearerSession.user, memberships: bearerSession.memberships };
       }
-      const cookieSessionToken = cookies.sf_session;
+      const cookieSessionToken = cookies.vsh_session;
       if (cookieSessionToken) {
         const cookieSession = await identity.authenticate(cookieSessionToken);
         if (cookieSession) {
@@ -409,7 +409,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
             const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
             if (typeof origin !== 'string' || origin !== expectedOrigin) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_CSRF', 'A matching same-origin Origin header is required for cookie-authenticated writes.');
             const header = req.headers['x-csrf-token'];
-            if (!header || !safeCsrfCookie(cookies.sf_csrf, header) || !(await identity.validateCsrf(cookieSessionToken, header))) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_CSRF', 'A valid CSRF token is required.');
+            if (!header || !safeCsrfCookie(cookies.vsh_csrf, header) || !(await identity.validateCsrf(cookieSessionToken, header))) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_CSRF', 'A valid CSRF token is required.');
           }
           return { mode: 'session', sessionToken: cookieSessionToken, sessionId: cookieSession.sessionId, expiresAt: cookieSession.expiresAt, user: cookieSession.user, memberships: cookieSession.memberships };
         }
@@ -781,29 +781,31 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            * PostgreSQL stores only its SHA-256 digest.
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.setHeader('set-cookie', cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
+          // lgtm[js/clear-text-storage-of-sensitive-data] Intentional browser transport: one-time challenge is HttpOnly/Secure, short-lived and path-scoped; server storage retains only its SHA-256 digest.
+          res.setHeader('set-cookie', cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
           return sendJson(res, 200, { authenticated: false, mfaRequired: true, user: { id: session.user.id, email: session.user.email }, expiresAt: session.expiresAt, requestId });
         }
-        res.setHeader('set-cookie', [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) })]);
+        res.setHeader('set-cookie', [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) })]);
         return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/verify') {
         if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
         const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
         if (typeof req.headers.origin !== 'string' || req.headers.origin !== expectedOrigin) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_CSRF', 'A matching same-origin Origin header is required.');
-        const challenge = parseCookies(req.headers.cookie || '').sf_mfa_challenge;
+        const challenge = parseCookies(req.headers.cookie || '').vsh_mfa_challenge;
         const body = await readJson(req, Math.min(maxBody, 16_384));
         const session = await identity.completeMfaLogin({ challengeToken: challenge, code: body.code, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
         /*
-         * sf_session is an opaque random bearer token, stored server-side only
-         * as a SHA-256 digest and transported in an HttpOnly cookie. sf_csrf
+         * vsh_session is an opaque random bearer token, stored server-side only
+         * as a SHA-256 digest and transported in an HttpOnly cookie. vsh_csrf
          * is a separate random double-submit token; client JS must read it and
          * echo it in the request header. Both cookies are Secure in production,
          * SameSite=Lax, and expire with the session.
          */
         // Required browser transport: the opaque random session is digest-stored and HttpOnly; CSRF remains a separate double-submit token.
-        res.setHeader('set-cookie', [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('sf_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
+        // lgtm[js/clear-text-storage-of-sensitive-data] Intentional browser transport: the opaque session is HttpOnly/Secure and only its SHA-256 digest is stored server-side; CSRF is a separate double-submit token.
+        res.setHeader('set-cookie', [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('vsh_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
         return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/auth/password-reset/request') {
@@ -876,10 +878,11 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
+          // lgtm[js/clear-text-storage-of-sensitive-data] Intentional browser transport: one-time challenge is HttpOnly/Secure, short-lived and path-scoped; server storage retains only its SHA-256 digest.
+          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
         }
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
-        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge })] }); return res.end();
+        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge })] }); return res.end();
       }
 
       if (req.method === 'GET' && url.pathname === '/api/v1/auth/oidc/start') {
@@ -906,11 +909,12 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('sf_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
+          // lgtm[js/clear-text-storage-of-sensitive-data] Intentional browser transport: one-time challenge is HttpOnly/Secure, short-lived and path-scoped; server storage retains only its SHA-256 digest.
+          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
           return res.end();
         }
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
-        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('sf_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('sf_csrf', session.csrf, { secure: secureCookies, maxAge })] });
+        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge })] });
         return res.end();
       }
 
@@ -1432,7 +1436,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/auth/logout') {
         if (actor.sessionToken) await identity.logout(actor.sessionToken);
-        res.setHeader('set-cookie', [cookie('sf_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('sf_csrf', '', { secure: secureCookies, maxAge: 0 })]);
+        res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
         return sendJson(res, 200, { authenticated: false, requestId });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/auth/email-verification/request') {
@@ -1448,7 +1452,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if (req.method === 'DELETE' && ownSessionMatch) {
         if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Session management requires a real account.');
         const result = await identity.revokeSession({ userId: actor.user.id, sessionId: ownSessionMatch[1] });
-        if (result.revoked && ownSessionMatch[1] === actor.sessionId) res.setHeader('set-cookie', [cookie('sf_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('sf_csrf', '', { secure: secureCookies, maxAge: 0 })]);
+        if (result.revoked && ownSessionMatch[1] === actor.sessionId) res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
         return sendJson(res, 200, { ...result, requestId });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/enroll') {
@@ -1464,7 +1468,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'MFA management requires a real account.');
         const body = await readJson(req, Math.min(maxBody, 16_384));
         const result = await identity.disableMfa({ userId: actor.user.id, password: body.password, code: body.code });
-        res.setHeader('set-cookie', [cookie('sf_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('sf_csrf', '', { secure: secureCookies, maxAge: 0 })]);
+        res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
         return sendJson(res, 200, { ...result, reauthenticationRequired: true, requestId });
       }
       if (req.method === 'GET' && url.pathname === '/api/v1/ai/status') {

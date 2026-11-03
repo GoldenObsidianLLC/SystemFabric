@@ -413,7 +413,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
         if (sbom.bomFormat !== 'CycloneDX' || !Array.isArray(sbom.components) || !Array.isArray(sbom.dependencies)) {
           errors.push('CycloneDX SBOM structure is invalid.');
         }
-        if (packageLock.name !== 'virgoscorpio_hub' || packageLock.version !== '0.5.1' || packageLock.lockfileVersion !== 3) {
+        if (packageLock.name !== 'virgoscorpio-hub' || packageLock.version !== '0.5.1' || packageLock.lockfileVersion !== 3) {
           errors.push('Dependency lockfile identity/version/format does not match this release.');
         }
         for (const file of ['npm-audit-all.log', 'npm-audit.log']) {

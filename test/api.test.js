@@ -217,8 +217,8 @@ test('session cookie writes require CSRF validation, same-origin context, and Ht
     const login = await fetch(`${base}/api/v1/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@example.com', password: 'Password1234' }) });
     assert.equal(login.status, 200);
     const setCookie = login.headers.get('set-cookie');
-    assert.match(setCookie, /sf_session=.*HttpOnly/i);
-    const cookieHeader = 'sf_session=' + 's'.repeat(43) + '; sf_csrf=' + 'c'.repeat(43);
+    assert.match(setCookie, /vsh_session=.*HttpOnly/i);
+    const cookieHeader = 'vsh_session=' + 's'.repeat(43) + '; vsh_csrf=' + 'c'.repeat(43);
     const missingOrigin = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(missingOrigin.status, 403);
     assert.equal((await missingOrigin.json()).code, 'ERR_VIRGOSCORPIO_HUB_CSRF');
@@ -264,8 +264,8 @@ test('secure-cookie configuration marks the session and CSRF cookies Secure', as
     });
     assert.equal(login.status, 200);
     const setCookie = login.headers.get('set-cookie') || '';
-    const sessionCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('sf_session='));
-    const csrfCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('sf_csrf='));
+    const sessionCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('vsh_session='));
+    const csrfCookie = setCookie.split(/,\s*(?=[A-Za-z0-9_-]+=)/).find(value => value.trim().startsWith('vsh_csrf='));
     assert.ok(sessionCookie);
     assert.ok(csrfCookie);
     assert.match(sessionCookie, /; HttpOnly/i);
@@ -304,7 +304,7 @@ test('MFA challenge cookie is HttpOnly, Secure when configured, path-limited and
     assert.equal(response.status, 200);
     assert.equal((await response.json()).mfaRequired, true);
     const challengeCookie = response.headers.get('set-cookie') || '';
-    assert.match(challengeCookie, /sf_mfa_challenge=/);
+    assert.match(challengeCookie, /vsh_mfa_challenge=/);
     assert.match(challengeCookie, /; HttpOnly/i);
     assert.match(challengeCookie, /; Secure/i);
     assert.match(challengeCookie, /; SameSite=Strict/i);

@@ -50,7 +50,7 @@ async function openClient(browser, { baseUrl, siteId, contentId, sessionNumber, 
   const context = await browser.newContext();
   const token = 'f1-10-session-' + sessionNumber;
   await context.addCookies([{
-    name: 'sf_session',
+    name: 'vsh_session',
     value: token,
     url: baseUrl,
     httpOnly: true,
@@ -149,7 +149,7 @@ async function openRawCollaborationClient({ baseUrl, siteId, contentId, sessionN
   const socket = new WebSocket(wsUrl, {
     headers: {
       origin: baseUrl,
-      cookie: 'sf_session=f1-10-session-' + sessionNumber
+      cookie: 'vsh_session=f1-10-session-' + sessionNumber
     }
   });
   const client = createRawCollaborationClient(socket);

@@ -28,7 +28,7 @@
     $('dirty-status').style.color = dirty ? '#e4bd7c' : '#72dba7';
   }
   function slugify(text) { return String(text || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180); }
-  function csrfFromCookie() { const match = document.cookie.match(/(?:^|;\s*)sf_csrf=([^;]+)/); return match ? match[1] : ''; }
+  function csrfFromCookie() { const match = document.cookie.match(/(?:^|;\s*)vsh_csrf=([^;]+)/); return match ? match[1] : ''; }
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
     const method = (options.method || 'GET').toUpperCase();

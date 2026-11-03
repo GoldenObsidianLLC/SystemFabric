@@ -4,7 +4,7 @@
   const state = { user: null, sites: [], siteId: '', asset: null, icons: [] };
   let toastTimer;
   function toast(message, error = false) { const el = $('toast'); el.textContent = message; el.classList.toggle('error', error); el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 3600); }
-  function csrf() { return document.cookie.match(/(?:^|;\s*)sf_csrf=([^;]+)/)?.[1] || ''; }
+  function csrf() { return document.cookie.match(/(?:^|;\s*)vsh_csrf=([^;]+)/)?.[1] || ''; }
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {}); const method = (options.method || 'GET').toUpperCase();
     if (options.body !== undefined && !(options.body instanceof FormData) && !headers.has('content-type')) headers.set('content-type', 'application/json');

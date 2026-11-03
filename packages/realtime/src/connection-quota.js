@@ -11,7 +11,7 @@ const DEFAULT_LIMITS = Object.freeze({
 });
 const KEY_PREFIX_RE = /^[A-Za-z0-9:_-]{1,96}$/;
 
-const ACQUIRE_SCRIPT = `-- SF_REALTIME_QUOTA_ACQUIRE
+const ACQUIRE_SCRIPT = `-- VSH_REALTIME_QUOTA_ACQUIRE
 local now = tonumber(ARGV[1])
 local expiresAt = tonumber(ARGV[2])
 local maxGlobal = tonumber(ARGV[3])
@@ -34,7 +34,7 @@ for i = 1, 3 do
 end
 return {1, globalCount + 1, siteCount + 1, principalCount + 1}`;
 
-const RENEW_SCRIPT = `-- SF_REALTIME_QUOTA_RENEW
+const RENEW_SCRIPT = `-- VSH_REALTIME_QUOTA_RENEW
 local now = tonumber(ARGV[1])
 local expiresAt = tonumber(ARGV[2])
 local connectionId = ARGV[3]
@@ -54,7 +54,7 @@ for i = 1, 3 do
 end
 return 1`;
 
-const RELEASE_SCRIPT = `-- SF_REALTIME_QUOTA_RELEASE
+const RELEASE_SCRIPT = `-- VSH_REALTIME_QUOTA_RELEASE
 local connectionId = ARGV[1]
 local ttl = tonumber(ARGV[2])
 for i = 1, 3 do

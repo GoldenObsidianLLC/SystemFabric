@@ -248,14 +248,14 @@ test('two real browser sessions converge, retry a lost acknowledgement, reconnec
 
   try {
     await contextA.addCookies([{
-      name: 'sf_session',
+      name: 'vsh_session',
       value: TOKEN_A,
       url: baseUrl,
       httpOnly: true,
       sameSite: 'Lax'
     }]);
     await contextB.addCookies([{
-      name: 'sf_session',
+      name: 'vsh_session',
       value: TOKEN_B,
       url: baseUrl,
       httpOnly: true,

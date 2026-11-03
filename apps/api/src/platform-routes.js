@@ -218,7 +218,7 @@ async function handlePlatformRoute(ctx) {
         paymentIntentId,
         amountMinor: Number(refund.amount_minor),
         reason: refund.reason,
-        idempotencyKey: `sf_refund_${refund.id}`,
+        idempotencyKey: `vsh_refund_${refund.id}`,
         metadata: { site_id: siteId, order_id: orderId, refund_id: refund.id }
       });
     } catch (error) {
@@ -381,7 +381,7 @@ async function handlePlatformRoute(ctx) {
         cancelUrl: env.STRIPE_CHECKOUT_CANCEL_URL,
         customerEmail: existing.email,
         metadata: { site_id: siteId, order_id: existing.id },
-        idempotencyKey: `sf_${existing.id}`,
+        idempotencyKey: `vsh_${existing.id}`,
         expiresAt: checkoutExpiresAt
       });
       const recoveredOrder = await localPool.query(
@@ -474,7 +474,7 @@ async function handlePlatformRoute(ctx) {
         secretKey: env.STRIPE_SECRET_KEY, mode: 'payment', lineItems: checkoutLineItems,
         successUrl: env.STRIPE_CHECKOUT_SUCCESS_URL, cancelUrl: env.STRIPE_CHECKOUT_CANCEL_URL,
         customerEmail: email, metadata: { site_id: siteId, order_id: order.id },
-        idempotencyKey: `sf_${order.id}`, expiresAt: checkoutExpiresAt
+        idempotencyKey: `vsh_${order.id}`, expiresAt: checkoutExpiresAt
       });
     } catch (error) {
       // A transport failure or provider 5xx may occur after the session was
@@ -514,7 +514,7 @@ async function handlePlatformRoute(ctx) {
     const q=await localPool.query('INSERT INTO membership_plans(site_id,slug,name,description,price_minor,currency,interval_unit,interval_count,access_rules,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10) RETURNING *',[siteId,body.slug,body.name.trim(),String(body.description||'').slice(0,8000),body.priceMinor,body.currency||'USD',body.intervalUnit,body.intervalCount||1,JSON.stringify(body.accessRules||{}),body.active!==false]);return sendJson(res,201,{plan:q.rows[0],requestId});
   }
   const membershipCheckout=pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/memberships\/checkout$/i);
-  if(method==='POST'&&membershipCheckout){if(!localPool)throw fail(503,'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED','Membership checkout requires PostgreSQL.');if(!actor.user.id)throw fail(401,'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED','A user account is required for membership checkout.');const siteId=membershipCheckout[1],body=await readJson(req,Math.min(maxBody,32_000));await siteIdFor({ req, url, body, actor, routeSiteId: siteId });const q=await localPool.query('SELECT * FROM membership_plans WHERE site_id=$1 AND id=$2 AND active=true',[siteId,body.planId]);const plan=q.rows[0];if(!plan)throw fail(404,'ERR_VIRGOSCORPIO_HUB_MEMBERSHIP_PLAN_NOT_FOUND','Membership plan not found.');const mode=plan.interval_unit==='one_time'?'payment':'subscription';const checkout=await createStripeCheckoutSession({secretKey:env.STRIPE_SECRET_KEY,mode,lineItems:[{currency:plan.currency,unitAmount:Number(plan.price_minor),quantity:1,name:plan.name,description:plan.description,interval:mode==='subscription'?plan.interval_unit:undefined,intervalCount:plan.interval_count}],successUrl:env.STRIPE_CHECKOUT_SUCCESS_URL,cancelUrl:env.STRIPE_CHECKOUT_CANCEL_URL,customerEmail:actor.user.email,metadata:{site_id:siteId,membership_plan_id:plan.id,user_id:actor.user.id,purchase_type:'membership'},subscriptionMetadata:{site_id:siteId,membership_plan_id:plan.id,user_id:actor.user.id,purchase_type:'membership'},idempotencyKey:`sf_mem_${siteId}_${actor.user.id}_${plan.id}_${randomUUID()}`});const saved=await localPool.query('INSERT INTO paid_memberships(site_id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id) VALUES($1,$2,$3,\'pending\',\'stripe\',$4,$5) RETURNING id,status,plan_id,provider_subscription_id',[siteId,actor.user.id,plan.id,checkout.customerId,checkout.subscriptionId]);return sendJson(res,201,{membership:saved.rows[0],checkoutUrl:checkout.url,requestId});}
+  if(method==='POST'&&membershipCheckout){if(!localPool)throw fail(503,'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED','Membership checkout requires PostgreSQL.');if(!actor.user.id)throw fail(401,'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED','A user account is required for membership checkout.');const siteId=membershipCheckout[1],body=await readJson(req,Math.min(maxBody,32_000));await siteIdFor({ req, url, body, actor, routeSiteId: siteId });const q=await localPool.query('SELECT * FROM membership_plans WHERE site_id=$1 AND id=$2 AND active=true',[siteId,body.planId]);const plan=q.rows[0];if(!plan)throw fail(404,'ERR_VIRGOSCORPIO_HUB_MEMBERSHIP_PLAN_NOT_FOUND','Membership plan not found.');const mode=plan.interval_unit==='one_time'?'payment':'subscription';const checkout=await createStripeCheckoutSession({secretKey:env.STRIPE_SECRET_KEY,mode,lineItems:[{currency:plan.currency,unitAmount:Number(plan.price_minor),quantity:1,name:plan.name,description:plan.description,interval:mode==='subscription'?plan.interval_unit:undefined,intervalCount:plan.interval_count}],successUrl:env.STRIPE_CHECKOUT_SUCCESS_URL,cancelUrl:env.STRIPE_CHECKOUT_CANCEL_URL,customerEmail:actor.user.email,metadata:{site_id:siteId,membership_plan_id:plan.id,user_id:actor.user.id,purchase_type:'membership'},subscriptionMetadata:{site_id:siteId,membership_plan_id:plan.id,user_id:actor.user.id,purchase_type:'membership'},idempotencyKey:`vsh_mem_${siteId}_${actor.user.id}_${plan.id}_${randomUUID()}`});const saved=await localPool.query('INSERT INTO paid_memberships(site_id,user_id,plan_id,status,provider,provider_customer_id,provider_subscription_id) VALUES($1,$2,$3,\'pending\',\'stripe\',$4,$5) RETURNING id,status,plan_id,provider_subscription_id',[siteId,actor.user.id,plan.id,checkout.customerId,checkout.subscriptionId]);return sendJson(res,201,{membership:saved.rows[0],checkoutUrl:checkout.url,requestId});}
   const memberships=pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/memberships$/i);
   if(method==='GET'&&memberships){if(!localPool)throw fail(503,'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED','Memberships require PostgreSQL.');const siteId=memberships[1];await siteIdFor({ req, url, body: {}, actor, routeSiteId: siteId });await requireCapability(actor,siteId,'memberships:manage');const result=await localPool.query('SELECT m.id,m.user_id,u.email,u.display_name,m.plan_id,p.name AS plan_name,m.status,m.provider,m.current_period_start,m.current_period_end,m.cancel_at_period_end,m.created_at FROM paid_memberships m JOIN users u ON u.id=m.user_id JOIN membership_plans p ON p.id=m.plan_id WHERE m.site_id=$1 ORDER BY m.created_at DESC LIMIT 500',[siteId]);return sendJson(res,200,{memberships:result.rows,requestId});}
 

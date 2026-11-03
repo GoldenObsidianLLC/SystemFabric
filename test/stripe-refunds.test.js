@@ -18,7 +18,7 @@ function refundArgs(extra = {}) {
     paymentIntentId: PAYMENT_INTENT_ID,
     amountMinor: 2500,
     reason: 'requested_by_customer',
-    idempotencyKey: 'sf_refund_333333333333',
+    idempotencyKey: 'vsh_refund_333333333333',
     metadata: { site_id: SITE_ID, order_id: ORDER_ID, refund_id: REFUND_ID },
     fetchImpl: async (_url, options) => ({
       ok: true,
@@ -205,7 +205,7 @@ test('Stripe refund helper posts the exact PaymentIntent amount, metadata and st
   const options = refundArgs.lastOptions;
   assert.equal(options.method, 'POST');
   assert.equal(options.headers.authorization, 'Bearer sk_test_fixture_not_a_real_key');
-  assert.equal(options.headers['idempotency-key'], 'sf_refund_333333333333');
+  assert.equal(options.headers['idempotency-key'], 'vsh_refund_333333333333');
   const form = new URLSearchParams(options.body);
   assert.equal(form.get('payment_intent'), PAYMENT_INTENT_ID);
   assert.equal(form.get('amount'), '2500');
@@ -274,7 +274,7 @@ test('admin refund route reserves amounts, calls Stripe once and keeps partial r
     status: 200,
     async text() {
       const form = new URLSearchParams(options.body);
-      assert.equal(options.headers['idempotency-key'], `sf_refund_${REFUND_ID}`);
+      assert.equal(options.headers['idempotency-key'], `vsh_refund_${REFUND_ID}`);
       assert.equal(form.get('payment_intent'), PAYMENT_INTENT_ID);
       assert.equal(form.get('amount'), '2500');
       return JSON.stringify(providerResponse());
@@ -319,7 +319,7 @@ test('same refund request retries an ambiguous provider outcome with the identic
     await handlePlatformRoute(ctx);
   });
   assert.equal(keys.length, 2);
-  assert.deepEqual(keys, [`sf_refund_${REFUND_ID}`, `sf_refund_${REFUND_ID}`]);
+  assert.deepEqual(keys, [`vsh_refund_${REFUND_ID}`, `vsh_refund_${REFUND_ID}`]);
   assert.equal(state.refunds[0].status, 'succeeded');
   assert.equal(state.refunds.length, 1);
   assert.equal(ctx.res.payload.idempotentReplay, true);
