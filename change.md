@@ -45,6 +45,10 @@ Before adopting this version:
 
 There is deliberately no fallback lookup, alias, schema-specific legacy detection, or silent dual-read/dual-write behavior. Before applying migrations, the runner performs a generic public-schema emptiness check and refuses to initialize a non-empty database when the new migration ledger has no entries. This prevents an accidental replay of the new migration set against an existing database without embedding legacy identifiers in the new code.
 
+## Historical Git objects
+
+The current tracked working tree, project metadata, and tracked filenames use only the new identity. Existing Git history and commit objects are intentionally preserved for provenance; rewriting historical trees and commit messages would require a repository-wide history rewrite and force-push, disrupting existing branches and open pull requests. Historical references are not active project metadata or compatibility aliases.
+
 ## Verification requirements
 
 The rename is not considered complete until all of the following pass:
