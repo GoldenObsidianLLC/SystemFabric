@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 async function contentSideEffects(pool, siteId, contentId) {
@@ -48,14 +48,14 @@ test(
       REQUIRE_VERIFIED_EMAIL: 'false',
       AI_PROVIDER: 'mock',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
 
     const identity = createIdentityService({ pool, env });
 
     t.after(async () => {
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM sites WHERE id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -173,7 +173,7 @@ test(
     });
 
     const base = `http://127.0.0.1:${server.address().port}`;
-    const headers = { authorization: `Bearer ${session.token}`, 'x-systemfabric-site-id': siteB };
+    const headers = { authorization: `Bearer ${session.token}`, 'x-virgoscorpio-hub-site-id': siteB };
     const before = await contentSideEffects(pool, siteA, foreignContent.id);
     assert.ok(before, 'site A fixture must exist before adversarial requests');
 
@@ -234,8 +234,8 @@ test(
         const payload = await response.json();
         assert.equal(response.status, scenario.status, 'foreign object IDs must be scoped to the selected site');
         assert.ok(
-          payload.code === 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND' ||
-          payload.code === 'ERR_SYSTEMFABRIC_REVISION_NOT_FOUND',
+          payload.code === 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND' ||
+          payload.code === 'ERR_VIRGOSCORPIO_HUB_REVISION_NOT_FOUND',
           'a foreign object must be indistinguishable from an absent object in the selected site'
         );
         assert.doesNotMatch(JSON.stringify(payload), /Private Site A Draft|Site A only/);

@@ -1,6 +1,6 @@
-# SystemFabric 0.5.1 — Production Certification Execution Plan
+# VirgoScorpio Hub 0.5.1 — Production Certification Execution Plan
 
-> **Status refresh — 1 November 2026:** this document remains the procedural certification plan, not a current evidence snapshot. Its original baseline paragraph and counts refer to the 31 October/PR #12 state and are historical. Use the [1 November project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md) for the latest PR #36 candidate results, blockers, open CodeQL findings and issue state. The independent/provider/operations gates remain open; production remains NO-GO.
+> **Status refresh — 1 November 2026:** this document remains the procedural certification plan, not a current evidence snapshot. Its original baseline paragraph and counts refer to the 31 October/PR #12 state and are historical. Use the [1 November project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md) for the latest PR #36 candidate results, blockers, open CodeQL findings and issue state. The independent/provider/operations gates remain open; production remains NO-GO.
 
 > **Decision: NO-GO.** This plan organizes the 13 missing formal evidence gates and the one partial dependency-review check recorded in the 2026-10-31 readiness snapshot. It is a work plan, not evidence that any gate has passed.
 
@@ -27,7 +27,7 @@ Rules for this work:
 
 ### Phase 0 — Freeze the candidate scope and provider matrix
 
-Before provisioning external systems, record a release-scope decision for SystemFabric 0.5.1:
+Before provisioning external systems, record a release-scope decision for VirgoScorpio Hub 0.5.1:
 
 | Decision | Required record |
 |---|---|
@@ -129,7 +129,7 @@ The committed lockfile installs cleanly, but an explicit human maintainer review
 
 For every evidence artifact, include at least:
 - Gate ID, outcome, and concise scope statement.
-- Full SystemFabric commit SHA and repository revision reviewed.
+- Full VirgoScorpio Hub commit SHA and repository revision reviewed.
 - Environment/topology, OS, Node.js and database/service/provider versions.
 - Test account/project identifiers in redacted form; no credentials or secrets.
 - Exact commands or human procedure, with inputs/test fixtures described safely.
@@ -150,7 +150,7 @@ Production certification is **NO-GO** until:
 5. The readiness report is regenerated for the release candidate and its source SHA is reconciled with the candidate under review.
 6. The named release owner records an explicit approval and any scope limitations.
 
-Until then, SystemFabric remains an expanded developer preview and must not be represented as production-certified.
+Until then, VirgoScorpio Hub remains an expanded developer preview and must not be represented as production-certified.
 
 ## Appendix A — Independent reviewer source map
 
@@ -176,23 +176,23 @@ The open tickets below provide per-gate execution and evidence tracking. No revi
 
 | Work item | GitHub issue |
 |---|---|
-| Freeze 0.5.1 release scope/provider matrix (prerequisite) | [#13](https://github.com/GoldenObsidianLLC/SystemFabric/issues/13) |
-| Independent tenant/site isolation review — first review task | [#14](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14) |
-| Identity provider and MFA lifecycle evidence | [#15](https://github.com/GoldenObsidianLLC/SystemFabric/issues/15) |
-| Malware-scanning corpus and legacy-asset quarantine | [#16](https://github.com/GoldenObsidianLLC/SystemFabric/issues/16) |
-| Live object-storage provider validation | [#17](https://github.com/GoldenObsidianLLC/SystemFabric/issues/17) |
-| Stripe checkout/webhook/payment lifecycle | [#18](https://github.com/GoldenObsidianLLC/SystemFabric/issues/18) |
-| Browser and manual accessibility acceptance | [#19](https://github.com/GoldenObsidianLLC/SystemFabric/issues/19) |
-| Commerce acceptance | [#20](https://github.com/GoldenObsidianLLC/SystemFabric/issues/20) |
-| Community acceptance | [#21](https://github.com/GoldenObsidianLLC/SystemFabric/issues/21) |
-| Plugin pipeline and runtime isolation | [#22](https://github.com/GoldenObsidianLLC/SystemFabric/issues/22) |
-| Lockfile, SBOM, provenance and CodeQL review | [#23](https://github.com/GoldenObsidianLLC/SystemFabric/issues/23) |
-| Load, fault-injection and backup/restore drills | [#24](https://github.com/GoldenObsidianLLC/SystemFabric/issues/24) |
-| Independent security assessment | [#25](https://github.com/GoldenObsidianLLC/SystemFabric/issues/25) |
-| Operations runbooks and release-owner approval | [#26](https://github.com/GoldenObsidianLLC/SystemFabric/issues/26) |
+| Freeze 0.5.1 release scope/provider matrix (prerequisite) | [#13](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/13) |
+| Independent tenant/site isolation review — first review task | [#14](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14) |
+| Identity provider and MFA lifecycle evidence | [#15](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/15) |
+| Malware-scanning corpus and legacy-asset quarantine | [#16](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/16) |
+| Live object-storage provider validation | [#17](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/17) |
+| Stripe checkout/webhook/payment lifecycle | [#18](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/18) |
+| Browser and manual accessibility acceptance | [#19](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/19) |
+| Commerce acceptance | [#20](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/20) |
+| Community acceptance | [#21](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/21) |
+| Plugin pipeline and runtime isolation | [#22](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/22) |
+| Lockfile, SBOM, provenance and CodeQL review | [#23](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/23) |
+| Load, fault-injection and backup/restore drills | [#24](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/24) |
+| Independent security assessment | [#25](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/25) |
+| Operations runbooks and release-owner approval | [#26](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/26) |
 
 Start with #13 to freeze the supported release scope, then #14 to commission the independent tenant/site review. Provider-specific work in #15–#18 should use only the resulting approved provider matrix. The 13 evidence gates remain open until their respective artifacts are accepted; opening an issue does not change the readiness status.
 
 ## Appendix C — Recommended release scope
 
-The proposed baseline for SystemFabric 0.5.1 is recorded in [RELEASE-SCOPE.md](RELEASE-SCOPE.md). It follows the current manifest and environment defaults, limits 0.5.1 to an isolated developer preview, identifies provider/feature exclusions, and requires named release-owner approval before becoming an official product decision. The production evidence gates remain open.
+The proposed baseline for VirgoScorpio Hub 0.5.1 is recorded in [RELEASE-SCOPE.md](RELEASE-SCOPE.md). It follows the current manifest and environment defaults, limits 0.5.1 to an isolated developer preview, identifies provider/feature exclusions, and requires named release-owner approval before becoming an official product decision. The production evidence gates remain open.

@@ -20,8 +20,8 @@ npm --version
 ## Checkout and dependency install
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/SystemFabric.git
-Set-Location SystemFabric
+git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+Set-Location VirgoScorpio-Hub
 npm ci
 ```
 
@@ -50,7 +50,7 @@ gitleaks dir --redact --verbose .
 gitleaks git --redact --verbose --log-opts="--all"
 ```
 
-The live integration command requires a reachable PostgreSQL server with a dedicated `systemfabric_test` database and Memgraph. Follow the integration script's current configuration and avoid destructive operations against shared databases.
+The live integration command requires a reachable PostgreSQL server with a dedicated `virgoscorpio_hub_test` database and Memgraph. Follow the integration script's current configuration and avoid destructive operations against shared databases.
 
 ## Working on a change
 

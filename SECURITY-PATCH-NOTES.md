@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 dependency security patch
+# VirgoScorpio Hub 0.5.1 dependency security patch
 
 ## Changes
 
@@ -8,7 +8,7 @@
 
 ## Apply
 
-1. Extract the included `SystemFabric-0.5.1/package.json` over the project's root `package.json`.
+1. Extract the included `VirgoScorpio-Hub-0.5.1/package.json` over the project's root `package.json`.
 2. From the project root, run `npm install` to reconcile and update the already-generated `package-lock.json` and install the patched versions. Do not use `npm ci` until after the lockfile has been refreshed.
 3. Verify versions: `npm ls zod sharp`.
 4. Run `npm audit` and `npm audit --omit=dev`.

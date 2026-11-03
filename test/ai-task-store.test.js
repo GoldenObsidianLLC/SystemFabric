@@ -157,31 +157,31 @@ test('AI task store blocks invalid and backwards transitions', async () => {
 
   await assert.rejects(
     store.create({ siteId, actorId, requestId: 'bad', taskType: 'shell', inputChars: 0 }),
-    { code: 'ERR_SYSTEMFABRIC_AI_TASK_INVALID', statusCode: 400 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_INVALID', statusCode: 400 }
   );
   await assert.rejects(
     store.create({ siteId, actorId, requestId: 'bad', taskType: 'translate', inputChars: -1 }),
-    { code: 'ERR_SYSTEMFABRIC_AI_TASK_INVALID', statusCode: 400 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_INVALID', statusCode: 400 }
   );
   assert.equal(pool.queries.length, 0);
 
   await store.create({ siteId, actorId, requestId: 'request-124', taskType: 'translate', inputChars: 5 });
   await assert.rejects(
     store.finish({ taskId, siteId, status: 'succeeded', outputChars: 1, latencyMs: 1 }),
-    { code: 'ERR_SYSTEMFABRIC_AI_TASK_CONFLICT', statusCode: 409 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_CONFLICT', statusCode: 409 }
   );
   await store.finish({
     taskId,
     siteId,
     status: 'blocked',
-    errorCode: 'ERR_SYSTEMFABRIC_AI_DISABLED'
+    errorCode: 'ERR_VIRGOSCORPIO_HUB_AI_DISABLED'
   });
   const blocked = await store.get({ taskId, siteId, actorId });
   assert.equal(blocked.status, 'blocked');
-  assert.equal(blocked.errorCode, 'ERR_SYSTEMFABRIC_AI_DISABLED');
+  assert.equal(blocked.errorCode, 'ERR_VIRGOSCORPIO_HUB_AI_DISABLED');
   await assert.rejects(
     store.finish({ taskId, siteId, status: 'failed', errorCode: 'ERR_TEST' }),
-    { code: 'ERR_SYSTEMFABRIC_AI_TASK_CONFLICT', statusCode: 409 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_CONFLICT', statusCode: 409 }
   );
 });
 
@@ -195,7 +195,7 @@ test('AI task store sanitizes unknown provider error codes before persistence', 
     status: 'failed',
     errorCode: 'provider-secret\nwith-sensitive-details'
   });
-  assert.equal(pool.records.get(taskId).errorCode, 'ERR_SYSTEMFABRIC_AI_FAILURE');
+  assert.equal(pool.records.get(taskId).errorCode, 'ERR_VIRGOSCORPIO_HUB_AI_FAILURE');
 });
 
 test('AI task store detects whether the lifecycle migration is installed', async () => {

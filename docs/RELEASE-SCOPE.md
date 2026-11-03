@@ -1,10 +1,10 @@
-# SystemFabric 0.5.1 — Recommended Release Scope
+# VirgoScorpio Hub 0.5.1 — Recommended Release Scope
 
 > **Status: Recommended scope baseline; named release-owner sign-off is pending.**
 >
 > **Release classification: EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED.**
 >
-> This document narrows what SystemFabric 0.5.1 may claim and what the next certification work should cover. It does not approve a production release, prove the provider integrations, or waive the production gates. The scope is based on the committed `RELEASE-MANIFEST.json`, `.env.example`, CI workflow, and Playwright configuration at the baseline commit recorded below.
+> This document narrows what VirgoScorpio Hub 0.5.1 may claim and what the next certification work should cover. It does not approve a production release, prove the provider integrations, or waive the production gates. The scope is based on the committed `RELEASE-MANIFEST.json`, `.env.example`, CI workflow, and Playwright configuration at the baseline commit recorded below.
 
 ## 1. Decision summary
 
@@ -37,11 +37,11 @@ The implementation contains adapters and feature foundations beyond the configur
 For a deployment describing itself as the 0.5.1 developer preview, use the following policy:
 
 - Keep `NODE_ENV=development` or another explicitly isolated non-production environment. Do not represent the sample environment as a production template.
-- Keep `SYSTEMFABRIC_REALTIME_ENABLED=false`, `MEMGRAPH_ENABLED=false` unless a developer deliberately enables the local test topology, and do not expose internal service ports publicly.
+- Keep `VIRGOSCORPIO_HUB_REALTIME_ENABLED=false`, `MEMGRAPH_ENABLED=false` unless a developer deliberately enables the local test topology, and do not expose internal service ports publicly.
 - Keep `AI_PROVIDER=mock`, `AI_ALLOWED_PROVIDERS=mock`, `AI_ALLOW_EXTERNAL_CONTENT=false`, and `AI_LOG_PROMPTS=false`.
-- Keep `SYSTEMFABRIC_MAIL_PROVIDER=disabled`, `SAML_ENABLED=false`, and OIDC credentials unset unless conducting isolated integration testing.
+- Keep `VIRGOSCORPIO_HUB_MAIL_PROVIDER=disabled`, `SAML_ENABLED=false`, and OIDC credentials unset unless conducting isolated integration testing.
 - Keep `MEDIA_DRIVER=local` and `LIBRARY_STORAGE_PROVIDER=local`; do not configure remote storage providers as supported production services under this release claim.
-- Keep `SYSTEMFABRIC_PLUGIN_EXECUTION_ENABLED=false`, with no external plugin runner exposed.
+- Keep `VIRGOSCORPIO_HUB_PLUGIN_EXECUTION_ENABLED=false`, with no external plugin runner exposed.
 - Do not configure Stripe live credentials. Any checkout/webhook testing must use a dedicated test-mode account and isolated test data.
 - Do not accept untrusted uploads unless a real scanner is configured and the relevant scanner acceptance procedure has passed. Production upload policy must fail closed when ClamAV is absent or unavailable.
 - Set real, unique secrets in any isolated environment; never reuse the example bootstrap credentials/API tokens. Use HTTPS and secure cookies if exposing the preview beyond loopback.
@@ -68,7 +68,7 @@ Every selected production provider must be tested against a dedicated non-produc
 
 | Field | Value |
 |---|---|
-| Repository | `GoldenObsidianLLC/SystemFabric` |
+| Repository | `GoldenObsidianLLC/VirgoScorpio-Hub` |
 | Version | `0.5.1` |
 | Source baseline | `af21b728bb906bb37b561bb5a381deb0a19da007` |
 | Manifest state | `EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED` |
@@ -82,6 +82,6 @@ The CI workflow and sample configuration establish the evidence boundaries for t
 
 This scope does **not** change the current release status:
 
-**SystemFabric 0.5.1 remains an expanded developer preview and is NOT_PRODUCTION_CERTIFIED / NO-GO.**
+**VirgoScorpio Hub 0.5.1 remains an expanded developer preview and is NOT_PRODUCTION_CERTIFIED / NO-GO.**
 
 The named release owner must approve or amend this scope before it is treated as an official product decision. Independent tenant/site review (#14) remains the first independent security workstream; this scope proposal does not close or reduce that gate.

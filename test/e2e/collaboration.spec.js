@@ -72,14 +72,14 @@ function createMemoryCollaborationStore() {
       if (siteId !== SITE_ID || contentId !== CONTENT_ID) {
         const error = new Error('Content not found.');
         error.statusCode = 404;
-        error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND';
         throw error;
       }
       const validation = validateCollaborationOperation(operation);
       if (!validation.valid) {
         const error = new Error(validation.errors.join('; '));
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION';
         throw error;
       }
 
@@ -90,7 +90,7 @@ function createMemoryCollaborationStore() {
         if (existing.actorId !== actorId || !samePayload) {
           const error = new Error('The collaboration opId was already used.');
           error.statusCode = 409;
-          error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE';
+          error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_OP_ID_REUSE';
           throw error;
         }
         return { ...existing.result, duplicate: true };
@@ -98,7 +98,7 @@ function createMemoryCollaborationStore() {
       if (operation.baseSequence > sequence) {
         const error = new Error('The base sequence is ahead of the server.');
         error.statusCode = 409;
-        error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE';
         throw error;
       }
       if (operation.baseSequence < oldestReplaySequence) {
@@ -140,13 +140,13 @@ function createMemoryCollaborationStore() {
       if (siteId !== SITE_ID || contentId !== CONTENT_ID) {
         const error = new Error('Content not found.');
         error.statusCode = 404;
-        error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND';
         throw error;
       }
       if (afterSequence > sequence) {
         const error = new Error('The requested sequence is ahead of the server.');
         error.statusCode = 409;
-        error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE';
         throw error;
       }
       if (afterSequence < oldestReplaySequence) {
@@ -226,8 +226,8 @@ test('two real browser sessions converge, retry a lost acknowledgement, reconnec
     env: {
       NODE_ENV: 'test',
       HOST: '127.0.0.1',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: SITE_ID,
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: SITE_ID,
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -355,12 +355,12 @@ test('two real browser sessions converge, retry a lost acknowledgement, reconnec
   } finally {
     for (const page of [pageA, pageB, pageAReconnected, pageBReloaded]) {
       if (page && !page.isClosed()) {
-        await page.evaluate(() => window.__systemfabricCollaboration?.close()).catch(() => {});
+        await page.evaluate(() => window.__virgoscorpio_hubCollaboration?.close()).catch(() => {});
       }
     }
     await contextA.close();
     await contextB.close();
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   }
 });

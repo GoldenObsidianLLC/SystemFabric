@@ -14,7 +14,7 @@ The coupon table is groundwork only and must not be exposed as supported checkou
 
 ## Stripe configuration
 
-Configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CHECKOUT_SUCCESS_URL`, and `STRIPE_CHECKOUT_CANCEL_URL` as deployment secrets/configuration. Use test-mode keys and a private test webhook before any live test. Never store raw card details in SystemFabric. Card collection belongs to Stripe-hosted Checkout; the application stores references and status only.
+Configure `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CHECKOUT_SUCCESS_URL`, and `STRIPE_CHECKOUT_CANCEL_URL` as deployment secrets/configuration. Use test-mode keys and a private test webhook before any live test. Never store raw card details in VirgoScorpio Hub. Card collection belongs to Stripe-hosted Checkout; the application stores references and status only.
 
 The refund API requires `commerce:manage` on the target site and accepts `amountMinor`, an optional `reason` (`duplicate`, `fraudulent`, or `requested_by_customer`), and a caller-generated `Idempotency-Key` header (the body `idempotencyKey` is also accepted for compatibility). Reuse the same key and parameters after a timeout or unknown outcome; a different amount, currency, or reason under the same key is rejected. Requested/pending/succeeded refunds reserve balance. A full refund changes the order to `refunded` only when succeeded refunds cumulatively cover the order total. Refunds do not automatically restock inventory.
 

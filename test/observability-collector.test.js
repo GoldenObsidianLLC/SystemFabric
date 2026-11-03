@@ -15,7 +15,7 @@ const {
 } = require('../scripts/configure-otel-dev');
 
 function temporaryRoot(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'systemfabric-otel-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'virgoscorpio_hub-otel-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -27,26 +27,26 @@ test('local collector setup creates an ignored token file and matching loopback 
   const savedToken = fs.readFileSync(result.secretFile, 'utf8').trim();
   const env = fs.readFileSync(result.envFile, 'utf8');
   const headersLine = env.split(/\r?\n/).find(line =>
-    line.startsWith('SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON=')
+    line.startsWith('VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON=')
   );
 
   assert.equal(savedToken, token);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_ENABLED=true$/m);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/traces$/m);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_LOGS_ENABLED=true$/m);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/logs$/m);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true$/m);
-  assert.match(env, /^SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE=\.\/var\/secrets\/otel-collector-token\.txt$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_ENABLED=true$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/traces$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED=true$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT=http:\/\/127\.0\.0\.1:4318\/v1\/logs$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP=true$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_AUTH_TOKEN_FILE=\.\/var\/secrets\/otel-collector-token\.txt$/m);
   assert.deepEqual(JSON.parse(headersLine.slice(headersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + token
   });
   const logHeadersLine = env.split(/\r?\n/).find(line =>
-    line.startsWith('SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
+    line.startsWith('VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
   );
   assert.deepEqual(JSON.parse(logHeadersLine.slice(logHeadersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + token
   });
-  assert.match(env, /^SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG=0\.164\.0-amd64$/m);
+  assert.match(env, /^VIRGOSCORPIO_HUB_OTEL_COLLECTOR_IMAGE_TAG=0\.164\.0-amd64$/m);
   assert.equal(result.rotated, false);
   assert.equal(JSON.stringify(result).includes(token), false);
 });
@@ -84,14 +84,14 @@ test('local collector setup is idempotent and token rotation updates both sides'
   const rotated = configureLocalCollector({ root, rotate: true, tokenFactory });
   const env = fs.readFileSync(rotated.envFile, 'utf8');
   const headersLine = env.split(/\r?\n/).find(line =>
-    line.startsWith('SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON=')
+    line.startsWith('VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON=')
   );
   assert.equal(fs.readFileSync(rotated.secretFile, 'utf8').trim(), 'c'.repeat(43));
   assert.deepEqual(JSON.parse(headersLine.slice(headersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + 'c'.repeat(43)
   });
   const logHeadersLine = env.split(/\r?\n/).find(line =>
-    line.startsWith('SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
+    line.startsWith('VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON=')
   );
   assert.deepEqual(JSON.parse(logHeadersLine.slice(logHeadersLine.indexOf('=') + 1)), {
     authorization: 'Bearer ' + 'c'.repeat(43)
@@ -112,11 +112,11 @@ test('duplicate environment keys do not rotate or replace the existing collector
   const root = temporaryRoot(t);
   const first = configureLocalCollector({ root, tokenFactory: () => 'd'.repeat(43) });
   const originalToken = fs.readFileSync(first.secretFile, 'utf8');
-  fs.appendFileSync(first.envFile, 'SYSTEMFABRIC_OTEL_ENABLED=false\\n');
+  fs.appendFileSync(first.envFile, 'VIRGOSCORPIO_HUB_OTEL_ENABLED=false\\n');
 
   assert.throws(
     () => configureLocalCollector({ root, rotate: true, tokenFactory: () => 'e'.repeat(43) }),
-    /duplicate SYSTEMFABRIC_OTEL_ENABLED/
+    /duplicate VIRGOSCORPIO_HUB_OTEL_ENABLED/
   );
   assert.equal(fs.readFileSync(first.secretFile, 'utf8'), originalToken);
 });
@@ -179,18 +179,18 @@ test('temporary writes use exclusive files and replacement publishes complete co
 
 test('environment updates preserve unrelated settings and reject duplicate OTEL keys', () => {
   const result = upsertEnv(
-    '# keep me\nDATABASE_URL=postgres://localhost/db\nSYSTEMFABRIC_OTEL_ENABLED=false\n',
-    { SYSTEMFABRIC_OTEL_ENABLED: 'true' }
+    '# keep me\nDATABASE_URL=postgres://localhost/db\nVIRGOSCORPIO_HUB_OTEL_ENABLED=false\n',
+    { VIRGOSCORPIO_HUB_OTEL_ENABLED: 'true' }
   );
   assert.match(result, /^# keep me$/m);
   assert.match(result, /^DATABASE_URL=postgres:\/\/localhost\/db$/m);
-  assert.match(result, /^SYSTEMFABRIC_OTEL_ENABLED=true$/m);
+  assert.match(result, /^VIRGOSCORPIO_HUB_OTEL_ENABLED=true$/m);
   assert.throws(
     () => upsertEnv(
-      'SYSTEMFABRIC_OTEL_ENABLED=false\nSYSTEMFABRIC_OTEL_ENABLED=false\n',
-      { SYSTEMFABRIC_OTEL_ENABLED: 'true' }
+      'VIRGOSCORPIO_HUB_OTEL_ENABLED=false\nVIRGOSCORPIO_HUB_OTEL_ENABLED=false\n',
+      { VIRGOSCORPIO_HUB_OTEL_ENABLED: 'true' }
     ),
-    /duplicate SYSTEMFABRIC_OTEL_ENABLED/
+    /duplicate VIRGOSCORPIO_HUB_OTEL_ENABLED/
   );
 });
 
@@ -217,7 +217,7 @@ test('collector reference config is authenticated, supports traces and logs, mem
   assert.match(config, /\n\s+logs:\s*\n\s+receivers:\s+\[otlp\]/);
   assert.doesNotMatch(config, /\n\s+metrics:\s*\n\s+receivers:/);
   assert.match(config, /telemetry:\s*\n\s+logs:\s*\n\s+level:\s+info/);
-  assert.ok(compose.includes('image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}'));
+  assert.ok(compose.includes('image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${VIRGOSCORPIO_HUB_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}'));
   assert.match(compose, /127\.0\.0\.1:4318:4318/);
   assert.match(compose, /cap_drop:\s*\[\s*"ALL"\s*\]/);
   assert.match(compose, /no-new-privileges:true/);

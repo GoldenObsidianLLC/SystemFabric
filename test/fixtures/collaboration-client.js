@@ -91,7 +91,7 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
       }
     };
 
-    window.__systemfabricCollaboration = client;
+    window.__virgoscorpio_hubCollaboration = client;
     const wsUrl = config.baseUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
       + '/api/v1/sites/' + config.siteId + '/realtime/ws';
     client.socket = new WebSocket(wsUrl);
@@ -138,13 +138,13 @@ async function connectCollaborationClient(page, { baseUrl, siteId, contentId, cl
 
 async function sendCollaborationCommand(page, command) {
   return page.evaluate(value => {
-    window.__systemfabricCollaboration.send(value);
+    window.__virgoscorpio_hubCollaboration.send(value);
   }, command);
 }
 
 async function waitForCollaborationMessage(page, type, timeoutMs = 3_000) {
   return page.evaluate(({ expectedType, waitMs }) => (
-    window.__systemfabricCollaboration.waitFor(expectedType, waitMs)
+    window.__virgoscorpio_hubCollaboration.waitFor(expectedType, waitMs)
   ), { expectedType: type, waitMs: timeoutMs });
 }
 
@@ -153,11 +153,11 @@ async function waitForAnyCollaborationMessage(page, timeoutMs = 3_000) {
 }
 
 async function readCollaborativeDocument(page) {
-  return page.evaluate(() => window.__systemfabricCollaboration.snapshot());
+  return page.evaluate(() => window.__virgoscorpio_hubCollaboration.snapshot());
 }
 
 async function closeCollaborationClient(page) {
-  return page.evaluate(() => window.__systemfabricCollaboration.close());
+  return page.evaluate(() => window.__virgoscorpio_hubCollaboration.close());
 }
 
 module.exports = {

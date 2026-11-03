@@ -1,8 +1,8 @@
-# SystemFabric Documentation
+# VirgoScorpio Hub Documentation
 
 ## Current status and repository assurance
 
-- [SystemFabric 0.5.1 project status report — 1 November 2026](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md) — full engineering, security, release-readiness, governance and funding snapshot. Historical candidate evidence; not production approval.
+- [VirgoScorpio Hub 0.5.1 project status report — 1 November 2026](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md) — full engineering, security, release-readiness, governance and funding snapshot. Historical candidate evidence; not production approval.
 - [Repository coherence and continuity review — 1 November 2026](REPOSITORY-COHERENCE-AND-CONTINUITY-REVIEW-2026-11-01.md) — repository inventory, documentation drift, CI/readiness gaps, branch reconciliation, safe corrections and backlog.
 
 The project remains **NOT_PRODUCTION_CERTIFIED**. PR #36 is a candidate branch, not a merged release. See the report for exact revisions and evidence boundaries.
@@ -13,10 +13,11 @@ This directory contains task-oriented documentation. The root [README](../README
 
 | If you need to… | Read |
 |---|---|
+| Review the breaking project identity change and migration requirements | [Change record](../change.md) |
 | Make your first contribution from a fresh clone | [Contributor Quickstart](CONTRIBUTOR-QUICKSTART.md) |
 | Understand the platform layout and data flow | [Architecture](ARCHITECTURE.md) |
-| Understand the project mission and human-AI symbiosis vision | [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) |
-| Apply the manifesto to product and engineering decisions | [Engineering Principles](SYSTEMFABRIC-PRINCIPLES.md) |
+| Understand the project mission and human-AI symbiosis vision | [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md) |
+| Apply the manifesto to product and engineering decisions | [Engineering Principles](VIRGOSCORPIO-HUB-PRINCIPLES.md) |
 | Understand the proposed real-time, collaboration and AI architecture | [Real-Time and AI Architecture](REALTIME-AI-ARCHITECTURE.md) |
 | Review the implemented developer-preview presence foundation and its limits | [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md) |
 | Operate and troubleshoot the real-time preview without overstating its guarantees | [Real-Time Operations Runbook](REALTIME-OPERATIONS.md) |

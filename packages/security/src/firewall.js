@@ -21,7 +21,7 @@ function ruleMatches(rule, request) {
 }
 function createFirewall({ pool = null, env = process.env, cacheTtlMs = 5000 } = {}) {
   let cacheUntil = 0; let cached = []; let refreshing = null;
-  const staticDeny = String(env.SYSTEMFABRIC_FIREWALL_DENY_CIDRS || '').split(',').map(x=>x.trim()).filter(Boolean).filter(x=>validateIpPattern(x.includes('/')?'cidr':'ip',x));
+  const staticDeny = String(env.VIRGOSCORPIO_HUB_FIREWALL_DENY_CIDRS || '').split(',').map(x=>x.trim()).filter(Boolean).filter(x=>validateIpPattern(x.includes('/')?'cidr':'ip',x));
   async function refresh() {
     if (!pool) return;
     if (refreshing) return refreshing;

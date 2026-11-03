@@ -8,7 +8,7 @@ function createGeminiProvider({
   model = 'gemini-4-argon',
   timeoutMs = 30_000
 } = {}) {
-  if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY is required for gemini.'), { code: 'ERR_SYSTEMFABRIC_AI_NOT_CONFIGURED' });
+  if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY is required for gemini.'), { code: 'ERR_VIRGOSCORPIO_HUB_AI_NOT_CONFIGURED' });
   return Object.freeze({
     name: 'gemini', model,
     async generate({ system, input, schemaName, schema, maxOutputTokens = 6000, signal }) {
@@ -17,7 +17,7 @@ function createGeminiProvider({
         input,
         system_instruction: system,
         generation_config: { max_output_tokens: maxOutputTokens },
-        // SystemFabric uses stateless requests; do not persist an Interaction for retrieval.
+        // VirgoScorpio Hub uses stateless requests; do not persist an Interaction for retrieval.
         store: false
       };
       if (schema) body.response_format = { type: 'text', mime_type: 'application/json', schema };
@@ -31,7 +31,7 @@ function createGeminiProvider({
       if (!text) {
         text = (result.output || []).flatMap(item => item.content || []).filter(part => part.type === 'output_text' || part.type === 'text').map(part => part.text || '').join('\n');
       }
-      if (!text) throw Object.assign(new Error('Gemini returned no text output.'), { code: 'ERR_SYSTEMFABRIC_AI_EMPTY_OUTPUT' });
+      if (!text) throw Object.assign(new Error('Gemini returned no text output.'), { code: 'ERR_VIRGOSCORPIO_HUB_AI_EMPTY_OUTPUT' });
       return text;
     }
   });

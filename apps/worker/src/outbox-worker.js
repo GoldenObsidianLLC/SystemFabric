@@ -32,7 +32,7 @@ function createGraphProjectionWorker({
   pool,
   projector,
   consumerGroup = DEFAULT_GRAPH_CONSUMER_GROUP,
-  workerId = `sf-graph-${randomUUID()}`,
+  workerId = `vsh-graph-${randomUUID()}`,
   batchSize = 25,
   dispatchBatchSize = 250,
   leaseMs = 30_000,
@@ -53,8 +53,8 @@ function createGraphProjectionWorker({
     maxAttempts,
     onError,
     handler: ({ type, payload, envelope, delivery }) => withSpan('graph.projection.apply', {
-      'systemfabric.component': 'graph',
-      'systemfabric.operation': type,
+      'virgoscorpio_hub.component': 'graph',
+      'virgoscorpio_hub.operation': type,
       'db.system': 'memgraph',
       'db.operation.name': 'write'
     }, () => projector.apply({ type, payload, envelope, delivery }))
@@ -63,16 +63,16 @@ function createGraphProjectionWorker({
 
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
-  if (process.env.NODE_ENV === 'production' && process.env.SYSTEMFABRIC_WORKER_APPROVED !== 'true') {
-    throw new Error('Set SYSTEMFABRIC_WORKER_APPROVED=true only after production security review.');
+  if (process.env.NODE_ENV === 'production' && process.env.VIRGOSCORPIO_HUB_WORKER_APPROVED !== 'true') {
+    throw new Error('Set VIRGOSCORPIO_HUB_WORKER_APPROVED=true only after production security review.');
   }
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL must be configured for the outbox worker.');
   if (process.env.MEMGRAPH_ENABLED !== 'true') throw new Error('MEMGRAPH_ENABLED=true is required to run the graph projection worker.');
   const serviceVersion = require('../../../package.json').version;
-  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'systemfabric-outbox-worker', serviceVersion });
+  const tracingRuntime = initializeTracing({ env: process.env, serviceName: 'virgoscorpio-hub-outbox-worker', serviceVersion });
   let logRuntime;
   try {
-    logRuntime = initializeLogExport({ env: process.env, serviceName: 'systemfabric-outbox-worker', serviceVersion });
+    logRuntime = initializeLogExport({ env: process.env, serviceName: 'virgoscorpio-hub-outbox-worker', serviceVersion });
   } catch (error) {
     await tracingRuntime.shutdown().catch(() => {});
     throw error;
@@ -80,7 +80,7 @@ async function main() {
   const structuredLogger = createStructuredLogger({
     logger: console,
     otelLogger: logRuntime.logger,
-    service: 'systemfabric-outbox-worker',
+    service: 'virgoscorpio-hub-outbox-worker',
     environment: process.env.NODE_ENV || 'development'
   });
 
@@ -94,12 +94,12 @@ async function main() {
       password: process.env.MEMGRAPH_PASSWORD
     });
     const projector = createMemgraphProjector({ driver });
-    const consumerGroup = process.env.SYSTEMFABRIC_GRAPH_CONSUMER_GROUP || DEFAULT_GRAPH_CONSUMER_GROUP;
-    const batchSize = Number(process.env.SYSTEMFABRIC_GRAPH_BATCH_SIZE || 25);
-    const dispatchBatchSize = Number(process.env.SYSTEMFABRIC_GRAPH_DISPATCH_BATCH_SIZE || 250);
-    const leaseMs = Number(process.env.SYSTEMFABRIC_GRAPH_LEASE_MS || 30_000);
-    const maxAttempts = Number(process.env.SYSTEMFABRIC_GRAPH_MAX_ATTEMPTS || 10);
-    const pollMs = Number(process.env.SYSTEMFABRIC_GRAPH_POLL_MS || 1000);
+    const consumerGroup = process.env.VIRGOSCORPIO_HUB_GRAPH_CONSUMER_GROUP || DEFAULT_GRAPH_CONSUMER_GROUP;
+    const batchSize = Number(process.env.VIRGOSCORPIO_HUB_GRAPH_BATCH_SIZE || 25);
+    const dispatchBatchSize = Number(process.env.VIRGOSCORPIO_HUB_GRAPH_DISPATCH_BATCH_SIZE || 250);
+    const leaseMs = Number(process.env.VIRGOSCORPIO_HUB_GRAPH_LEASE_MS || 30_000);
+    const maxAttempts = Number(process.env.VIRGOSCORPIO_HUB_GRAPH_MAX_ATTEMPTS || 10);
+    const pollMs = Number(process.env.VIRGOSCORPIO_HUB_GRAPH_POLL_MS || 1000);
 
     const worker = createGraphProjectionWorker({
       pool,
@@ -109,7 +109,7 @@ async function main() {
       dispatchBatchSize,
       leaseMs,
       maxAttempts,
-      onError: event => structuredLogger.emit('error', 'systemfabric.outbox.delivery_error', {
+      onError: event => structuredLogger.emit('error', 'virgoscorpio_hub.outbox.delivery_error', {
         component: 'outbox',
         operation: 'delivery',
         code: event?.errorCode,
@@ -122,7 +122,7 @@ async function main() {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
 
-    structuredLogger.emit('info', 'systemfabric.graph_projection_worker.started', {
+    structuredLogger.emit('info', 'virgoscorpio_hub.graph_projection_worker.started', {
       component: 'graph', operation: 'startup', outcome: 'success',
       batchSize, dispatchBatchSize, leaseMs, maxAttempts, pollMs
     });
@@ -139,8 +139,8 @@ async function main() {
 
 if (require.main === module) {
   main().catch(error => {
-    const bootstrapLogger = createStructuredLogger({ service: 'systemfabric-outbox-worker', environment: process.env.NODE_ENV || 'development' });
-    bootstrapLogger.emit('error', 'systemfabric.outbox_worker.start_failed', {
+    const bootstrapLogger = createStructuredLogger({ service: 'virgoscorpio-hub-outbox-worker', environment: process.env.NODE_ENV || 'development' });
+    bootstrapLogger.emit('error', 'virgoscorpio_hub.outbox_worker.start_failed', {
       component: 'graph', operation: 'startup', outcome: 'failure',
       code: error?.code, errorType: error?.name || 'Error'
     });

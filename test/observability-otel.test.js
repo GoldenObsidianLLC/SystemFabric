@@ -28,9 +28,9 @@ class RetainingInMemorySpanExporter extends InMemorySpanExporter {
 
 const validEnv = overrides => ({
   NODE_ENV: 'test',
-  SYSTEMFABRIC_OTEL_ENABLED: 'true',
-  SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/v1/traces',
-  SYSTEMFABRIC_OTEL_SAMPLE_RATIO: '1',
+  VIRGOSCORPIO_HUB_OTEL_ENABLED: 'true',
+  VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/v1/traces',
+  VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO: '1',
   ...overrides
 });
 
@@ -76,7 +76,7 @@ test('instrumented PostgreSQL callback queries remain functional before tracing 
 });
 
 test('OpenTelemetry is disabled by default and does not require an exporter endpoint', () => {
-  const config = parseTracingConfig({}, 'systemfabric-api');
+  const config = parseTracingConfig({}, 'virgoscorpio-hub-api');
   assert.equal(config.enabled, false);
   assert.equal(config.endpoint, null);
   assert.equal(config.sampleRatio, 0.1);
@@ -85,35 +85,35 @@ test('OpenTelemetry is disabled by default and does not require an exporter endp
 
 test('OTLP endpoint validation requires an explicit secure endpoint when enabled', () => {
   assert.throws(
-    () => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: '' })),
+    () => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: '' })),
     /required when OpenTelemetry is enabled/
   );
   assert.throws(
-    () => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'http://collector.example/v1/traces' })),
+    () => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'http://collector.example/v1/traces' })),
     /must use HTTPS/
   );
   assert.throws(
-    () => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'https://user:secret@collector.example/v1/traces' })),
+    () => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'https://user:secret@collector.example/v1/traces' })),
     /must not contain credentials/
   );
   assert.throws(
-    () => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/v1/traces?token=secret' })),
+    () => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/v1/traces?token=secret' })),
     /must not contain credentials/
   );
   assert.throws(
-    () => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/custom' })),
+    () => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'https://collector.example/custom' })),
     /path must be \/v1\/traces or omitted/
   );
   assert.equal(
     parseTracingConfig(validEnv({
-      SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/traces',
-      SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP: 'true'
+      VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/traces',
+      VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP: 'true'
     })).endpoint,
     'http://127.0.0.1:4318/v1/traces'
   );
   assert.equal(
     parseTracingConfig(validEnv({
-      SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'https://collector.example'
+      VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'https://collector.example'
     })).endpoint,
     'https://collector.example/v1/traces'
   );
@@ -130,16 +130,16 @@ test('OTLP exporter authentication headers are narrowly allow-listed and never b
 });
 
 test('sampling ratio, timeout, and service identity are bounded', () => {
-  assert.throws(() => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_SAMPLE_RATIO: '1.1' })), /between 0 and 1/);
-  assert.throws(() => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_SAMPLE_RATIO: 'NaN' })), /between 0 and 1/);
-  assert.throws(() => parseTracingConfig(validEnv({ SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS: '50' })), /250 to 30000/);
-  assert.throws(() => parseTracingConfig(validEnv(), 'SystemFabric API'), /service name is invalid/);
+  assert.throws(() => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO: '1.1' })), /between 0 and 1/);
+  assert.throws(() => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO: 'NaN' })), /between 0 and 1/);
+  assert.throws(() => parseTracingConfig(validEnv({ VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS: '50' })), /250 to 30000/);
+  assert.throws(() => parseTracingConfig(validEnv(), 'VirgoScorpio Hub API'), /service name is invalid/);
 });
 
 test('span attributes are restricted to low-cardinality operational fields', () => {
   const attributes = sanitizeAttributes({
-    'systemfabric.component': 'database',
-    'systemfabric.operation': 'query',
+    'virgoscorpio_hub.component': 'database',
+    'virgoscorpio_hub.operation': 'query',
     'db.system': 'postgresql',
     'db.operation.name': 'SELECT',
     'http.request.method': 'GET',
@@ -147,12 +147,12 @@ test('span attributes are restricted to low-cardinality operational fields', () 
     'db.statement': 'SELECT * FROM users',
     'db.query.text': 'sensitive SQL',
     'enduser.id': 'user-123',
-    'systemfabric.site_id': 'site-secret',
+    'virgoscorpio_hub.site_id': 'site-secret',
     'error.message': 'sensitive error message'
   });
   assert.deepEqual(attributes, {
-    'systemfabric.component': 'database',
-    'systemfabric.operation': 'query',
+    'virgoscorpio_hub.component': 'database',
+    'virgoscorpio_hub.operation': 'query',
     'db.system': 'postgresql',
     'db.operation.name': 'select',
     'http.request.method': 'GET',
@@ -206,10 +206,10 @@ test('manual server, databases, worker and plugin-runner spans export one redact
   };
   const runtime = initializeTracing({
     env: validEnv({
-      SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:' + collectorAddress.port,
-      SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP: 'true'
+      VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:' + collectorAddress.port,
+      VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP: 'true'
     }),
-    serviceName: 'systemfabric-observability-test',
+    serviceName: 'virgoscorpio_hub-observability-test',
     exporter
   });
   const request = createTraceContext({ requestId: 'test-request-123' });
@@ -242,8 +242,8 @@ test('manual server, databases, worker and plugin-runner spans export one redact
   const pluginServer = createPluginRunnerServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN: pluginToken,
-      SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES: pluginImageDigest
+      VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN: pluginToken,
+      VIRGOSCORPIO_HUB_PLUGIN_ALLOWED_IMAGES: pluginImageDigest
     },
     runner: {
       async invoke(input) {
@@ -271,8 +271,8 @@ test('manual server, databases, worker and plugin-runner spans export one redact
     const acquiredClient = await pool.connect();
     await acquiredClient.query('SELECT secret FROM private_table WHERE value = $1', ['private-value']);
     await withSpan('realtime.redis.operation', {
-      'systemfabric.component': 'redis',
-      'systemfabric.operation': 'eval'
+      'virgoscorpio_hub.component': 'redis',
+      'virgoscorpio_hub.operation': 'eval'
     }, () => redis.eval('site-secret-key', 'secret-script', 'private-payload'));
     await redis.publish('site:secret:channel', 'private-payload');
     const pluginResult = await remotePluginRunner.invoke({
@@ -390,8 +390,8 @@ test('manual server, databases, worker and plugin-runner spans export one redact
       /private database failure detail/
     );
   }, {
-    'systemfabric.component': 'api',
-    'systemfabric.operation': 'test_request',
+    'virgoscorpio_hub.component': 'api',
+    'virgoscorpio_hub.operation': 'test_request',
     'http.request.method': 'POST'
     });
   } finally {
@@ -400,7 +400,7 @@ test('manual server, databases, worker and plugin-runner spans export one redact
   }
 
   const spans = memoryExporter.getFinishedSpans();
-  const server = spans.find(span => span.kind === 1 && span.attributes['systemfabric.component'] === 'api');
+  const server = spans.find(span => span.kind === 1 && span.attributes['virgoscorpio_hub.component'] === 'api');
   const postgres = spans.find(span => span.name === 'db.postgresql.query');
   const redisEval = spans.find(span => span.name === 'db.redis.eval');
   const redisPublish = spans.find(span => span.name === 'db.redis.publish');

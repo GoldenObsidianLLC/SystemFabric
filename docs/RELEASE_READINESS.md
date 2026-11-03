@@ -4,7 +4,7 @@
 
 ## Current candidate snapshot — 1 November 2026
 
-The latest reviewed engineering evidence is recorded in the [1 November 2026 project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md). It covers candidate PR #36 at `f9d463ef9ca82d15c9220e15cf50df2ba6367a11` (based on `main` `1a903b8eab4304dd61b2489381b091d34f1ea546`). The candidate's latest hosted workflow completed all five jobs successfully, including the dedicated PostgreSQL/Memgraph job (22/22 tests, zero skips), fresh migrations (14/14 applied, 14/14 idempotently skipped), Chromium smoke (9/9), and CodeQL analysis execution.
+The latest reviewed engineering evidence is recorded in the [1 November 2026 project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md). It covers candidate PR #36 at `f9d463ef9ca82d15c9220e15cf50df2ba6367a11` (based on `main` `1a903b8eab4304dd61b2489381b091d34f1ea546`). The candidate's latest hosted workflow completed all five jobs successfully, including the dedicated PostgreSQL/Memgraph job (22/22 tests, zero skips), fresh migrations (14/14 applied, 14/14 idempotently skipped), Chromium smoke (9/9), and CodeQL analysis execution.
 
 The candidate readiness snapshots report **6 PASS, 2 PARTIAL, 2 BLOCKED, 13 MISSING_EVIDENCE, 0 NOT_RUN**. The two blockers concern (1) source-tree changes observed on a generated merge-ref checkout, whose exact four paths require diagnosis, and (2) readiness failing to aggregate the separate live integration job. The service-less matrix integration skips must remain distinct from the 22/22 dedicated live result. These are unresolved readiness-control issues, not a failed live integration run.
 
@@ -35,17 +35,17 @@ See [Production Certification Execution Plan](PRODUCTION-CERTIFICATION-PLAN.md) 
 
 ### Confirmed engineering evidence
 
-- `npm run check`: 212/212 SystemFabric unit/security tests passed, zero skips; 146 required artifacts and 143 JavaScript files checked.
+- `npm run check`: 212/212 VirgoScorpio Hub unit/security tests passed, zero skips; 146 required artifacts and 143 JavaScript files checked.
 - `npm --prefix vendor/enginex test`: 88/88 passed, zero skips.
 - Fresh PostgreSQL database: all 14 migrations applied, then all 14 skipped on the second pass; only the generated disposable test database was dropped.
-- Live local PostgreSQL/Memgraph/Redis integration: 22/22 passed, zero skips, against the dedicated `systemfabric_test` database.
+- Live local PostgreSQL/Memgraph/Redis integration: 22/22 passed, zero skips, against the dedicated `virgoscorpio_hub_test` database.
 - Memgraph outage/recovery and canonical graph rebuild rehearsals passed using isolated test resources.
 - Playwright Chromium suite: 9/9 passed with one worker, including editor, accessibility smoke, two-session collaboration and multi-node collaboration recovery. Manual screen-reader and broader WCAG acceptance remain open.
 - `npm audit --audit-level=high` and runtime-only audit both reported zero vulnerabilities.
 - CycloneDX 1.5 SBOM generated with 163 components and 164 dependency records.
 - Gitleaks working-tree and locally fetched Git-history scans exited successfully with zero findings. Re-scan the exact published refs before release.
-- PR #12 validation completed successfully: workflow runs [41242423422](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41242423422) and [41242454838](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41242454838) each passed all five jobs on the release-tooling correction.
-- Post-merge main workflow [41242636499](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41242636499) passed all five jobs on merge commit `81e31b235a846c291d3d100eb33c08bf0ecd86cf` (Node.js 22.23.4 and 24.22.1, PostgreSQL/Memgraph integration, browser/accessibility smoke, and CodeQL).
+- PR #12 validation completed successfully: workflow runs [41242423422](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41242423422) and [41242454838](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41242454838) each passed all five jobs on the release-tooling correction.
+- Post-merge main workflow [41242636499](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41242636499) passed all five jobs on merge commit `81e31b235a846c291d3d100eb33c08bf0ecd86cf` (Node.js 22.23.4 and 24.22.1, PostgreSQL/Memgraph integration, browser/accessibility smoke, and CodeQL).
 
 These are development/test results only. They do not prove production deployment behavior or replace third-party, manual, or independent assessments.
 
@@ -99,7 +99,7 @@ For each remaining gate, record:
 
 ## Release decision
 
-SystemFabric remains **NOT_PRODUCTION_CERTIFIED**. Do not mark it production-ready until every required gate has current evidence for the intended release revision, exceptions are documented and approved, restore/rollback paths are proven, and the release owner signs off. A green CI run, public repository, or a passed unit suite is not production certification.
+VirgoScorpio Hub remains **NOT_PRODUCTION_CERTIFIED**. Do not mark it production-ready until every required gate has current evidence for the intended release revision, exceptions are documented and approved, restore/rollback paths are proven, and the release owner signs off. A green CI run, public repository, or a passed unit suite is not production certification.
 
 ### Recommended 0.5.1 release scope
 

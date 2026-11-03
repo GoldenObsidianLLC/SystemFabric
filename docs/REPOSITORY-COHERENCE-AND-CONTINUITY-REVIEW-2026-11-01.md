@@ -1,7 +1,7 @@
-# SystemFabric Repository Coherence and Continuity Review
+# VirgoScorpio Hub Repository Coherence and Continuity Review
 
 **Review date:** 1 November 2026
-**Repository:** `GoldenObsidianLLC/SystemFabric`
+**Repository:** `GoldenObsidianLLC/VirgoScorpio-Hub`
 **Reviewed main SHA:** `1a903b8eab4304dd61b2489381b091d34f1ea546`
 **Reviewed candidate:** PR #36, `f9d463ef9ca82d15c9220e15cf50df2ba6367a11`
 **Comparison branch:** PR #35, `db18267cece70e30be52425cd66c400b7480d82b`
@@ -74,7 +74,7 @@ This is an **evidence orchestration defect**, not a reason to conceal source mut
 
 Both PRs target `main` at `1a903b8eab4304dd61b2489381b091d34f1ea546`. PR #35 head is `db18267cece70e30be52425cd66c400b7480d82b` (5 commits, 11 changed files). PR #36 head is `f9d463ef9ca82d15c9220e15cf50df2ba6367a11` (10 commits, 21 changed files, draft). Comparing their heads reports 10 commits ahead and 5 behind, with a common merge base at `main`.
 
-PR #36 contains the expanded filesystem/input fixes, dynamic SBOM/dependency evidence, route/capability map, broader denied-capability tests, and a Stripe subscription tenant-binding correction. PR #35 includes overlapping fixes and older SBOM-normalization artifacts (`artifacts/systemfabric.sbom.cdx.json`, `scripts/normalize-sbom.js`, `test/sbom-normalization.test.js`) that may be superseded by PR #36's dynamic generator and dependency-evidence tests. Supersession must be confirmed from the actual commit history and functional requirements, not assumed from filenames.
+PR #36 contains the expanded filesystem/input fixes, dynamic SBOM/dependency evidence, route/capability map, broader denied-capability tests, and a Stripe subscription tenant-binding correction. PR #35 includes overlapping fixes and older SBOM-normalization artifacts (`artifacts/virgoscorpio-hub.sbom.cdx.json`, `scripts/normalize-sbom.js`, `test/sbom-normalization.test.js`) that may be superseded by PR #36's dynamic generator and dependency-evidence tests. Supersession must be confirmed from the actual commit history and functional requirements, not assumed from filenames.
 
 **Disposition:** keep both unmerged; select one canonical branch after a commit/file-level reconciliation. Port any still-required unique behavior into the canonical branch, re-run hosted checks, request human review, then close the superseded PR with a clear cross-reference. Never merge both independently.
 
@@ -128,7 +128,7 @@ The project operating premise remains no funding, no liquid reserve and no appro
 
 The following changes are suitable as a documentation-only review patch and do not pretend to close a certification gate:
 
-- Archive the complete 1 November project status report at `docs/reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md`.
+- Archive the complete 1 November project status report at `docs/reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md`.
 - Add this repository coherence/continuity review at `docs/REPOSITORY-COHERENCE-AND-CONTINUITY-REVIEW-2026-11-01.md`.
 - Add direct links to both records in `docs/README.md` under a clearly marked current-status section.
 - Add a prominent 1 November status correction to `docs/RELEASE_READINESS.md`, and relabel the 31 October snapshot as historical/superseded rather than silently overwriting it.
@@ -137,7 +137,7 @@ The following changes are suitable as a documentation-only review patch and do n
 - Correct the stale migration milestone wording in `docs/IMPLEMENTATION-ROADMAP.md` to reference the current 14-migration fresh-install evidence and supported v0008-to-current upgrade fixture.
 - Add a changelog entry describing the documentation/evidence reconciliation, not a software release claim.
 
-The documentation-only patch has now been applied to an isolated local worktree on branch \`docs/repo-coherence-continuity-2026-11-01\`, created from the reviewed \`main\` SHA. The separate local GitHub CLI session is authenticated; issue [#37](https://github.com/GoldenObsidianLLC/SystemFabric/issues/37) has been created for the readiness-aggregation work. The primary \`main\` worktree and the PR #35/#36 worktrees were left unchanged. This branch contains documentation/evidence reconciliation only; it does not change application code, release manifest, release scope, security posture, or governance decisions.
+The documentation-only patch has now been applied to an isolated local worktree on branch \`docs/repo-coherence-continuity-2026-11-01\`, created from the reviewed \`main\` SHA. The separate local GitHub CLI session is authenticated; issue [#37](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/37) has been created for the readiness-aggregation work. The primary \`main\` worktree and the PR #35/#36 worktrees were left unchanged. This branch contains documentation/evidence reconciliation only; it does not change application code, release manifest, release scope, security posture, or governance decisions.
 
 ## 5. Work that cannot be completed from this review and must remain backlogged
 
@@ -150,7 +150,7 @@ The documentation-only patch has now been applied to an isolated local worktree 
 | P0 | Release scope and release-owner sign-off | No named owner approval and candidate reconciliation yet. | Issue #13; signed/reviewed scope, provider matrix, exact SHA, limitations. |
 | P0 | Operations readiness and release approval | No approved deployment topology, operations owner, backup/restore/rollback and incident acceptance. | Issue #26; rehearsed runbooks and exact-candidate approval record. |
 | P0 | Corporate zero-reserve controls | Draft only; legal standing/authority/adoption not verified. | Issue #32; proper company process and qualified advice; no implied spend authority. |
-| P1 | Cross-job readiness aggregator and dirty-tree diagnosis | Needs code changes, job artifacts and negative tests. | GitHub issue [#37](https://github.com/GoldenObsidianLLC/SystemFabric/issues/37); identify four paths, safe generated-output policy, exact-SHA aggregate. |
+| P1 | Cross-job readiness aggregator and dirty-tree diagnosis | Needs code changes, job artifacts and negative tests. | GitHub issue [#37](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/37); identify four paths, safe generated-output policy, exact-SHA aggregate. |
 | P1 | Identity/email/MFA provider validation | Requires real provider test infrastructure and recovery workflows. | Issue #15; provider-scoped test evidence. |
 | P1 | Live ClamAV corpus and legacy-asset treatment | No accepted scanner/corpus evidence. | Issue #16; fail-closed, known test signatures, outage and rescan results. |
 | P1 | Cloud storage provider least-privilege validation | No provider account/credential validation in scope. | Issue #17; select providers and test actual lifecycle and isolation. |
@@ -177,6 +177,6 @@ The evidence gates above should be narrowed only by an explicit, reviewed releas
 
 ## 7. Final conclusion
 
-SystemFabric's source and process show a sound direction: modular domain packages, separate application entry points, layered test suites, a useful evidence contract, and a security-conscious CI baseline. The most pressing continuity problem is that the repository's current-state documentation and the formal readiness tooling lag the latest engineering evidence. A documentation reconciliation is safe and valuable now; readiness aggregation and source fixes should be implemented as a separate, test-driven code change. Independent review, production-provider acceptance, legal/license analysis, operating controls, and production operations cannot be simulated or declared complete from this repository review.
+VirgoScorpio Hub's source and process show a sound direction: modular domain packages, separate application entry points, layered test suites, a useful evidence contract, and a security-conscious CI baseline. The most pressing continuity problem is that the repository's current-state documentation and the formal readiness tooling lag the latest engineering evidence. A documentation reconciliation is safe and valuable now; readiness aggregation and source fixes should be implemented as a separate, test-driven code change. Independent review, production-provider acceptance, legal/license analysis, operating controls, and production operations cannot be simulated or declared complete from this repository review.
 
 **Disposition:** engineering-positive; documentation report and continuity review applied on an isolated, unmerged documentation branch; readiness aggregation backlogged as issue #37; security candidate still requires human review; production remains **NO-GO / NOT_PRODUCTION_CERTIFIED**.

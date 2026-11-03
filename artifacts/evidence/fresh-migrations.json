@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "product": "SystemFabric",
+  "product": "VirgoScorpio Hub",
   "version": "0.5.1",
   "gate": "fresh-migrations",
   "generatedAt": "2026-10-31T19:31:14.639Z",
@@ -10,7 +10,7 @@
     "platform": "win32",
     "arch": "x64"
   },
-  "databaseName": "systemfabric_fresh_0b58b856619f_test",
+  "databaseName": "virgoscorpio_hub_fresh_0b58b856619f_test",
   "migrationCount": 14,
   "firstPass": "14/14 migrations applied",
   "secondPass": "14/14 migrations skipped as already applied",

@@ -50,4 +50,4 @@ Please do not publish an exploitable vulnerability, credential, or personal data
 
 ## Current status
 
-SystemFabric is **not production-certified**. An independent security review, tenant-isolation evidence, plugin isolation evidence, secret-scan results for the release refs, provider/live validation, and operational recovery testing remain necessary release gates. See [Release readiness](RELEASE_READINESS.md).
+VirgoScorpio Hub is **not production-certified**. An independent security review, tenant-isolation evidence, plugin isolation evidence, secret-scan results for the release refs, provider/live validation, and operational recovery testing remain necessary release gates. See [Release readiness](RELEASE_READINESS.md).

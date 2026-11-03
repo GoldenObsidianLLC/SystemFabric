@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: SystemFabric API
+  title: VirgoScorpio Hub API
   version: 0.5.0
   description: >-
-    Developer-preview API for the SystemFabric AI-integrated CMS, visual builder, libraries, commerce, memberships, community and cloud adapters.
+    Developer-preview API for the VirgoScorpio Hub AI-integrated CMS, visual builder, libraries, commerce, memberships, community and cloud adapters.
     Most routes require a database-backed session and site-scoped capabilities. The static
     development bearer token is disabled in production. This API description does not claim
     production certification or full WordPress/Elementor feature parity.
@@ -32,7 +32,7 @@ paths:
       summary: Create the first owner account using the one-time bootstrap secret
       parameters:
         - in: header
-          name: x-systemfabric-bootstrap-secret
+          name: x-virgoscorpio-hub-bootstrap-secret
           required: true
           schema: { type: string }
       requestBody:
@@ -99,7 +99,7 @@ paths:
                 SAMLResponse: { type: string, maxLength: 2097152 }
                 RelayState: { type: string, minLength: 32, maxLength: 256 }
       responses:
-        '303': { description: Set a SystemFabric session and redirect after validation }
+        '303': { description: Set a VirgoScorpio Hub session and redirect after validation }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '503': { description: SAML, identity storage, or shared cache is unavailable }
   /api/v1/auth/invitations/accept:

@@ -12,8 +12,8 @@ Add repeatable tests for the resilience gaps left open by F1.10: a failed Redis 
 ## Non-goals and safety boundaries
 
 - Do not stop, restart, flush, reconfigure or inspect the existing shared Redis/Memurai service.
-- Use only `SYSTEMFABRIC_TEST_REDIS_URL` pointing to a loopback Redis endpoint, without credentials, query parameters or fragments.
-- Use unique `systemfabric:test:f1-11-<uuid>` Pub/Sub prefixes. Do not scan or delete Redis keys.
+- Use only `VIRGOSCORPIO_HUB_TEST_REDIS_URL` pointing to a loopback Redis endpoint, without credentials, query parameters or fragments.
+- Use unique `virgoscorpio_hub:test:f1-11-<uuid>` Pub/Sub prefixes. Do not scan or delete Redis keys.
 - Do not use an application/primary database, apply migrations, change production Redis, deploy, push or merge.
 - Do not add dependencies or claim production throughput/SLO capacity.
 - Redis Cluster failover, network partitions, rolling deploys in the actual orchestrator, multi-hour soak and operational ownership remain external gates.
@@ -61,25 +61,25 @@ Add repeatable tests for the resilience gaps left open by F1.10: a failed Redis 
 From the F1.11 worktree, the local Redis gate is intentionally explicit:
 
 ```cmd
-set NODE_PATH=C:\Users\Justin Harlan\Documents\SystemFabric-0.5.1\node_modules
-set SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true
-set SYSTEMFABRIC_TEST_REDIS_URL=redis://127.0.0.1:6379
+set NODE_PATH=C:\Users\Justin Harlan\Documents\VirgoScorpio-Hub-0.5.1\node_modules
+set VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true
+set VIRGOSCORPIO_HUB_TEST_REDIS_URL=redis://127.0.0.1:6379
 node --test test/integration/redis-collaboration.integration.test.js test/integration/redis-collaboration-resilience.integration.test.js
 ```
 
 Optional bounded load overrides (defaults are 10 subscribers, 2,000 operations and 5 ms pacing):
 
 ```cmd
-set SYSTEMFABRIC_TEST_LOAD_SUBSCRIBERS=10
-set SYSTEMFABRIC_TEST_LOAD_MESSAGES=2000
-set SYSTEMFABRIC_TEST_LOAD_PACING_MS=5
+set VIRGOSCORPIO_HUB_TEST_LOAD_SUBSCRIBERS=10
+set VIRGOSCORPIO_HUB_TEST_LOAD_MESSAGES=2000
+set VIRGOSCORPIO_HUB_TEST_LOAD_PACING_MS=5
 ```
 
 Browser/protocol validation was run independently to keep host browser resources bounded:
 
 ```cmd
-set NODE_PATH=C:\Users\Justin Harlan\Documents\SystemFabric-0.5.1\node_modules
-set SYSTEMFABRIC_TEST_REDIS_URL=redis://127.0.0.1:6379
+set NODE_PATH=C:\Users\Justin Harlan\Documents\VirgoScorpio-Hub-0.5.1\node_modules
+set VIRGOSCORPIO_HUB_TEST_REDIS_URL=redis://127.0.0.1:6379
 node "..\..\node_modules\@playwright\test\cli.js" test test/e2e/collaboration.spec.js --workers=1 --reporter=line
 node "..\..\node_modules\@playwright\test\cli.js" test test/e2e/collaboration-multinode.spec.js --grep "2/5/10 editor matrix" --workers=1 --reporter=line
 node "..\..\node_modules\@playwright\test\cli.js" test test/e2e/collaboration-multinode.spec.js --grep "shared operation history" --workers=1 --reporter=line

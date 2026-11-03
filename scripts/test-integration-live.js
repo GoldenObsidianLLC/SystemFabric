@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..');
 const evidenceDir = path.join(root, 'artifacts', 'evidence');
 const evidence = {
   schemaVersion: 1,
-  product: 'SystemFabric',
+  product: 'VirgoScorpio Hub',
   gate: 'local-live-integration-subset',
   generatedAt: new Date().toISOString(),
   status: 'BLOCKED',
@@ -124,27 +124,27 @@ async function main() {
     NODE_ENV: 'test',
     DATABASE_URL: testDbUrl,
     MEMGRAPH_URL: graphUrl,
-    SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION: 'true',
-    SYSTEMFABRIC_RUN_MEMGRAPH_INTEGRATION: 'true'
+    VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION: 'true',
+    VIRGOSCORPIO_HUB_RUN_MEMGRAPH_INTEGRATION: 'true'
   };
   run('Apply versioned migrations to the isolated test database', ['scripts/migrate.js'], env, 'integration-migrations.log');
 
-  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
+  const redisUrl = process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL;
   if (redisUrl) {
     let parsedRedis;
     try { parsedRedis = new URL(redisUrl); }
-    catch { throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is invalid.'); }
+    catch { throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL is invalid.'); }
     const allowedRedisHosts = new Set(['127.0.0.1', 'localhost', '::1', 'redis']);
     if (!['redis:', 'rediss:'].includes(parsedRedis.protocol) || !allowedRedisHosts.has(parsedRedis.hostname.toLowerCase())) {
       throw new Error('Safety stop: Redis integration is restricted to a local Redis/Memurai test service.');
     }
     // Reuse the one explicitly approved loopback Redis endpoint for both
     // presence and document Pub/Sub integration suites. Those suites require
-    // SYSTEMFABRIC_TEST_REDIS_URL and must never guess a Redis target.
-    env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION = 'true';
-    env.SYSTEMFABRIC_TEST_REDIS_URL = redisUrl;
+    // VIRGOSCORPIO_HUB_TEST_REDIS_URL and must never guess a Redis target.
+    env.VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION = 'true';
+    env.VIRGOSCORPIO_HUB_TEST_REDIS_URL = redisUrl;
   } else {
-    delete env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION;
+    delete env.VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION;
   }
 
   const integrationDir = path.join(root, 'test', 'integration');

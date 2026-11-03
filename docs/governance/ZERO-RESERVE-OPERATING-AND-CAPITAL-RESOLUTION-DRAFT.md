@@ -6,17 +6,17 @@
 
 **Prepared:** 2026-10-31
 **Company:** Golden Obsidian LLC
-**Project:** SystemFabric
+**Project:** VirgoScorpio Hub
 **Financial starting point supplied by the owner:** no funding and no liquid asset reserve; no approved resolution, budget, payment program, or authority to commit funds to employees, contractors, assessors, vendors, suppliers, platforms, or other organizations. This statement is a planning assumption from the owner, not an independently audited financial statement.
 
 ## 1. Executive recommendation
 
-Adopt a **zero-reserve, revenue-first operating model**. Do not try to solve a zero-cash position by informally promising future pay, recruiting unpaid staff, issuing improvised equity, using personal accounts to collect project money, taking on debt without a repayment plan, or marketing SystemFabric as production-ready.
+Adopt a **zero-reserve, revenue-first operating model**. Do not try to solve a zero-cash position by informally promising future pay, recruiting unpaid staff, issuing improvised equity, using personal accounts to collect project money, taking on debt without a repayment plan, or marketing VirgoScorpio Hub as production-ready.
 
 The Company should separate three things that have previously been bundled together:
 
 1. **Market development:** permitted now on a no-cost, non-binding basis, with accurate developer-preview disclosures.
-2. **Commercial revenue:** pursue founder-led software engineering and narrowly scoped customer work that can be contracted and delivered without representing SystemFabric 0.5.1 as production-certified. Accept a paid pilot only when its scope, delivery capacity, funds, customer-data controls, and obligations are understood and documented.
+2. **Commercial revenue:** pursue founder-led software engineering and narrowly scoped customer work that can be contracted and delivered without representing VirgoScorpio Hub 0.5.1 as production-certified. Accept a paid pilot only when its scope, delivery capacity, funds, customer-data controls, and obligations are understood and documented.
 3. **Capital and hiring:** no securities offering, borrowing, paid hiring, paid assessor engagement, purchase order, or recurring spend until the Company has the correct approvals, a verified funding source, and a separate written authorization.
 
 The first funding objective is **not broad expansion**. It is to create a small, dependable operating reserve and pay for the highest-risk independent evidence work, beginning with the independent tenant-isolation assessment. The product stays a developer preview until its existing release gates are satisfied.
@@ -41,7 +41,7 @@ The following is proposed wording for a written consent or resolution by the Com
    - no spend, payment obligation, exclusivity, or purchase commitment is created;
    - no investment or securities offering is solicited;
    - all statements about current functionality, security, scope, support, and certification are accurate;
-   - SystemFabric 0.5.1 is described as **NOT_PRODUCTION_CERTIFIED / developer preview**; and
+   - VirgoScorpio Hub 0.5.1 is described as **NOT_PRODUCTION_CERTIFIED / developer preview**; and
    - no customer is led to believe unfinished, mocked, disabled, or unvalidated functionality is generally available.
 
 4. **Revenue-first commercial activity.** The Company may prepare and negotiate proposals for clearly scoped software engineering, architecture, integration, modernization, prototyping, testing, and related professional services. A binding statement of work, subscription, license, pilot, or customer prepayment may be accepted only after a separate written authorization confirms:
@@ -70,7 +70,7 @@ The following is proposed wording for a written consent or resolution by the Com
 
 13. **Conflicts and disclosure.** Material conflicts involving a sponsor, customer, investor, supplier, assessor, or decision-maker must be disclosed and managed. No funding source receives automatic project ownership, maintainer status, security-report control, roadmap control, preferential access, or endorsement.
 
-14. **No production-release waiver.** Nothing in this resolution approves a production release, changes SystemFabric's release scope, waives certification evidence, or changes the status **NOT_PRODUCTION_CERTIFIED / NO-GO**.
+14. **No production-release waiver.** Nothing in this resolution approves a production release, changes VirgoScorpio Hub's release scope, waives certification evidence, or changes the status **NOT_PRODUCTION_CERTIFIED / NO-GO**.
 
 15. **Further approval.** Any expenditure, compensation plan, capital raise, borrowing, security issuance, material customer contract, or other obligation must be presented in a separate written approval that identifies the amount, funding source, authority, risk, terms, and accounting treatment.
 
@@ -88,7 +88,7 @@ Until an actual governing-authority approval and funded budget exist, the practi
 | Public developer-preview marketing | **Allowed, no-cost** | State limitations plainly; do not claim production readiness, audit completion, provider certification, SLA, or feature parity. |
 | Non-binding quotes from security assessors/vendors | **Allowed, no-cost only** | Ask for scope, availability and price estimates; do not authorize billable discovery or testing. |
 | Paid professional services | **Prepare / negotiate only** | No binding work until scope, delivery capacity, legal terms and cleared funds are approved. |
-| SystemFabric production deployment or production customer data | **Not authorized by release scope** | 0.5.1 remains an isolated developer preview. |
+| VirgoScorpio Hub production deployment or production customer data | **Not authorized by release scope** | 0.5.1 remains an isolated developer preview. |
 | Recruiting paid employees or contractors | **Not funded / not authorized** | Expressions of interest only; no work, offer or start-date promise. |
 | Unpaid staff, unpaid interns, or unpaid contractors | **Do not recruit** | A for-profit company must not treat productive business labor as volunteer staffing. Apply the legal tests to actual facts. |
 | Equity, profit share, tokens, deferred pay, or future-payment promises | **Not authorized** | Requires separate legal, tax, securities and governance review. |
@@ -110,7 +110,7 @@ The lowest-friction near-term path is a founder-led services offer with bounded 
 - prototype builds and proof-of-concept integrations;
 - test automation, migration planning, and reliability remediation.
 
-This work can create actual customer value without requiring the Company to claim SystemFabric is production-certified. Separate client work from the SystemFabric preview and disclose the Company's ability and capacity honestly.
+This work can create actual customer value without requiring the Company to claim VirgoScorpio Hub is production-certified. Separate client work from the VirgoScorpio Hub preview and disclose the Company's ability and capacity honestly.
 
 Prefer small fixed-scope discovery engagements or milestone contracts with an initial cleared payment that covers the next stage's direct costs. Do not use a customer's advance as unrestricted working capital where it is needed to deliver that customer's contracted work. Do not accept obligations that depend on hiring people or purchasing services the Company cannot yet fund.
 
@@ -204,9 +204,9 @@ Before discretionary use, establish:
 
 Subject to adoption and the existing release-scope approval, the Company can use messaging such as:
 
-> Golden Obsidian LLC is developing SystemFabric, an open-source modular Node.js platform. SystemFabric 0.5.1 is an expanded developer preview for isolated, self-hosted evaluation. It is not production-certified. We are conducting customer discovery and seeking feedback from prospective design partners and technical reviewers. Provider integrations, security assessment, accessibility, and production operations remain subject to validation.
+> Golden Obsidian LLC is developing VirgoScorpio Hub, an open-source modular Node.js platform. VirgoScorpio Hub 0.5.1 is an expanded developer preview for isolated, self-hosted evaluation. It is not production-certified. We are conducting customer discovery and seeking feedback from prospective design partners and technical reviewers. Provider integrations, security assessment, accessibility, and production operations remain subject to validation.
 
-For services marketing, describe the actual service, deliverables, relevant experience, and capacity. Do not imply that buying a service includes a certified SystemFabric deployment unless that is separately true and supportable.
+For services marketing, describe the actual service, deliverables, relevant experience, and capacity. Do not imply that buying a service includes a certified VirgoScorpio Hub deployment unless that is separately true and supportable.
 
 For talent:
 
@@ -260,7 +260,7 @@ This is a sequence of proposed tasks, not a promise that they will produce fundi
 |---|---|---|---|
 | 1 | Confirm legal entity records and governing documents; determine who may adopt the resolution. | Verified authority map and signed internal resolution, if approved. | Do not represent this draft as adopted before signatures/valid action. |
 | 2 | Establish one-page service offers based on demonstrated founder capability and available capacity. | Two or three precise service packages, sample deliverables, exclusions and qualification criteria. | No paid advertising, unbounded promises, or client commitments without funding/capacity. |
-| 3 | Conduct targeted customer discovery with prospective buyers (not investor solicitation). | Interview notes, problem ranking, buyer/use-case evidence and objections. | No claims that SystemFabric is production-ready or independently audited. |
+| 3 | Conduct targeted customer discovery with prospective buyers (not investor solicitation). | Interview notes, problem ranking, buyer/use-case evidence and objections. | No claims that VirgoScorpio Hub is production-ready or independently audited. |
 | 4 | Ask the assessor shortlist and relevant suppliers for non-binding fee/scope estimates only. | Comparable quotes and a real assessment cost target. | No paid pre-assessment or work authorization. |
 | 5 | Validate one service engagement or narrowly scoped design-partner opportunity. | Written proposal and draft statement of work with costed delivery plan. | No acceptance until separately approved, adequately funded and deliverable. |
 | 6 | Prepare a weekly cash forecast and funding-source ledger template. | Transparent cash controls ready before first receipt. | No commingling, personal-account collections, or unrecorded funds. |
@@ -277,7 +277,7 @@ This is a planning document, not a legal opinion. The law may differ based on wh
 - [IRS — Limited Liability Company (LLC) federal tax classifications](https://www.irs.gov/businesses/small-businesses-self-employed/limited-liability-company-llc).
 - [SEC — Exempt Offerings](https://www.sec.gov/resources-small-businesses/exempt-offerings), [Rule 506(b)](https://www.sec.gov/resources-small-businesses/exempt-offerings/private-placements-rule-506b), [Rule 506(c)](https://www.sec.gov/resources-small-businesses/exempt-offerings/general-solicitation-rule-506c), and [Regulation Crowdfunding](https://www.sec.gov/resources-small-businesses/exempt-offerings/regulation-crowdfunding).
 - [Texas State Securities Board — Exemptions from Registration](https://ssb.texas.gov/securities-professionals/regulation-securities/exemptions-registration).
-- [SystemFabric Governance](../../GOVERNANCE.md), [Research & Collaboration](../../RESEARCH_COLLABORATION.md), [Contributing](../../CONTRIBUTING.md), [Recommended Release Scope](../RELEASE-SCOPE.md), [Production Certification Plan](../PRODUCTION-CERTIFICATION-PLAN.md), and [Release Evidence Contract](../RELEASE-EVIDENCE.md).
+- [VirgoScorpio Hub Governance](../../GOVERNANCE.md), [Research & Collaboration](../../RESEARCH_COLLABORATION.md), [Contributing](../../CONTRIBUTING.md), [Recommended Release Scope](../RELEASE-SCOPE.md), [Production Certification Plan](../PRODUCTION-CERTIFICATION-PLAN.md), and [Release Evidence Contract](../RELEASE-EVIDENCE.md).
 
 ---
 

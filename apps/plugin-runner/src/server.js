@@ -16,19 +16,19 @@ function sameSecret(candidate, expected) {
 }
 async function readJson(req, max = 300_000) {
   const chunks = []; let size = 0;
-  for await (const chunk of req) { size += chunk.length; if (size > max) throw Object.assign(new Error('Request too large.'), { statusCode: 413, code: 'ERR_SYSTEMFABRIC_PLUGIN_REQUEST_TOO_LARGE' }); chunks.push(chunk); }
-  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw Object.assign(new Error('Invalid JSON.'), { statusCode: 400, code: 'ERR_SYSTEMFABRIC_PLUGIN_INVALID_JSON' }); }
+  for await (const chunk of req) { size += chunk.length; if (size > max) throw Object.assign(new Error('Request too large.'), { statusCode: 413, code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_REQUEST_TOO_LARGE' }); chunks.push(chunk); }
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw Object.assign(new Error('Invalid JSON.'), { statusCode: 400, code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_INVALID_JSON' }); }
 }
 function createPluginRunnerServer({ env = process.env, runner, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
-  const token = env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN;
-  if (env.NODE_ENV === 'production' && (!token || token.length < 32)) throw new Error('A strong SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN is required.');
-  const allowlist = String(env.SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES || '').split(',').map(x => x.trim()).filter(Boolean);
+  const token = env.VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN;
+  if (env.NODE_ENV === 'production' && (!token || token.length < 32)) throw new Error('A strong VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN is required.');
+  const allowlist = String(env.VIRGOSCORPIO_HUB_PLUGIN_ALLOWED_IMAGES || '').split(',').map(x => x.trim()).filter(Boolean);
   for (const image of allowlist) if (!validatePinnedImageDigest(image)) throw new Error('Every allowlisted plugin image must be pinned with @sha256:<digest>.');
-  const execute = runner || createContainerPluginRunner({ runtime: env.SYSTEMFABRIC_CONTAINER_RUNTIME || 'docker', timeoutMs: Number(env.PLUGIN_TIMEOUT_MS || 5000), allowedImages: allowlist });
+  const execute = runner || createContainerPluginRunner({ runtime: env.VIRGOSCORPIO_HUB_CONTAINER_RUNTIME || 'docker', timeoutMs: Number(env.PLUGIN_TIMEOUT_MS || 5000), allowedImages: allowlist });
   const structuredLogger = suppliedStructuredLogger || createStructuredLogger({
     logger,
     otelLogger,
-    service: 'systemfabric-plugin-runner',
+    service: 'virgoscorpio-hub-plugin-runner',
     environment: env.NODE_ENV || 'development'
   });
 
@@ -45,7 +45,7 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console,
     };
     if (req.method === 'GET' && req.url === '/health') return json(200, { status: 'ok', allowlistedImages: allowlist.length });
     if (req.method !== 'POST' || req.url !== '/v1/invoke') return json(404, { error: 'Not found.' });
-    if (!sameSecret((req.headers.authorization || '').replace(/^Bearer\s+/i, ''), token)) return json(401, { error: 'Unauthorized.', code: 'ERR_SYSTEMFABRIC_PLUGIN_RUNNER_UNAUTHORIZED' });
+    if (!sameSecret((req.headers.authorization || '').replace(/^Bearer\s+/i, ''), token)) return json(401, { error: 'Unauthorized.', code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_RUNNER_UNAUTHORIZED' });
 
     // The service bearer token authenticates this internal hop. Only after that
     // check do we accept its W3C traceparent as a parent for this runner span.
@@ -64,14 +64,14 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console,
       const started = Date.now();
       let statusCode = 500;
       let outcome = 'failure';
-      let code = 'ERR_SYSTEMFABRIC_PLUGIN_RUNNER';
+      let code = 'ERR_VIRGOSCORPIO_HUB_PLUGIN_RUNNER';
       let errorType;
       try {
         const body = await readJson(req);
         if (!allowlist.includes(body.imageDigest)) {
           statusCode = 403;
           outcome = 'rejected';
-          code = 'ERR_SYSTEMFABRIC_PLUGIN_IMAGE_NOT_ALLOWED';
+          code = 'ERR_VIRGOSCORPIO_HUB_PLUGIN_IMAGE_NOT_ALLOWED';
           return json(statusCode, { error: 'Image is not allowlisted by the sandbox host.', code });
         }
         const result = await execute.invoke({ imageDigest: body.imageDigest, action: body.action, input: body.input, requestId: body.requestId });
@@ -81,12 +81,12 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console,
       } catch (error) {
         statusCode = Number.isInteger(error.statusCode) && error.statusCode >= 400 && error.statusCode <= 599 ? error.statusCode : 500;
         outcome = statusCode >= 500 ? 'failure' : 'rejected';
-        code = error.code || 'ERR_SYSTEMFABRIC_PLUGIN_RUNNER';
+        code = error.code || 'ERR_VIRGOSCORPIO_HUB_PLUGIN_RUNNER';
         errorType = error.name || 'Error';
         return json(statusCode, { error: error.message || 'Invocation failed.', code });
       } finally {
         setHttpStatus(invocationSpan, statusCode);
-        structuredLogger.emit(statusCode >= 500 ? 'error' : 'info', 'systemfabric.plugin_runner.invocation_completed', {
+        structuredLogger.emit(statusCode >= 500 ? 'error' : 'info', 'virgoscorpio_hub.plugin_runner.invocation_completed', {
           method: req.method,
           route: '/v1/invoke',
           statusCode,
@@ -98,17 +98,17 @@ function createPluginRunnerServer({ env = process.env, runner, logger = console,
         });
       }
     }, {
-      'systemfabric.component': 'plugin_runner',
-      'systemfabric.operation': 'invoke',
+      'virgoscorpio_hub.component': 'plugin_runner',
+      'virgoscorpio_hub.operation': 'invoke',
       'http.request.method': req.method
     });
   });
   return server;
 }
 if (require.main === module) {
-  const token = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN;
+  const token = process.env.VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN;
   if (!token || token.length < 32) {
-    console.error('Set SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN to at least 32 characters.');
+    console.error('Set VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN to at least 32 characters.');
     process.exitCode = 1;
   } else {
     const serviceVersion = require('../../../package.json').version;
@@ -137,13 +137,13 @@ if (require.main === module) {
       try {
         tracingRuntime = initializeTracing({
           env: process.env,
-          serviceName: 'systemfabric-plugin-runner',
+          serviceName: 'virgoscorpio-hub-plugin-runner',
           serviceVersion
         });
         try {
           logRuntime = initializeLogExport({
             env: process.env,
-            serviceName: 'systemfabric-plugin-runner',
+            serviceName: 'virgoscorpio-hub-plugin-runner',
             serviceVersion
           });
         } catch (error) {
@@ -153,7 +153,7 @@ if (require.main === module) {
         structuredLogger = createStructuredLogger({
           logger: console,
           otelLogger: logRuntime.logger,
-          service: 'systemfabric-plugin-runner',
+          service: 'virgoscorpio-hub-plugin-runner',
           environment: process.env.NODE_ENV || 'development'
         });
         server = createPluginRunnerServer({ structuredLogger });
@@ -163,7 +163,7 @@ if (require.main === module) {
           server.once('error', reject);
           server.listen(port, host, () => {
             server.off('error', reject);
-            structuredLogger.emit('info', 'systemfabric.plugin_runner.started', {
+            structuredLogger.emit('info', 'virgoscorpio_hub.plugin_runner.started', {
               component: 'plugin-runner',
               operation: 'startup',
               outcome: 'success'
@@ -175,10 +175,10 @@ if (require.main === module) {
         process.once('SIGTERM', () => { void shutdown(); });
       } catch (error) {
         const bootstrapLogger = structuredLogger || createStructuredLogger({
-          service: 'systemfabric-plugin-runner',
+          service: 'virgoscorpio-hub-plugin-runner',
           environment: process.env.NODE_ENV || 'development'
         });
-        bootstrapLogger.emit('error', 'systemfabric.plugin_runner.start_failed', {
+        bootstrapLogger.emit('error', 'virgoscorpio_hub.plugin_runner.start_failed', {
           component: 'plugin-runner',
           operation: 'startup',
           outcome: 'failure',

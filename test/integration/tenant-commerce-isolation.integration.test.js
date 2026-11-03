@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 test(
@@ -31,14 +31,14 @@ test(
       DATABASE_URL: process.env.DATABASE_URL,
       REQUIRE_VERIFIED_EMAIL: 'false',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
 
     const identity = createIdentityService({ pool, env });
 
     t.after(async () => {
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM sites WHERE id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -135,7 +135,7 @@ test(
     const base = `http://127.0.0.1:${server.address().port}`;
     const headers = {
       authorization: `Bearer ${session.token}`,
-      'x-systemfabric-site-id': siteB,
+      'x-virgoscorpio-hub-site-id': siteB,
     };
 
     const productBefore = await pool.query(
@@ -153,7 +153,7 @@ test(
       const response = await fetch(`${base}/api/v1/sites/${siteB}/products/${productA.id}`, { headers });
       const payload = await response.json();
       assert.equal(response.status, 404);
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_PRODUCT_NOT_FOUND');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_PRODUCT_NOT_FOUND');
       assert.doesNotMatch(JSON.stringify(payload), /PRIVATE_SITE_A_PRODUCT_MARKER/);
     });
 
@@ -174,7 +174,7 @@ test(
       });
       const payload = await response.json();
       assert.equal(response.status, 409);
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_VERSION_CONFLICT');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT');
       const after = await pool.query(
         'SELECT id,site_id,status,version,name,price_minor FROM commerce_products WHERE site_id=$1 AND id=$2',
         [siteA, productA.id]

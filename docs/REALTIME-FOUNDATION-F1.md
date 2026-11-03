@@ -2,10 +2,10 @@
 
 **Status:** Implemented developer-preview foundation, F1.9 collaborative CMS correctness proof and F1.10 cross-instance document delivery proof; not production-certified
 **Working branch:** `feat/f1-10-cross-instance-collaboration`
-**Baseline:** SystemFabric 0.5.1
+**Baseline:** VirgoScorpio Hub 0.5.1
 **Scope:** Foundation 1 process-local event fan-out, lease-based presence and authenticated presence SSE; Foundation 1.1 canonical durable event contract; Foundation 1.2 PostgreSQL consumer-group delivery ledger; Foundation 1.3 shared Redis presence leases; Foundation 1.4 cross-instance presence Pub/Sub; Foundation 1.5 authorization invalidation and session-bound SSE revocation; Foundation 1.6 bounded realtime observability; Foundation 1.7 collaborative CMS architecture spike; Foundation 1.8 authenticated WebSocket presence, shared connection quotas and bounded snapshot-refresh recovery; Foundation 1.9 draft-only semantic OT, PostgreSQL operation sequencing, authenticated document REST/WebSocket protocol and two-session browser proof; Foundation 1.10 bounded Redis document-operation hints, shared REST/WebSocket publication, cross-instance heartbeat repair and two-node 2/5/10-editor browser proof.
 
-This developer-preview track creates reusable seams for SystemFabric while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source and the canonical sequencer/materialized store for collaborative draft operations. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh, authorization invalidation and bounded document-operation notifications; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. F1.10 extends document notifications across API instances without moving the operation log or acknowledgement source out of PostgreSQL. Dropped, duplicate or out-of-order hints are repaired from the per-document sequence on heartbeat, sequence gap or reconnect. This remains a developer-preview correctness/load baseline, not production certification.
+This developer-preview track creates reusable seams for VirgoScorpio Hub while keeping transport and storage adapters replaceable. PostgreSQL remains the durable per-consumer-group event source and the canonical sequencer/materialized store for collaborative draft operations. Redis provides shared ephemeral presence leases and Pub/Sub for site-scoped presence refresh, authorization invalidation and bounded document-operation notifications; authorization messages carry only bounded site, principal and session UUID selectors, never bearer/session tokens. F1.10 extends document notifications across API instances without moving the operation log or acknowledgement source out of PostgreSQL. Dropped, duplicate or out-of-order hints are repaired from the per-document sequence on heartbeat, sequence gap or reconnect. This remains a developer-preview correctness/load baseline, not production certification.
 
 ## 1. Implemented components
 
@@ -28,7 +28,7 @@ This developer-preview track creates reusable seams for SystemFabric while keepi
 Set this in a local development environment only:
 
 ```dotenv
-SYSTEMFABRIC_REALTIME_ENABLED=true
+VIRGOSCORPIO_HUB_REALTIME_ENABLED=true
 ```
 
 The default is `false`. The built-in event hub and memory presence/quota adapters are process-local and lose state when the API exits. Redis presence mode requires injected shared presence, Pub/Sub bridge and distributed connection-quota adapters. Redis Pub/Sub carries ephemeral presence/authorization hints only; it is not a durable event log.
@@ -163,9 +163,9 @@ F1.3 adds a Redis-protocol-compatible presence adapter. Redis-compatible storage
 - The default lease is 30 seconds and is bounded to 5–120 seconds. The default per-site session ceiling is 10,000. These are operational limits, not user-count or connection guarantees.
 - Expired lease metadata is retained briefly (30 seconds by default) so `onExpired` can be invoked when a site index is swept by a later read or heartbeat. This callback is lazy cleanup notification, not a background expiry scheduler. F1.4 publishes a site-scoped invalidation when cleanup observes an expired lease.
 - The existing service continues to aggregate multiple sessions per principal, prefer the most active visible state, and hide a principal from other viewers when all sessions are hidden.
-- Store errors fail closed with `503`. Selecting `SYSTEMFABRIC_PRESENCE_STORE=redis` does not silently fall back to process-local memory. Redis connectivity is verified during API startup.
-- Set `SYSTEMFABRIC_REALTIME_ENABLED=true` and `SYSTEMFABRIC_PRESENCE_STORE=redis` to select Redis for the standalone development API. Configure `SYSTEMFABRIC_PRESENCE_REDIS_URL` and the bounded lease/session settings. Keep Redis private; use TLS and authentication/ACLs in deployed environments and inject the URL from a secret manager.
-- The Windows development machine has a local Memurai service listening on loopback port 6379. The live integration can also run against a separately managed Redis-compatible service by setting `SYSTEMFABRIC_PRESENCE_REDIS_URL` and `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true`.
+- Store errors fail closed with `503`. Selecting `VIRGOSCORPIO_HUB_PRESENCE_STORE=redis` does not silently fall back to process-local memory. Redis connectivity is verified during API startup.
+- Set `VIRGOSCORPIO_HUB_REALTIME_ENABLED=true` and `VIRGOSCORPIO_HUB_PRESENCE_STORE=redis` to select Redis for the standalone development API. Configure `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` and the bounded lease/session settings. Keep Redis private; use TLS and authentication/ACLs in deployed environments and inject the URL from a secret manager.
+- The Windows development machine has a local Memurai service listening on loopback port 6379. The live integration can also run against a separately managed Redis-compatible service by setting `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` and `VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true`.
 
 ### Deliberate boundaries
 
@@ -186,9 +186,9 @@ F1.4 adds Redis Pub/Sub for immediate, ephemeral site-scoped presence invalidati
 
 ### Publish and receive behavior
 
-- Each API instance owns independent Redis publisher and pattern-subscriber clients. The presence subscriber listens for channels shaped as `systemfabric:realtime:v1:<site-uuid>:presence`; those channel names contain no principal or session identifiers. The separate authorization channel is global and carries only validated UUID selectors in its bounded envelope.
+- Each API instance owns independent Redis publisher and pattern-subscriber clients. The presence subscriber listens for channels shaped as `virgoscorpio_hub:realtime:v1:<site-uuid>:presence`; those channel names contain no principal or session identifiers. The separate authorization channel is global and carries only validated UUID selectors in its bounded envelope.
 - The presence channel accepts only `{ "kind": "presence.refresh" }`. Its bounded v1 envelope includes a UUID event ID, publisher instance ID, site ID, topic and timestamp. The inbound message limit is 4 KiB by default; the dispatch queue is capped at 1,024 messages.
-- A separate global `systemfabric:realtime:v1:authorization` channel carries `{ kind: "authorization.invalidate", siteId?, principalId?, sessionId? }`. At least one UUID selector is required; unknown fields and token-like data are rejected. The bridge uses the same bounded message size and inbound queue.
+- A separate global `virgoscorpio_hub:realtime:v1:authorization` channel carries `{ kind: "authorization.invalidate", siteId?, principalId?, sessionId? }`. At least one UUID selector is required; unknown fields and token-like data are rejected. The bridge uses the same bounded message size and inbound queue.
 - A publisher emits to Redis, then delivers the same event to its local hub. Its own Pub/Sub echo is ignored. Other instances validate the channel/envelope and forward the invalidation to their local hub.
 - The local hub still performs a fresh authorization check for every matching SSE subscription before enqueueing. Redis Pub/Sub subscription itself never grants a user access to a site.
 - The existing heartbeat rate limit, per-principal SSE connection cap and bounded per-subscription queue remain in force. Broker reconnects use bounded retry settings; clients must refetch the authorized presence snapshot after receiving an invalidation.
@@ -243,9 +243,9 @@ F1.6 adds process-local, low-cardinality telemetry for the event hub, SSE gatewa
 ### Metric contract and access
 
 - `createRealtimeMetrics()` in `packages/observability/src/metrics.js` provides a fixed-name counter, gauge and histogram registry. Unknown metric names, negative increments and invalid gauge/observation values are rejected.
-- Realtime metric names use the `systemfabric_realtime_` prefix. The registry uses no request-, user-, session-, event- or site-ID labels, preventing tenant identifiers and high-cardinality values from leaking into Prometheus series.
-- The existing `GET /metrics` endpoint remains disabled unless `SYSTEMFABRIC_METRICS_ENABLED=true`; when enabled it requires the dedicated `SYSTEMFABRIC_METRICS_TOKEN` bearer credential. The metrics token is separate from the developer API token. Production startup requires a token of at least 32 characters when this endpoint is enabled.
-- `server.systemfabric.realtimeMetrics` exposes a read-only snapshot for local tests and diagnostics; the production scrape surface remains the authenticated Prometheus text endpoint.
+- Realtime metric names use the `virgoscorpio_hub_realtime_` prefix. The registry uses no request-, user-, session-, event- or site-ID labels, preventing tenant identifiers and high-cardinality values from leaking into Prometheus series.
+- The existing `GET /metrics` endpoint remains disabled unless `VIRGOSCORPIO_HUB_METRICS_ENABLED=true`; when enabled it requires the dedicated `VIRGOSCORPIO_HUB_METRICS_TOKEN` bearer credential. The metrics token is separate from the developer API token. Production startup requires a token of at least 32 characters when this endpoint is enabled.
+- `server.virgoScorpioHub.realtimeMetrics` exposes a read-only snapshot for local tests and diagnostics; the production scrape surface remains the authenticated Prometheus text endpoint.
 - Metric collection is best-effort and must not change request, authorization, delivery or shutdown behavior if an injected metrics adapter throws.
 - A production host that injects its own event hub or presence service must construct those adapters with the same `createRealtimeMetrics()` instance passed into `createApiServer`; internally created adapters are wired automatically.
 
@@ -310,13 +310,13 @@ node --test test/realtime-controls.test.js test/realtime-websocket.test.js test/
 npm run check
 ```
 
-The focused real-time, outbox-contract, outbox-delivery, graph-projection-worker, Memgraph-projector, Redis-presence and API suites cover local behavior. Run PostgreSQL and Memgraph live integration against the dedicated test database after migrations 0010–0013. Run the Redis integration against an isolated Redis/Memurai instance with `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true` and `SYSTEMFABRIC_PRESENCE_REDIS_URL` set. The live Redis integration verifies cross-instance presence refresh and site/principal/session authorization revocation over two independent API instances. Run `npm run test:graph:rebuild` and `scripts/test-memgraph-outage.js` for graph rebuild and interrupted-dependency recovery checks. Browser E2E, load/soak and production security suites remain separate gates and should be run where their prerequisites are available.
+The focused real-time, outbox-contract, outbox-delivery, graph-projection-worker, Memgraph-projector, Redis-presence and API suites cover local behavior. Run PostgreSQL and Memgraph live integration against the dedicated test database after migrations 0010–0013. Run the Redis integration against an isolated Redis/Memurai instance with `VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true` and `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` set. The live Redis integration verifies cross-instance presence refresh and site/principal/session authorization revocation over two independent API instances. Run `npm run test:graph:rebuild` and `scripts/test-memgraph-outage.js` for graph rebuild and interrupted-dependency recovery checks. Browser E2E, load/soak and production security suites remain separate gates and should be run where their prerequisites are available.
 
 For PowerShell, run the live Redis integration with:
 
 ```powershell
-$env:SYSTEMFABRIC_RUN_REDIS_INTEGRATION = 'true'
-$env:SYSTEMFABRIC_PRESENCE_REDIS_URL = 'redis://127.0.0.1:6379'
+$env:VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION = 'true'
+$env:VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL = 'redis://127.0.0.1:6379'
 node --test test/integration/redis-presence.integration.test.js
 ```
 
@@ -366,10 +366,10 @@ The shared quota interface is implemented by packages/realtime/src/connection-qu
 
 | Limit | Default | Configuration |
 |---|---:|---|
-| Global connections | 10,000 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS |
-| Connections per site | 500 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_SITE |
-| Connections per principal | 4 | SYSTEMFABRIC_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL |
-| Lease duration | 45 seconds | SYSTEMFABRIC_REALTIME_CONNECTION_LEASE_MS |
+| Global connections | 10,000 | VIRGOSCORPIO_HUB_REALTIME_MAX_CONNECTIONS |
+| Connections per site | 500 | VIRGOSCORPIO_HUB_REALTIME_MAX_CONNECTIONS_PER_SITE |
+| Connections per principal | 4 | VIRGOSCORPIO_HUB_REALTIME_MAX_CONNECTIONS_PER_PRINCIPAL |
+| Lease duration | 45 seconds | VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LEASE_MS |
 
 SSE and WebSocket use the same limiter. New Redis-quota acquisitions fail closed when the quota store is unavailable. The Redis presence mode and production API path require an injected distributed connection-quota adapter; they do not silently fall back to process-local quota accounting.
 
@@ -515,9 +515,9 @@ F1.24 adds an adversarial API regression for a principal whose only membership a
 
 The regression verifies that:
 - Site A presence heartbeat and snapshot access succeed for the authorized member.
-- Site B presence heartbeat and snapshot access return `403 ERR_SYSTEMFABRIC_FORBIDDEN`.
+- Site B presence heartbeat and snapshot access return `403 ERR_VIRGOSCORPIO_HUB_FORBIDDEN`.
 - The Site A SSE presence stream can be established, while a Site B SSE request is rejected before an event-stream response is opened.
 - A Site A WebSocket upgrade succeeds, while the same credentials cannot upgrade against the Site B route.
 - Authorization is evaluated against the requested site and the authenticated principal; the test does not accept a client-supplied identity or infer access from a different site's membership.
 
-This is targeted application-level regression coverage for the real-time route boundary. It does **not** establish that every application, worker, database, cache, storage or provider path is tenant-isolated; it does not replace independent security assessment or the full two-tenant review required by [issue #14](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14). That issue remains open until an independent reviewer assesses the exact candidate revision and the required evidence is retained. Production remains NO-GO pending all applicable release and deployment gates.
+This is targeted application-level regression coverage for the real-time route boundary. It does **not** establish that every application, worker, database, cache, storage or provider path is tenant-isolated; it does not replace independent security assessment or the full two-tenant review required by [issue #14](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14). That issue remains open until an independent reviewer assesses the exact candidate revision and the required evidence is retained. Production remains NO-GO pending all applicable release and deployment gates.

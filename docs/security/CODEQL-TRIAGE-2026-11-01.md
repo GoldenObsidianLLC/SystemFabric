@@ -3,7 +3,7 @@
 **Baseline reviewed:** `1a903b8eab4304dd61b2489381b091d34f1ea546`
 **Remediation branch:** `fix/codeql-high-alert-remediation`
 **Latest reviewed commit:** `9a004ff38224882d7f9ccf61a9df7a7efec89a84`
-**Hosted CI run:** [41338029772](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41338029772)
+**Hosted CI run:** [41338029772](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41338029772)
 **Status:** all five hosted CI jobs completed successfully on the latest reviewed commit. The latest branch scan retains five open alerts: #4–#7 (High) and #14 (Medium). No alert was bulk-dismissed.
 
 The latest scan confirms that the targeted baseline alerts #3, #8–#13 and #15 are no longer open on this branch. This is a static-analysis result, not an independent security assessment or a claim that the entire product is secure.
@@ -48,6 +48,6 @@ This finding is not being represented as a false positive. Keep the legacy path 
 - A successful CodeQL workflow run means analysis completed; it does not mean there are no alerts.
 - Dependency/SBOM evidence has been refreshed for the latest CI run; the optional inventory variance, LGPL distribution obligations, provenance/attestation and maintainer review remain open.
 - The independent tenant-isolation review remains open and must be performed by an independent reviewer.
-- SystemFabric remains `NOT_PRODUCTION_CERTIFIED`; no production release approval is implied.
+- VirgoScorpio Hub remains `NOT_PRODUCTION_CERTIFIED`; no production release approval is implied.
 
 No vendor, assessor, contractor, subscription, or paid service was engaged for this work.

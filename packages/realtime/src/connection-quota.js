@@ -91,16 +91,16 @@ function normalizeOptions({ limits = {}, leaseMs = 45_000, now = Date.now } = {}
 
 function validateScope({ siteId, principalId }) {
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
-    throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SITE_INVALID', 'A valid siteId is required for a real-time connection.');
+    throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SITE_INVALID', 'A valid siteId is required for a real-time connection.');
   }
   if (typeof principalId !== 'string' || !principalId.trim() || principalId.trim().length > 128) {
-    throw realtimeError(401, 'ERR_SYSTEMFABRIC_REALTIME_PRINCIPAL_REQUIRED', 'An authenticated principal is required for a real-time connection.');
+    throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PRINCIPAL_REQUIRED', 'An authenticated principal is required for a real-time connection.');
   }
   return { siteId: siteId.toLowerCase(), principalId: principalId.trim() };
 }
 
 function quotaError(scope) {
-  const error = realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT', 'The real-time connection quota has been reached.');
+  const error = realtimeError(429, 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT', 'The real-time connection quota has been reached.');
   error.limitScope = scope;
   return error;
 }
@@ -133,7 +133,7 @@ function createMemoryRealtimeConnectionLimiter(options = {}) {
   }
 
   async function acquire(input) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_CLOSED', 'The real-time connection quota adapter is closed.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_CLOSED', 'The real-time connection quota adapter is closed.');
     const scope = validateScope(input || {});
     prune();
     const current = counts(scope);
@@ -195,7 +195,7 @@ async function createRedisRealtimeConnectionLimiter({
   url,
   limits,
   leaseMs = 45_000,
-  keyPrefix = 'systemfabric:realtime:v1:connections',
+  keyPrefix = 'virgoscorpio_hub:realtime:v1:connections',
   createClient: createClientOverride,
   now = Date.now,
   metrics = null
@@ -236,7 +236,7 @@ async function createRedisRealtimeConnectionLimiter({
       else client.destroy?.();
     } catch { client.destroy?.(); }
     incrementMetric(metrics, 'connection_quota_store_errors_total');
-    throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_UNAVAILABLE', 'The distributed real-time connection quota store is unavailable.');
+    throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_UNAVAILABLE', 'The distributed real-time connection quota store is unavailable.');
   }
 
   // Keep the multi-key Lua operation in one Redis Cluster hash slot.
@@ -254,12 +254,12 @@ async function createRedisRealtimeConnectionLimiter({
   }
 
   async function runScript(script, keys, args) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_CLOSED', 'The real-time connection quota adapter is closed.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_CLOSED', 'The real-time connection quota adapter is closed.');
     try {
       return await client.eval(script, { keys, arguments: args.map(value => String(value)) });
     } catch {
       incrementMetric(metrics, 'connection_quota_store_errors_total');
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_UNAVAILABLE', 'The distributed real-time connection quota store is unavailable.');
+      throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_UNAVAILABLE', 'The distributed real-time connection quota store is unavailable.');
     }
   }
 

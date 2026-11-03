@@ -6,7 +6,7 @@
 
 ## 1. Operating model and hard boundaries
 
-SystemFabric has two related but distinct data paths:
+VirgoScorpio Hub has two related but distinct data paths:
 
 - **Presence and connection coordination:** Redis-compatible storage may hold ephemeral presence leases and shared connection-quota leases. Redis Pub/Sub carries bounded, ephemeral presence, authorization-invalidation, and collaborative-document notifications.
 - **Durable collaboration:** PostgreSQL is authoritative for document content, accepted operation sequencing, replay history, idempotency, and canonical synchronization. Redis document notifications are hints, not an operation log.
@@ -44,8 +44,8 @@ The API exposes request and realtime metrics at /metrics when metrics are enable
 
 Configuration used by the current test/runtime path:
 
-- SYSTEMFABRIC_METRICS_ENABLED=true enables collection/serving.
-- SYSTEMFABRIC_METRICS_TOKEN supplies the dedicated bearer token; production startup requires at least 32 characters when metrics are enabled.
+- VIRGOSCORPIO_HUB_METRICS_ENABLED=true enables collection/serving.
+- VIRGOSCORPIO_HUB_METRICS_TOKEN supplies the dedicated bearer token; production startup requires at least 32 characters when metrics are enabled.
 - Scrape with the Authorization: Bearer header; never put the token in a URL, query string, dashboard label, or log.
 - Keep the endpoint private to the approved monitoring network. Do not expose it publicly or reuse an application/user credential as the scrape token.
 - Rotate the token through the deployment's approved secret-management process. Do not write secrets into tickets, chat, command history, or this repository.
@@ -228,4 +228,4 @@ This runbook does not close any production gate. At minimum, the following remai
 - Independent tenant/site authorization and WebSocket/origin/security review, plus accessibility/browser acceptance.
 - Release-owner approval against the exact candidate SHA and all applicable release evidence.
 
-Until these are completed and accepted, keep SystemFabric 0.5.1 at **NOT_PRODUCTION_CERTIFIED / NO-GO**. Keep realtime features disabled or limited to the reviewed isolated developer-preview environment.
+Until these are completed and accepted, keep VirgoScorpio Hub 0.5.1 at **NOT_PRODUCTION_CERTIFIED / NO-GO**. Keep realtime features disabled or limited to the reviewed isolated developer-preview environment.

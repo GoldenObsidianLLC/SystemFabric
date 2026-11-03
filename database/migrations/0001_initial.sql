@@ -1,4 +1,4 @@
--- SystemFabric schema baseline v1.
+-- VirgoScorpio Hub schema baseline v1.
 -- Apply in a maintenance window after testing this migration against a disposable database.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 

@@ -29,8 +29,8 @@ const ICONS = Object.freeze({
 
 function listIcons() { return Object.keys(ICONS).sort().map(name => ({ name, category: name === 'user' || name === 'users' ? 'people' : ['folder','file','document','image','video'].includes(name) ? 'media' : 'interface' })); }
 function renderIcon(name, { size = 24, title = null, strokeWidth = 1.8 } = {}) {
-  if (!Object.hasOwn(ICONS, name)) { const error = new Error('Unknown icon name.'); error.code = 'ERR_SYSTEMFABRIC_ICON_NOT_FOUND'; error.statusCode = 404; throw error; }
-  if (!Number.isInteger(size) || size < 8 || size > 128 || !Number.isFinite(strokeWidth) || strokeWidth < 1 || strokeWidth > 3) { const error = new Error('Icon size or stroke width is out of range.'); error.code = 'ERR_SYSTEMFABRIC_ICON_OPTIONS'; error.statusCode = 400; throw error; }
+  if (!Object.hasOwn(ICONS, name)) { const error = new Error('Unknown icon name.'); error.code = 'ERR_VIRGOSCORPIO_HUB_ICON_NOT_FOUND'; error.statusCode = 404; throw error; }
+  if (!Number.isInteger(size) || size < 8 || size > 128 || !Number.isFinite(strokeWidth) || strokeWidth < 1 || strokeWidth > 3) { const error = new Error('Icon size or stroke width is out of range.'); error.code = 'ERR_VIRGOSCORPIO_HUB_ICON_OPTIONS'; error.statusCode = 400; throw error; }
   const escapedTitle = title === null ? '' : `<title>${String(title).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</title>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" role="img" aria-hidden="${title === null ? 'true' : 'false'}">${escapedTitle}${ICONS[name]}</svg>`;
 }

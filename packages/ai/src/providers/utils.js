@@ -4,7 +4,7 @@ function trimBaseUrl(value) { return String(value || '').replace(/\/+$/, ''); }
 
 function createAICancellationError(cause) {
   const error = new Error('AI task was cancelled because the requesting client disconnected.');
-  error.code = 'ERR_SYSTEMFABRIC_AI_CANCELLED';
+  error.code = 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED';
   error.statusCode = 499;
   if (cause !== undefined) error.cause = cause;
   return error;
@@ -15,7 +15,7 @@ function parseJson(text, providerName) {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   try { return JSON.parse(cleaned); } catch {
     const error = new Error(`${providerName} returned malformed JSON; output rejected.`);
-    error.code = 'ERR_SYSTEMFABRIC_AI_INVALID_JSON';
+    error.code = 'ERR_VIRGOSCORPIO_HUB_AI_INVALID_JSON';
     throw error;
   }
 }
@@ -36,13 +36,13 @@ async function postJson(url, headers, body, timeoutMs, { signal, fetchImpl = fet
     typeof signal.removeEventListener !== 'function'
   )) {
     throw Object.assign(new Error('AI request cancellation signal is invalid.'), {
-      code: 'ERR_SYSTEMFABRIC_AI_SIGNAL_INVALID',
+      code: 'ERR_VIRGOSCORPIO_HUB_AI_SIGNAL_INVALID',
       statusCode: 500
     });
   }
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || typeof fetchImpl !== 'function') {
     throw Object.assign(new Error('AI provider request configuration is invalid.'), {
-      code: 'ERR_SYSTEMFABRIC_AI_CONFIG',
+      code: 'ERR_VIRGOSCORPIO_HUB_AI_CONFIG',
       statusCode: 500
     });
   }
@@ -71,7 +71,7 @@ async function postJson(url, headers, body, timeoutMs, { signal, fetchImpl = fet
     });
     if (!response.ok) {
       const error = new Error(`AI provider request failed with HTTP ${response.status}.`);
-      error.code = 'ERR_SYSTEMFABRIC_AI_PROVIDER_HTTP';
+      error.code = 'ERR_VIRGOSCORPIO_HUB_AI_PROVIDER_HTTP';
       error.status = response.status;
       throw error;
     }
@@ -81,7 +81,7 @@ async function postJson(url, headers, body, timeoutMs, { signal, fetchImpl = fet
   } catch (error) {
     if (timedOut) {
       const timeout = new Error('AI provider request timed out.');
-      timeout.code = 'ERR_SYSTEMFABRIC_AI_TIMEOUT';
+      timeout.code = 'ERR_VIRGOSCORPIO_HUB_AI_TIMEOUT';
       timeout.cause = error;
       throw timeout;
     }

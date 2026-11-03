@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 — Live Integration Fixes
+# VirgoScorpio Hub 0.5.1 — Live Integration Fixes
 
 This patch addresses the two failures from the live PostgreSQL/Memgraph integration run.
 

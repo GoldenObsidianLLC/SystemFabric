@@ -20,7 +20,7 @@ async function main() {
   const client = await pool.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1::integer, $2::integer)', [LOCK_KEY_A, LOCK_KEY_B]);
-    await client.query(`CREATE TABLE IF NOT EXISTS systemfabric_schema_migrations (
+    await client.query(`CREATE TABLE IF NOT EXISTS virgoscorpio_hub_schema_migrations (
       version text PRIMARY KEY,
       sha256 text NOT NULL,
       applied_at timestamptz NOT NULL DEFAULT now()
@@ -29,7 +29,7 @@ async function main() {
       const rawSql = fs.readFileSync(path.join(MIGRATION_DIR, file), 'utf8');
       const sql = normalizeMigrationSql(rawSql);
       const sha256 = migrationChecksum(rawSql);
-      const existing = await client.query('SELECT sha256 FROM systemfabric_schema_migrations WHERE version=$1', [file]);
+      const existing = await client.query('SELECT sha256 FROM virgoscorpio_hub_schema_migrations WHERE version=$1', [file]);
       if (existing.rows[0]) {
         if (existing.rows[0].sha256 !== sha256) throw new Error(`Applied migration ${file} has changed. Create a new forward migration instead of editing an applied migration.`);
         console.log(`SKIP ${file} (already applied)`);
@@ -40,7 +40,7 @@ async function main() {
       try {
         // Migration files are trusted repository code and are deliberately executed without user-supplied SQL parameters.
         await client.query(sql);
-        await client.query('INSERT INTO systemfabric_schema_migrations(version,sha256) VALUES($1,$2)', [file, sha256]);
+        await client.query('INSERT INTO virgoscorpio_hub_schema_migrations(version,sha256) VALUES($1,$2)', [file, sha256]);
         await client.query('COMMIT');
         console.log(`OK   ${file}`);
       } catch (error) {
@@ -56,7 +56,7 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => {
-  console.error(`SystemFabric migration failed: ${error.message}`);
+  console.error(`VirgoScorpio Hub migration failed: ${error.message}`);
   process.exitCode = 1;
 });
 

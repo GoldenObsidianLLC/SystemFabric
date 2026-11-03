@@ -1,4 +1,4 @@
-# SystemFabric Master Technical Specification
+# VirgoScorpio Hub Master Technical Specification
 
 **Document version:** 0.5.1  
 **Status:** Foundation baseline / architecture RFC accepted for implementation  
@@ -9,13 +9,13 @@
 **Initial renderer:** EnginEx 6.2.0, vendored and pinned under `vendor/enginex/`  
 **Last updated:** 2026-10-27
 
-> This specification defines the intended architecture and the current starter implementation. Sections marked “implemented baseline” exist in the repository. “Planned / release gate” items are not claimed to be complete. SystemFabric 0.5.1 is not production-certified.
+> This specification defines the intended architecture and the current starter implementation. Sections marked “implemented baseline” exist in the repository. “Planned / release gate” items are not claimed to be complete. VirgoScorpio Hub 0.5.1 is not production-certified.
 
 ## 1. Executive summary
 
-SystemFabric is a modular Node.js content-management platform inspired by WordPress's content workflows and Elementor's visual page-building model. It represents pages as versioned, structured JSON documents; manages content and revisions in PostgreSQL; uses Memgraph as a relationship-oriented projection for traversal-heavy queries; renders through an EnginEx-based subsystem; exposes manifest-driven widgets and content-type definitions; and integrates AI through provider adapters, validated structured outputs, and the Model Context Protocol (MCP).
+VirgoScorpio Hub is a modular Node.js content-management platform inspired by WordPress's content workflows and Elementor's visual page-building model. It represents pages as versioned, structured JSON documents; manages content and revisions in PostgreSQL; uses Memgraph as a relationship-oriented projection for traversal-heavy queries; renders through an EnginEx-based subsystem; exposes manifest-driven widgets and content-type definitions; and integrates AI through provider adapters, validated structured outputs, and the Model Context Protocol (MCP).
 
-SystemFabric is not designed as a monolithic application that permits every module to query every store or execute arbitrary plugins inside the main process. The architecture uses explicit service boundaries and contracts so that the editor, content services, renderer, graph projection, AI service, and integrations can evolve independently.
+VirgoScorpio Hub is not designed as a monolithic application that permits every module to query every store or execute arbitrary plugins inside the main process. The architecture uses explicit service boundaries and contracts so that the editor, content services, renderer, graph projection, AI service, and integrations can evolve independently.
 
 ### 1.1 Product goals
 
@@ -45,7 +45,7 @@ Admin / Visual Editor / API Clients / MCP Hosts
                          |
                   Identity + API Edge
                          |
-                 SystemFabric Core API
+                 VirgoScorpio Hub Core API
           +--------------+----------------+
           |              |                |
     Content Service  Widget Registry  AI Orchestrator
@@ -101,7 +101,7 @@ Canonical relationship edges are recorded in PostgreSQL. This allows the project
 
 ### 3.3 No false two-phase-commit guarantee
 
-A Node.js function that writes to PostgreSQL and then Memgraph cannot guarantee atomic commit across both stores by merely running compensating rollback scripts. SystemFabric therefore uses a transactional outbox:
+A Node.js function that writes to PostgreSQL and then Memgraph cannot guarantee atomic commit across both stores by merely running compensating rollback scripts. VirgoScorpio Hub therefore uses a transactional outbox:
 
 1. Begin a PostgreSQL transaction.
 2. Write content/revision/canonical relation changes.
@@ -130,7 +130,7 @@ Workers must be idempotent, version-aware, duplicate-safe, observable, and safe 
 - Every data repository method must require a site context, not infer it from untrusted request body fields.
 - Public route identity is `(site_id, content_type, locale, slug)` with uniqueness enforced in PostgreSQL.
 - Site identity may be derived from a verified hostname, signed token claim, or trusted route configuration. It must not be selected by accepting an arbitrary `siteId` from an unauthenticated client.
-- In 0.4.0, cookie-backed database sessions and per-site memberships/capabilities are implemented when PostgreSQL and migrations are configured. The `SYSTEMFABRIC_DEFAULT_SITE_ID` plus static bearer path is retained only as a non-production local development mode; it is not a substitute for production identity controls.
+- In 0.4.0, cookie-backed database sessions and per-site memberships/capabilities are implemented when PostgreSQL and migrations are configured. The `VIRGOSCORPIO_HUB_DEFAULT_SITE_ID` plus static bearer path is retained only as a non-production local development mode; it is not a substitute for production identity controls.
 
 ## 5. Content and page-document model
 
@@ -200,7 +200,7 @@ Trusted first-party plugins may run in-process under the application's normal se
 
 ## 7. Rendering runtime based on EnginEx
 
-EnginEx is the initial rendering subsystem, vendored as version 6.2.0. It is kept behind `packages/render/src/index.js` so SystemFabric can evolve or replace the renderer without coupling content models to one engine's internal types.
+EnginEx is the initial rendering subsystem, vendored as version 6.2.0. It is kept behind `packages/render/src/index.js` so VirgoScorpio Hub can evolve or replace the renderer without coupling content models to one engine's internal types.
 
 ### 7.1 Rendering request lifecycle
 
@@ -217,7 +217,7 @@ The renderer must not query PostgreSQL or Memgraph while walking each widget. Th
 
 ### 7.2 Safety and deterministic rendering
 
-Page documents do not contain HTML injection points. Text values go through EnginEx's escaping. URL attributes use validated URLs and the engine's URL-safe helper. Widget rendering uses allow-listed static templates. SystemFabric's output must not be considered secure merely because a template engine is present: every widget is part of the output security boundary, and a new widget cannot bypass the domain contract.
+Page documents do not contain HTML injection points. Text values go through EnginEx's escaping. URL attributes use validated URLs and the engine's URL-safe helper. Widget rendering uses allow-listed static templates. VirgoScorpio Hub's output must not be considered secure merely because a template engine is present: every widget is part of the output security boundary, and a new widget cannot bypass the domain contract.
 
 EnginEx's current output-context analyzer is a diagnostic aid, not a complete HTML parser or a universal sanitizer. A separate security review must cover template helpers, URL handling, widget renderers, HTML output, Content Security Policy, and browser sinks.
 
@@ -276,17 +276,17 @@ These planned features must use the same provider adapter and policy services; t
 
 ### 8.4 Provider-specific behavior
 
-OpenAI Responses supports structured output formats and tool calls; SystemFabric uses structured outputs where supported and independently validates every result. OpenAI-compatible providers may expose only JSON mode or no schema-constrained generation; local validation remains mandatory. Anthropic requests JSON in its instruction contract; Gemini uses the Interactions API structured-output format. All adapters reject malformed output. Model names, endpoint support, and provider SDK contracts must be verified when deployments are upgraded.
+OpenAI Responses supports structured output formats and tool calls; VirgoScorpio Hub uses structured outputs where supported and independently validates every result. OpenAI-compatible providers may expose only JSON mode or no schema-constrained generation; local validation remains mandatory. Anthropic requests JSON in its instruction contract; Gemini uses the Interactions API structured-output format. All adapters reject malformed output. Model names, endpoint support, and provider SDK contracts must be verified when deployments are upgraded.
 
 ### 8.5 MCP
 
 The MCP server exposes only a constrained, local stdio tool set in 0.4.0:
 
-- `systemfabric_status` — non-sensitive service status.
-- `systemfabric_list_widgets` — approved widget catalog.
-- `systemfabric_validate_page_document` — validate a serialized document.
-- `systemfabric_generate_page_draft` — generate an unsaved document proposal.
-- `systemfabric_render_preview` — render a validated document to safe HTML without persisting it.
+- `virgoscorpio_hub_status` — non-sensitive service status.
+- `virgoscorpio_hub_list_widgets` — approved widget catalog.
+- `virgoscorpio_hub_validate_page_document` — validate a serialized document.
+- `virgoscorpio_hub_generate_page_draft` — generate an unsaved document proposal.
+- `virgoscorpio_hub_render_preview` — render a validated document to safe HTML without persisting it.
 
 The initial transport is stdio for local host integration. The MCP process inherits the launching user's local access and must be configured as a trusted local tool. It does not expose publish/delete/write tools. If a network MCP endpoint is added later, implement transport authentication, tenant propagation, per-tool authorization, request size/rate limits, audit metadata, and human approval before enabling write tools. Stdout is reserved for the MCP protocol; diagnostics go to stderr.
 
@@ -395,7 +395,7 @@ PostgreSQL is the authority for content, revisions, sessions, memberships, permi
 The release contains implementation foundations for password reset and email verification, TOTP MFA, OIDC and SAML SSO, S3-compatible media storage, site-scoped taxonomy/relationship APIs, site AI policy and usage budgets, Ed25519 plugin artifact/SBOM provenance, and CI jobs for PostgreSQL/browser checks. These additions are not considered production-validated because the corresponding live providers, PostgreSQL/Memgraph services, browser binaries, and container runtime were unavailable during local packaging. The remaining release gates are tracked in `docs/RELEASE-GATE.md` and must not be read as completed work.
 
 
-## SystemFabric 0.4.0 platform extension (historical)
+## VirgoScorpio Hub 0.4.0 platform extension (historical)
 
 This release adds unified File/Document/Media Library records and derived variants, curated icons, bounded TeX rendering, product/order/membership foundations, community primitives, mega-menu presentation, application-level firewall rules, and cloud adapter families. The migration is `0006_platform_libraries_commerce_social_billing.sql`.
 
@@ -412,10 +412,10 @@ This version adds a ClamAV `clamdscan` adapter and scan-gated library uploads: p
 
 A local library-object reconciler is exposed as `npm run reconcile:library`; it is dry-run by default, only handles local files, respects database references and age thresholds, and requires `--apply` to delete candidates. S3, Google Cloud Storage and Azure adapters now expose read-only connectivity probes, and cloud connection tests execute those probes when SDKs, configuration and credentials are available. These operations were tested with unit mocks only in the current environment.
 
-The CI workflow now defines a supported-Node matrix, PostgreSQL/Memgraph integration services, browser/accessibility smoke tests, dependency audit/SBOM steps and CodeQL. These definitions have not produced verified CI results during local packaging. Current local validation is 76 passing SystemFabric tests and 88 passing vendored EnginEx tests, with 3 database integration tests skipped. The environment's Node.js 22.16.0 is below the declared 22.23.4 minimum; there is no reviewed lockfile, clean `npm ci`, live database/provider run, Playwright E2E, container runtime validation, production load test or independent security review. See `LOCAL-VALIDATION.md`, `FEATURE-PARITY.md` and `RELEASE-GATE.md`.
+The CI workflow now defines a supported-Node matrix, PostgreSQL/Memgraph integration services, browser/accessibility smoke tests, dependency audit/SBOM steps and CodeQL. These definitions have not produced verified CI results during local packaging. Current local validation is 76 passing VirgoScorpio Hub tests and 88 passing vendored EnginEx tests, with 3 database integration tests skipped. The environment's Node.js 22.16.0 is below the declared 22.23.4 minimum; there is no reviewed lockfile, clean `npm ci`, live database/provider run, Playwright E2E, container runtime validation, production load test or independent security review. See `LOCAL-VALIDATION.md`, `FEATURE-PARITY.md` and `RELEASE-GATE.md`.
 
 ## Implementation status update — 0.5.1
 
 The 0.5.1 hardening candidate adds user-facing, site-scoped direct conversations/messages, notifications/read markers, blocks, reports and moderation APIs. Checkout creation now persists its provider request snapshot for idempotent recovery, reconciles expired stock holds against Stripe Checkout Session state (never releasing stock solely because a local timer elapsed), and commits/releases reservations transactionally on observed payment/expiration transitions. The release-readiness command records machine-readable checks and keeps external deployment evidence fail-closed. These changes are covered by unit tests but still require live PostgreSQL/Stripe, browser, security and supported-runtime validation.
 
-SystemFabric 0.5.1 remains an expanded developer preview, not a production-certified or full WordPress/WooCommerce/BuddyPress/Elementor equivalent release.
+VirgoScorpio Hub 0.5.1 remains an expanded developer preview, not a production-certified or full WordPress/WooCommerce/BuddyPress/Elementor equivalent release.

@@ -101,8 +101,8 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: SITE_A,
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: SITE_A,
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -124,7 +124,7 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
         siteASocket.close();
       });
     }
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   });
 
@@ -149,11 +149,11 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
     body: JSON.stringify({ availability: 'active' })
   });
   assert.equal(heartbeatB.status, 403);
-  assert.equal((await heartbeatB.json()).code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+  assert.equal((await heartbeatB.json()).code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
 
   const presenceB = await fetch(origin + sitePath(SITE_B) + '/presence', { headers });
   assert.equal(presenceB.status, 403);
-  assert.equal((await presenceB.json()).code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+  assert.equal((await presenceB.json()).code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
 
   const sseA = await fetch(origin + sitePath(SITE_A) + '/realtime/events?topic=presence', {
     headers,
@@ -169,20 +169,20 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
 
   const sseB = await fetch(origin + sitePath(SITE_B) + '/realtime/events?topic=presence', { headers });
   assert.equal(sseB.status, 403);
-  assert.equal((await sseB.json()).code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+  assert.equal((await sseB.json()).code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
   assert.doesNotMatch(sseB.headers.get('content-type') || '', /text\/event-stream/);
 
   const wsPath = siteId => origin.replace(/^http/, 'ws') + sitePath(siteId) + '/realtime/ws';
   siteASocket = await connectWebSocket(wsPath(SITE_A), origin);
   assert.equal((await nextWebSocketMessage(siteASocket)).type, 'connection.ready');
 
-  const subscriptionsBeforeDeniedUpgrade = server.systemfabric.realtimeHub.subscriberCount;
+  const subscriptionsBeforeDeniedUpgrade = server.virgoScorpioHub.realtimeHub.subscriberCount;
   await assert.rejects(
     connectWebSocket(wsPath(SITE_B), origin),
     error => error.statusCode === 403
   );
   assert.equal(
-    server.systemfabric.realtimeHub.subscriberCount,
+    server.virgoScorpioHub.realtimeHub.subscriberCount,
     subscriptionsBeforeDeniedUpgrade,
     'the denied Site B upgrade must not create a subscription'
   );

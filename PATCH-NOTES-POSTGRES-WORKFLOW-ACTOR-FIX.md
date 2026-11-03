@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 — PostgreSQL workflow actor fix
+# VirgoScorpio Hub 0.5.1 — PostgreSQL workflow actor fix
 
 ## Problem
 

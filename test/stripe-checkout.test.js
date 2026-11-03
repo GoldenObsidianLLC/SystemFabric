@@ -11,7 +11,7 @@ function checkoutArgs(extra = {}) {
     lineItems: [{ currency: 'USD', unitAmount: 1250, quantity: 2, name: 'Test product' }],
     successUrl: 'https://shop.example.test/success',
     cancelUrl: 'https://shop.example.test/cancel',
-    idempotencyKey: 'systemfabric_test_1234',
+    idempotencyKey: 'virgoscorpio_hub_test_1234',
     fetchImpl: async (_url, options) => {
       checkoutArgs.lastBody = options.body;
       return { ok: true, async text() { return JSON.stringify({ id: 'cs_test_123', url: 'https://checkout.stripe.test/cs_test_123', mode: 'payment', status: 'open', payment_status: 'unpaid' }); } };
@@ -45,18 +45,18 @@ test('Stripe checkout rejects unsupported expiration bounds before external requ
 test('ambiguous Stripe transport failures retain a recoverable provider outcome code', async () => {
   await assert.rejects(
     createStripeCheckoutSession(checkoutArgs({ fetchImpl: async () => { throw new TypeError('socket closed'); } })),
-    error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
   );
 });
 
 test('ambiguous Stripe server errors are distinguished from definitive request rejection', async () => {
   const serverError = await assert.rejects(
     createStripeCheckoutSession(checkoutArgs({ fetchImpl: async () => ({ ok: false, status: 503, async text() { return '{"error":{"message":"temporary"}}'; } }) })),
-    error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN'
   );
   assert.equal(serverError, undefined); // node:assert rejects returns undefined when a predicate is used.
   await assert.rejects(
     createStripeCheckoutSession(checkoutArgs({ fetchImpl: async () => ({ ok: false, status: 400, async text() { return '{"error":{"message":"invalid"}}'; } }) })),
-    error => error.code === 'ERR_SYSTEMFABRIC_BILLING_PROVIDER'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER'
   );
 });

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "product": "SystemFabric",
+  "product": "VirgoScorpio Hub",
   "version": "0.5.1",
   "gate": "clean-npm-ci-local",
   "status": "passed",

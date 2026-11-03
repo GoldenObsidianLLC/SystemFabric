@@ -70,19 +70,19 @@ test('memory quota rejects global, per-site and per-principal excess connections
   const first = await limiter.acquire({ siteId: SITE_A, principalId: 'user-a' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   const second = await limiter.acquire({ siteId: SITE_A, principalId: 'user-b' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-c' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   const third = await limiter.acquire({ siteId: SITE_B, principalId: 'user-c' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_B, principalId: 'user-d' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   await Promise.all([first.release(), second.release(), third.release()]);
@@ -127,7 +127,7 @@ test('Redis quota adapter uses atomic leases for acquire, renew and release', as
   const first = await limiter.acquire({ siteId: SITE_A, principalId: 'user-a' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
   assert.equal(await first.renew(), true);
   await first.release();
@@ -149,7 +149,7 @@ test('Redis quota adapter fails closed when its backing store is unavailable', a
   client.eval = async () => { throw Object.assign(new Error('redis unavailable'), { code: 'ECONNRESET' }); };
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_UNAVAILABLE'
+    error => error.statusCode === 503 && error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_UNAVAILABLE'
   );
   await limiter.close();
 });

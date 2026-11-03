@@ -50,7 +50,7 @@ function createMemoryCollaborationStore({ sitesAndDocuments }) {
     if (!record || record.siteId !== siteId) {
       const error = new Error('Content not found.');
       error.statusCode = 404;
-      error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+      error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND';
       throw error;
     }
     return record;
@@ -79,14 +79,14 @@ function createMemoryCollaborationStore({ sitesAndDocuments }) {
       if (record.status !== 'draft') {
         const error = new Error('Collaborative editing is draft-only.');
         error.statusCode = 409;
-        error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_DRAFT';
         throw error;
       }
       const validation = validateCollaborationOperation(operation);
       if (!validation.valid) {
         const error = new Error(validation.errors.join('; '));
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION';
         throw error;
       }
       const existing = record.idempotency.get(operation.opId);
@@ -94,7 +94,7 @@ function createMemoryCollaborationStore({ sitesAndDocuments }) {
         if (existing.actorId !== actorId || JSON.stringify(existing.operation) !== JSON.stringify(operation)) {
           const error = new Error('Operation ID reuse.');
           error.statusCode = 409;
-          error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE';
+          error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_OP_ID_REUSE';
           throw error;
         }
         return { ...existing.result, operation: structuredClone(existing.appliedOperation), duplicate: true };
@@ -102,7 +102,7 @@ function createMemoryCollaborationStore({ sitesAndDocuments }) {
       if (operation.baseSequence > record.sequence) {
         const error = new Error('Future collaboration sequence.');
         error.statusCode = 409;
-        error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE';
         throw error;
       }
       if (operation.baseSequence < record.oldestReplaySequence) {
@@ -154,13 +154,13 @@ function createMemoryCollaborationStore({ sitesAndDocuments }) {
       if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
         const error = new Error('Invalid sequence cursor.');
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_SEQUENCE';
         throw error;
       }
       if (afterSequence > record.sequence) {
         const error = new Error('Future sequence cursor.');
         error.statusCode = 409;
-        error.code = 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE';
         throw error;
       }
       if (afterSequence < record.oldestReplaySequence) {
@@ -301,9 +301,9 @@ async function createRedisApiInstance({
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: siteIds[0],
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_PRESENCE_STORE: 'memory',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: siteIds[0],
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_PRESENCE_STORE: 'memory',
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '1000'
     },
@@ -314,7 +314,7 @@ async function createRedisApiInstance({
     logger: { error() {} }
   });
 
-  await server.systemfabric.ready();
+  await server.virgoScorpioHub.ready();
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', resolve);
@@ -331,7 +331,7 @@ async function createRedisApiInstance({
     async close() {
       if (closed) return;
       closed = true;
-      await server.systemfabric.close();
+      await server.virgoScorpioHub.close();
       if (server.listening) {
         await new Promise(resolve => server.close(resolve));
       }

@@ -20,14 +20,14 @@ function collectorImageTagForArch(arch = process.arch) {
 }
 
 const ENVIRONMENT = Object.freeze({
-  SYSTEMFABRIC_OTEL_ENABLED: 'true',
-  SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/traces',
-  SYSTEMFABRIC_OTEL_LOGS_ENABLED: 'true',
-  SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/logs',
-  SYSTEMFABRIC_OTEL_SAMPLE_RATIO: '0.1',
-  SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS: '5000',
-  SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP: 'true',
-  SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE: './var/secrets/otel-collector-token.txt'
+  VIRGOSCORPIO_HUB_OTEL_ENABLED: 'true',
+  VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/traces',
+  VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED: 'true',
+  VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT: 'http://127.0.0.1:4318/v1/logs',
+  VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO: '0.1',
+  VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS: '5000',
+  VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP: 'true',
+  VIRGOSCORPIO_HUB_OTEL_AUTH_TOKEN_FILE: './var/secrets/otel-collector-token.txt'
 });
 
 function isInsideDirectory(directory, candidate) {
@@ -191,11 +191,11 @@ function configureLocalCollector({
 
   const updates = {
     ...ENVIRONMENT,
-    SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG: collectorImageTag,
-    SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON: JSON.stringify({
+    VIRGOSCORPIO_HUB_OTEL_COLLECTOR_IMAGE_TAG: collectorImageTag,
+    VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON: JSON.stringify({
       authorization: 'Bearer ' + token
     }),
-    SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON: JSON.stringify({
+    VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON: JSON.stringify({
       authorization: 'Bearer ' + token
     })
   };

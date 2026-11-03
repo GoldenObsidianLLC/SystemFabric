@@ -1,4 +1,4 @@
-# SystemFabric AI Integration
+# VirgoScorpio Hub AI Integration
 
 ## Purpose
 
@@ -31,7 +31,7 @@ Use secret management in deployed environments. External-provider calls are bloc
 }
 ```
 
-Returns a `document` conforming to SystemFabric Page Document v1 plus `provenance` (`provider`, `model`, `generatedAt`) and `status: draft-proposal`. The response is not saved and not published.
+Returns a `document` conforming to VirgoScorpio Hub Page Document v1 plus `provenance` (`provider`, `model`, `generatedAt`) and `status: draft-proposal`. The response is not saved and not published.
 
 ### 2. Assist with content
 
@@ -85,7 +85,7 @@ These records track the lifecycle of the synchronous HTTP request; they do not r
 - `POST /api/v1/preview` returns safe server-rendered HTML. The response is no-store and carries a restrictive Content Security Policy.
 - `POST /api/v1/pages/drafts` writes an explicitly reviewed draft when PostgreSQL and a site context are configured. `reviewed: true` is required for AI-generated proposals; publication is a separate capability-checked workflow.
 
-Protected API routes use database-backed sessions or a server-side bearer session token when identity is configured. Cookie-authenticated unsafe methods require CSRF validation. The static `SYSTEMFABRIC_API_TOKEN` route is available only in non-production local development; production startup is guarded.
+Protected API routes use database-backed sessions or a server-side bearer session token when identity is configured. Cookie-authenticated unsafe methods require CSRF validation. The static `VIRGOSCORPIO_HUB_API_TOKEN` route is available only in non-production local development; production startup is guarded.
 
 ## Provider-neutral contract
 
@@ -107,11 +107,11 @@ They return text. The AI service parses the JSON, validates and normalizes the d
 
 Start the stdio server with `npm run start:mcp` after `npm install`. Available tools:
 
-- `systemfabric_status`
-- `systemfabric_list_widgets`
-- `systemfabric_validate_page_document`
-- `systemfabric_generate_page_draft`
-- `systemfabric_render_preview`
+- `virgoscorpio_hub_status`
+- `virgoscorpio_hub_list_widgets`
+- `virgoscorpio_hub_validate_page_document`
+- `virgoscorpio_hub_generate_page_draft`
+- `virgoscorpio_hub_render_preview`
 
 The server intentionally omits publication, deletion, user administration, plugin installation, direct SQL, and arbitrary code execution tools. Tools used by an AI agent are API entry points and must enforce the same caller authorization as direct user requests. Do not expose stdio MCP through a public TCP endpoint. If a remote transport is introduced, add authentication, tenant context, scopes, request budgets, logs that omit secrets, and explicit action approvals first.
 
@@ -177,7 +177,7 @@ These contracts are provider-owned and may evolve. Verify current request schema
 
 ## AI in the 0.5.0 CMS workflow
 
-AI tasks in this release are integrated as proposal-producing capabilities for page draft generation, content assist, SEO suggestions and translation. Generated page documents pass SystemFabric's independent runtime validation before a draft may be persisted, and the CMS publication workflow remains separate. Human review is required; provider-side structured output never replaces local validation.
+AI tasks in this release are integrated as proposal-producing capabilities for page draft generation, content assist, SEO suggestions and translation. Generated page documents pass VirgoScorpio Hub's independent runtime validation before a draft may be persisted, and the CMS publication workflow remains separate. Human review is required; provider-side structured output never replaces local validation.
 
 The MCP server exposes only bounded status, widget catalog, page schema validation, draft proposal and preview tools. It does not expose publishing, role management, direct SQL, arbitrary shell access or plugin activation. Tool output is untrusted input when consumed by another agent.
 
@@ -188,6 +188,6 @@ Future AI milestones include tenant-specific provider allowlists, per-site budge
 
 ## 0.5.0 AI governance
 
-SystemFabric includes site-level AI policy records for provider allowlists, enabling/disabling AI, external-content opt-in, maximum data classification, human-review requirement, and daily request/input-character budgets. Provider calls use both global configuration and site policy where database-backed site context is present. AI generation remains proposal-only: it cannot publish a page, grant a role, activate a plugin, or bypass the page-document schema.
+VirgoScorpio Hub includes site-level AI policy records for provider allowlists, enabling/disabling AI, external-content opt-in, maximum data classification, human-review requirement, and daily request/input-character budgets. Provider calls use both global configuration and site policy where database-backed site context is present. AI generation remains proposal-only: it cannot publish a page, grant a role, activate a plugin, or bypass the page-document schema.
 
 The local tests verify core policy paths, but concurrent quota enforcement, provider billing reconciliation, all data-classification enforcement paths, and prompt-injection resistance still require live integration tests and review. `store: false` on a provider request is not a guarantee of zero provider-side logging or retention.

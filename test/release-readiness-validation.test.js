@@ -114,12 +114,12 @@ test('NUL porcelain parser rejects malformed, absolute and traversal paths', () 
 });
 
 test('real Git status detects source changes and line-ending-only edits on Windows and Linux', t => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'systemfabric-git-status-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'virgoscorpio_hub-git-status-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
 
   git(directory, ['init', '--quiet']);
-  git(directory, ['config', 'user.name', 'SystemFabric Test']);
-  git(directory, ['config', 'user.email', 'systemfabric-test@example.invalid']);
+  git(directory, ['config', 'user.name', 'VirgoScorpio Hub Test']);
+  git(directory, ['config', 'user.email', 'virgoscorpio_hub-test@example.invalid']);
   git(directory, ['config', 'core.autocrlf', 'false']);
 
   const tracked = path.join(directory, 'tracked.txt');

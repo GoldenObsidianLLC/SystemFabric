@@ -13,21 +13,21 @@ const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,64}$/;
 function readLocalCollectorConfig(root) {
   const env = Object.create(null);
   loadEnvFile(path.join(root, '.env'), env);
-  if (env.SYSTEMFABRIC_OTEL_ENABLED !== 'true' ||
-      env.SYSTEMFABRIC_OTEL_LOGS_ENABLED !== 'true') {
-    throw new Error('SYSTEMFABRIC_OTEL_ENABLED=true and SYSTEMFABRIC_OTEL_LOGS_ENABLED=true are required in the local .env.');
+  if (env.VIRGOSCORPIO_HUB_OTEL_ENABLED !== 'true' ||
+      env.VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED !== 'true') {
+    throw new Error('VIRGOSCORPIO_HUB_OTEL_ENABLED=true and VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED=true are required in the local .env.');
   }
 
-  const traceEndpoint = new URL(env.SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT || '');
+  const traceEndpoint = new URL(env.VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT || '');
   if (traceEndpoint.toString() !== LOCAL_TRACE_URL) {
     throw new Error('The smoke test only sends traces to the fixed loopback OTLP endpoint 127.0.0.1:4318/v1/traces.');
   }
-  const logsEndpoint = new URL(env.SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT || '');
+  const logsEndpoint = new URL(env.VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT || '');
   if (logsEndpoint.toString() !== LOCAL_LOGS_URL) {
     throw new Error('The smoke test only sends logs to the fixed loopback OTLP endpoint 127.0.0.1:4318/v1/logs.');
   }
 
-  const relativeSecretPath = env.SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE ||
+  const relativeSecretPath = env.VIRGOSCORPIO_HUB_OTEL_AUTH_TOKEN_FILE ||
     './var/secrets/otel-collector-token.txt';
   if (path.isAbsolute(relativeSecretPath)) {
     throw new Error('The local collector token path must be relative to the repository root.');
@@ -60,11 +60,11 @@ function readLocalCollectorConfig(root) {
   }
 
   const traceAuthorization = readBearerHeader(
-    env.SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON,
+    env.VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON,
     'trace exporter'
   );
   const logsAuthorization = readBearerHeader(
-    env.SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON,
+    env.VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON,
     'logs exporter'
   );
   if (traceAuthorization !== logsAuthorization) {
@@ -87,11 +87,11 @@ function createSmokePayload(now = Date.now()) {
       resource: {
         attributes: [{
           key: 'service.name',
-          value: { stringValue: 'systemfabric-local-collector-smoke' }
+          value: { stringValue: 'virgoscorpio_hub-local-collector-smoke' }
         }]
       },
       scopeSpans: [{
-        scope: { name: 'systemfabric.local-collector-smoke' },
+        scope: { name: 'virgoscorpio-hub.local-collector-smoke' },
         spans: [{
           traceId,
           spanId,
@@ -107,17 +107,17 @@ function createSmokePayload(now = Date.now()) {
 
 function createSmokeLogPayload(now = Date.now()) {
   const timestamp = (BigInt(now) * 1_000_000n).toString();
-  const eventName = 'systemfabric.observability.logs_smoke';
+  const eventName = 'virgoscorpio_hub.observability.logs_smoke';
   return {
     resourceLogs: [{
       resource: {
         attributes: [{
           key: 'service.name',
-          value: { stringValue: 'systemfabric-local-collector-smoke' }
+          value: { stringValue: 'virgoscorpio_hub-local-collector-smoke' }
         }]
       },
       scopeLogs: [{
-        scope: { name: 'systemfabric.local-collector-smoke', version: '0.5.1' },
+        scope: { name: 'virgoscorpio-hub.local-collector-smoke', version: '0.5.1' },
         logRecords: [{
           timeUnixNano: timestamp,
           observedTimeUnixNano: timestamp,

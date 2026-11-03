@@ -82,15 +82,15 @@ function createWebSocketGateway({
   const readyMessage = JSON.stringify(createConnectionReadyPayload({ heartbeatMs }));
 
   async function handleUpgrade(req, socket, head, context) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_CLOSED', 'The real-time gateway is shutting down.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_CLOSED', 'The real-time gateway is shutting down.');
     const { principal, siteId, topic = 'presence', principalId, sessionId, expiresAt = null } = context || {};
     if (topic !== 'presence') {
-      throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_TOPIC_FORBIDDEN', 'This WebSocket preview only supports the presence topic.');
+      throw realtimeError(403, 'ERR_VIRGOSCORPIO_HUB_REALTIME_TOPIC_FORBIDDEN', 'This WebSocket preview only supports the presence topic.');
     }
     if (!principal || typeof principal.id !== 'string' || principal.id !== principalId ||
         typeof principalId !== 'string' || !principalId.trim() ||
         typeof sessionId !== 'string' || !sessionId.trim()) {
-      throw realtimeError(401, 'ERR_SYSTEMFABRIC_REALTIME_PRINCIPAL_REQUIRED', 'A server-authenticated principal and session are required for WebSocket connections.');
+      throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PRINCIPAL_REQUIRED', 'A server-authenticated principal and session are required for WebSocket connections.');
     }
     let lease = null;
     let subscription = null;
@@ -295,7 +295,7 @@ function createWebSocketGateway({
             send({
               type: 'document.sync.degraded',
               contentId,
-              code: 'ERR_SYSTEMFABRIC_COLLABORATION_SYNC_DEGRADED'
+              code: 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_SYNC_DEGRADED'
             });
           }
 
@@ -343,7 +343,7 @@ function createWebSocketGateway({
                 !DOCUMENT_ID_PATTERN.test(String(command.contentId || '')) ||
                 !Number.isSafeInteger(command.afterSequence) || command.afterSequence < 0 ||
                 Object.keys(command).some(key => !['type', 'contentId', 'afterSequence'].includes(key))) {
-              send({ type: 'document.error', code: 'ERR_SYSTEMFABRIC_COLLABORATION_COMMAND_INVALID' });
+              send({ type: 'document.error', code: 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_COMMAND_INVALID' });
               return;
             }
             const contentId = command.contentId.toLowerCase();
@@ -356,7 +356,7 @@ function createWebSocketGateway({
                 siteId,
                 contentId
               }))) {
-                throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN', 'The principal cannot edit this draft.');
+                throw realtimeError(403, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN', 'The principal cannot edit this draft.');
               }
               documentSubscription = await hub.subscribe({
                 principal: { id: principalId, isDeveloper: principal.isDeveloper === true },
@@ -388,7 +388,7 @@ function createWebSocketGateway({
               send({
                 type: 'document.error',
                 contentId,
-                code: String(error?.code || 'ERR_SYSTEMFABRIC_COLLABORATION_UNAVAILABLE').slice(0, 100)
+                code: String(error?.code || 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_UNAVAILABLE').slice(0, 100)
               });
             }
           }
@@ -398,7 +398,7 @@ function createWebSocketGateway({
                 !DOCUMENT_ID_PATTERN.test(String(command.contentId || '')) ||
                 Object.keys(command).some(key => !['type', 'contentId', 'operation'].includes(key)) ||
                 !documentSubscriptions.has(String(command.contentId || '').toLowerCase())) {
-              send({ type: 'document.error', code: 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_JOINED' });
+              send({ type: 'document.error', code: 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_JOINED' });
               return;
             }
             const contentId = command.contentId.toLowerCase();
@@ -410,12 +410,12 @@ function createWebSocketGateway({
               contentId
             }))) {
               await closeDocumentSubscription(contentId);
-              send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+              send({ type: 'document.error', contentId, code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN' });
               return;
             }
             if (!(await hub.reauthorize(entry.subscription))) {
               await closeDocumentSubscription(contentId);
-              send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+              send({ type: 'document.error', contentId, code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN' });
               return;
             }
             const result = await store.applyCollaborationOperation({
@@ -521,7 +521,7 @@ function createWebSocketGateway({
               }
               if (command.type === 'document.operation') {
                 if (Buffer.byteLength(JSON.stringify(command.operation ?? null), 'utf8') > 12 * 1024) {
-                  send({ type: 'document.error', contentId: command.contentId, code: 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION' });
+                  send({ type: 'document.error', contentId: command.contentId, code: 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION' });
                   return;
                 }
                 await submitDocumentOperation(command);
@@ -562,14 +562,14 @@ function createWebSocketGateway({
               incrementMetric(metrics, 'websocket_message_rejections_total');
               close(1008, 'unsupported-command');
             } catch (error) {
-              if (error?.code === 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' ||
-                  error?.code === 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRED') {
+              if (error?.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN' ||
+                  error?.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_SESSION_EXPIRED') {
                 close(1008, 'authorization-expired');
               } else if (typeof command.type === 'string' && command.type.startsWith('document.')) {
                 send({
                   type: 'document.error',
                   contentId: typeof command.contentId === 'string' ? command.contentId : undefined,
-                  code: String(error?.code || 'ERR_SYSTEMFABRIC_COLLABORATION_UNAVAILABLE').slice(0, 100)
+                  code: String(error?.code || 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_UNAVAILABLE').slice(0, 100)
                 });
               } else {
                 send({ type: 'error', code: 'command-unavailable' });
@@ -609,7 +609,7 @@ function createWebSocketGateway({
                 if (!allowed || !(await hub.reauthorize(entry.subscription))) {
                   documentSubscriptions.delete(contentId);
                   entry.subscription.close();
-                  send({ type: 'document.error', contentId, code: 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN' });
+                  send({ type: 'document.error', contentId, code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN' });
                   continue;
                 }
                 try {

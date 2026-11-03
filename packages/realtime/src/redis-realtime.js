@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
 const { validateCollaborationOperation } = require('../../collaboration/src');
 
-const DEFAULT_CHANNEL_PREFIX = 'systemfabric:realtime:v1';
+const DEFAULT_CHANNEL_PREFIX = 'virgoscorpio_hub:realtime:v1';
 const CHANNEL_PREFIX_RE = /^[A-Za-z0-9:_-]{1,96}$/;
 const EVENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESENCE_PAYLOAD = Object.freeze({ kind: 'presence.refresh' });
@@ -136,14 +136,14 @@ async function createRedisRealtimeBridge({
   metrics = null
 } = {}) {
   if (typeof url !== 'string' || !url) {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is required for the Redis real-time bridge.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL is required for the Redis real-time bridge.');
   }
   let parsed;
   try { parsed = new URL(url); } catch {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL must be a valid redis:// or rediss:// URL.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL must be a valid redis:// or rediss:// URL.');
   }
   if (!['redis:', 'rediss:'].includes(parsed.protocol) || !parsed.hostname) {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL must use redis:// or rediss://.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL must use redis:// or rediss://.');
   }
   if (typeof channelPrefix !== 'string' || !CHANNEL_PREFIX_RE.test(channelPrefix)) {
     throw new TypeError('channelPrefix must be a 1-96 character Redis-safe prefix.');
@@ -314,7 +314,7 @@ async function createRedisRealtimeBridge({
   }
 
   async function attach(targetHub) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
     if (!targetHub || typeof targetHub.publish !== 'function' || typeof targetHub.invalidateAuthorization !== 'function') {
       throw new TypeError('A local hub with publish and authorization invalidation support is required.');
     }
@@ -377,26 +377,26 @@ async function createRedisRealtimeBridge({
       attached = true;
     } catch (error) {
       hub = null;
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis real-time subscription could not be established.');
+      throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis real-time subscription could not be established.');
     }
   }
 
   async function publish({ siteId, topic, payload, eventId = randomUUID(), occurredAt = new Date(now()).toISOString() } = {}) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
-    if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (!attached || !hub) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
     if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId) || topic !== 'presence') {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SCOPE_INVALID', 'A valid site-scoped presence event is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SCOPE_INVALID', 'A valid site-scoped presence event is required.');
     }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
         Object.keys(payload).length !== 1 || payload.kind !== 'presence.refresh') {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_PAYLOAD_INVALID', 'Only presence refresh invalidations may be published through this bridge.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PAYLOAD_INVALID', 'Only presence refresh invalidations may be published through this bridge.');
     }
     if (!EVENT_ID_RE.test(eventId)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_ID_INVALID', 'eventId must be a UUID.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_ID_INVALID', 'eventId must be a UUID.');
     }
     const timestamp = new Date(occurredAt);
     if (!Number.isFinite(timestamp.getTime())) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.');
     }
 
     const envelope = {
@@ -410,7 +410,7 @@ async function createRedisRealtimeBridge({
     };
     const serialized = JSON.stringify(envelope);
     if (Buffer.byteLength(serialized) > maxMessageBytes) {
-      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Presence invalidation exceeds the configured size limit.');
+      throw realtimeError(413, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_TOO_LARGE', 'Presence invalidation exceeds the configured size limit.');
     }
     // Deliver locally first: ephemeral relay failure must never suppress the
     // publisher instance's own presence refresh. Remote replicas recover by
@@ -445,22 +445,22 @@ async function createRedisRealtimeBridge({
     originConnectionId = null,
     operation
   } = {}) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
-    if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (!attached || !hub) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
     if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId) ||
         typeof contentId !== 'string' || !DOCUMENT_ID_RE.test(contentId)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SCOPE_INVALID', 'A valid site and document scope is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SCOPE_INVALID', 'A valid site and document scope is required.');
     }
     if (!Number.isSafeInteger(sequence) || sequence < 1) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SEQUENCE_INVALID', 'A positive safe document sequence is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SEQUENCE_INVALID', 'A positive safe document sequence is required.');
     }
     if (originConnectionId !== null &&
         (typeof originConnectionId !== 'string' || !EVENT_ID_RE.test(originConnectionId))) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_ORIGIN_INVALID', 'originConnectionId must be null or a UUID.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_ORIGIN_INVALID', 'originConnectionId must be null or a UUID.');
     }
     const validation = validateCollaborationOperation(operation);
     if (!validation.valid) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION', validation.errors.join('; '));
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION', validation.errors.join('; '));
     }
 
     const envelope = {
@@ -480,7 +480,7 @@ async function createRedisRealtimeBridge({
     };
     const serialized = JSON.stringify(envelope);
     if (Buffer.byteLength(serialized, 'utf8') > maxDocumentMessageBytes) {
-      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Document operation envelope exceeds the configured size limit.');
+      throw realtimeError(413, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_TOO_LARGE', 'Document operation envelope exceeds the configured size limit.');
     }
 
     const startedAt = now();
@@ -525,8 +525,8 @@ async function createRedisRealtimeBridge({
   }
 
   async function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
-    if (!attached || !hub) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_CLOSED', 'The Redis real-time bridge is closed.');
+    if (!attached || !hub) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_NOT_READY', 'The Redis real-time bridge is not ready.');
     const payload = { kind: 'authorization.invalidate' };
     if (siteId !== null) payload.siteId = siteId;
     if (principalId !== null) payload.principalId = principalId;
@@ -540,10 +540,10 @@ async function createRedisRealtimeBridge({
     };
     const serialized = JSON.stringify(envelope);
     if (Buffer.byteLength(serialized) > maxMessageBytes) {
-      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Authorization invalidation exceeds the configured size limit.');
+      throw realtimeError(413, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_TOO_LARGE', 'Authorization invalidation exceeds the configured size limit.');
     }
     if (!validateAuthorizationEnvelope(serialized, maxMessageBytes)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'Authorization invalidation requires valid UUID selectors.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE', 'Authorization invalidation requires valid UUID selectors.');
     }
     // Revoke local streams even if Redis is unavailable; other replicas also
     // revalidate sessions on each SSE heartbeat as a bounded fallback.
@@ -559,7 +559,7 @@ async function createRedisRealtimeBridge({
       incrementMetric('fanout_failures_total');
       reportError(error);
       try { metrics?.observe?.('redis_publish_duration_milliseconds', Math.max(0, now() - relayStartedAt)); } catch {}
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis authorization invalidation bridge is unavailable.');
+      throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_UNAVAILABLE', 'The Redis authorization invalidation bridge is unavailable.');
     }
     return { ...local, eventId: envelope.eventId };
   }

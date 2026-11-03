@@ -31,10 +31,10 @@ function validateDesignTokens(input) {
 
 function cssVariables(tokens) {
   const validation = validateDesignTokens(tokens);
-  if (!validation.valid) { const error = new Error(`Design tokens are invalid: ${validation.errors.join('; ')}`); error.code = 'ERR_SYSTEMFABRIC_DESIGN_TOKENS_INVALID'; error.details = validation.errors; throw error; }
+  if (!validation.valid) { const error = new Error(`Design tokens are invalid: ${validation.errors.join('; ')}`); error.code = 'ERR_VIRGOSCORPIO_HUB_DESIGN_TOKENS_INVALID'; error.details = validation.errors; throw error; }
   const rows = [];
   for (const group of ['colors','spacing','radii','fontSizes','fontFamilies','fontWeights']) {
-    for (const [name, value] of Object.entries(tokens[group] || {})) rows.push(`--sf-${group.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}-${name}:${value}`);
+    for (const [name, value] of Object.entries(tokens[group] || {})) rows.push(`--vsh-${group.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}-${name}:${value}`);
   }
   return `:root{${rows.join(';')}}`;
 }

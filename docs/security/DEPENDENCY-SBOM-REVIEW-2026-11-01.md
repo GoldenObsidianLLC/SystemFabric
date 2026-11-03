@@ -1,8 +1,8 @@
 # Dependency and SBOM review — 2026-11-01
 
 **Reviewed revision:** `9a004ff38224882d7f9ccf61a9df7a7efec89a84`
-**CI workflow run:** [41338029772](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41338029772)
-**Related PR:** [#36](https://github.com/GoldenObsidianLLC/SystemFabric/pull/36)
+**CI workflow run:** [41338029772](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41338029772)
+**Related PR:** [#36](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/36)
 **Disposition:** SBOM and audit evidence refreshed and verified; license/distribution review, inventory variance root cause, provenance and maintainer sign-off remain open.
 
 This record describes the actual matrix evidence. It is not a legal opinion, dependency attestation, or production release approval.
@@ -15,7 +15,7 @@ Both CI jobs used the same committed `package-lock.json`:
 - SHA-256: `5b2b79b4fff771a6f0209f51737b320b0513685db5997b1dce9c437adf0d1ad3`
 - The file is unchanged from `main` at the reviewed PR base.
 
-The two jobs generated CycloneDX 1.5 SBOMs using `npm sbom --sbom-format=cyclonedx --omit=dev`. Both describe SystemFabric 0.5.1. Their artifact ZIP digests identify the retained evidence sets, while the SBOM hashes identify the SBOM file inside each set.
+The two jobs generated CycloneDX 1.5 SBOMs using `npm sbom --sbom-format=cyclonedx --omit=dev`. Both describe VirgoScorpio Hub 0.5.1. Their artifact ZIP digests identify the retained evidence sets, while the SBOM hashes identify the SBOM file inside each set.
 
 | CI runtime | Components | Dependency records | SBOM SHA-256 | Evidence ZIP SHA-256 |
 |---|---:|---:|---|---|

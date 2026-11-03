@@ -100,29 +100,29 @@ function createRealtimeHub({
   function validateScope({ principal, siteId, topic }) {
     const principalId = typeof principal?.id === 'string' ? principal.id.trim() : '';
     if (!principalId || principalId.length > 128) {
-      throw realtimeError(401, 'ERR_SYSTEMFABRIC_REALTIME_PRINCIPAL_REQUIRED', 'An authenticated principal is required.');
+      throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PRINCIPAL_REQUIRED', 'An authenticated principal is required.');
     }
     if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SITE_INVALID', 'A valid siteId is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SITE_INVALID', 'A valid siteId is required.');
     }
     if (typeof topic !== 'string' || !TOPIC_RE.test(topic) || topic.length > 64) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_TOPIC_INVALID', 'A valid event topic is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_TOPIC_INVALID', 'A valid event topic is required.');
     }
     return { principalId, siteId: siteId.toLowerCase(), topic };
   }
 
   async function subscribe({ principal, siteId, topic, sessionId = null, expiresAt = null }) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_CLOSED', 'The real-time hub is shutting down.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_CLOSED', 'The real-time hub is shutting down.');
     const scope = validateScope({ principal, siteId, topic });
     if (sessionId !== null && (typeof sessionId !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(sessionId))) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_INVALID', 'sessionId must be a safe identifier.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SESSION_INVALID', 'sessionId must be a safe identifier.');
     }
     const expiresAtMs = expiresAt === null ? null : new Date(expiresAt).getTime();
     if (expiresAt !== null && !Number.isFinite(expiresAtMs)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRY_INVALID', 'expiresAt must be a valid timestamp.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SESSION_EXPIRY_INVALID', 'expiresAt must be a valid timestamp.');
     }
     if (expiresAtMs !== null && expiresAtMs <= now()) {
-      throw realtimeError(401, 'ERR_SYSTEMFABRIC_REALTIME_SESSION_EXPIRED', 'The authenticated session has expired.');
+      throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SESSION_EXPIRED', 'The authenticated session has expired.');
     }
     const safePrincipal = Object.freeze({ id: scope.principalId, isDeveloper: principal.isDeveloper === true });
     let authorized = false;
@@ -133,13 +133,13 @@ function createRealtimeHub({
     }
     if (!authorized) {
       incrementMetric('authorization_denials_total');
-      throw realtimeError(403, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN', 'The principal cannot subscribe to this site topic.');
+      throw realtimeError(403, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN', 'The principal cannot subscribe to this site topic.');
     }
 
     const count = principalCounts.get(scope.principalId) || 0;
     if (count >= maxSubscriptionsPerPrincipal) {
       incrementMetric('connection_limit_rejections_total');
-      throw realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT', 'The principal has reached the real-time subscription limit.');
+      throw realtimeError(429, 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT', 'The principal has reached the real-time subscription limit.');
     }
 
     const id = randomUUID();
@@ -216,15 +216,15 @@ function createRealtimeHub({
   function invalidateAuthorization({ siteId = null, principalId = null, sessionId = null } = {}) {
     if (closed) return { revoked: 0 };
     if (siteId !== null && (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId))) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'siteId must be a valid UUID.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE', 'siteId must be a valid UUID.');
     }
     for (const [label, value] of [['principalId', principalId], ['sessionId', sessionId]]) {
       if (value !== null && (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value))) {
-        throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', `${label} must be a safe identifier.`);
+        throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE', `${label} must be a safe identifier.`);
       }
     }
     if (siteId === null && principalId === null && sessionId === null) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE', 'At least one authorization invalidation selector is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE', 'At least one authorization invalidation selector is required.');
     }
     const normalizedSiteId = siteId === null ? null : siteId.toLowerCase();
     const normalizedPrincipalId = principalId !== null && SITE_ID_RE.test(principalId) ? principalId.toLowerCase() : principalId;
@@ -245,22 +245,22 @@ function createRealtimeHub({
     if (closed) return { delivered: 0, revoked: 0, dropped: 0 };
     const scope = validateScope({ principal: { id: 'system' }, siteId, topic });
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) || (Object.getPrototypeOf(payload) !== Object.prototype && Object.getPrototypeOf(payload) !== null)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_PAYLOAD_INVALID', 'Event payload must be a plain JSON object.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PAYLOAD_INVALID', 'Event payload must be a plain JSON object.');
     }
 
     let serialized;
     try { serialized = JSON.stringify(payload); }
-    catch { throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_PAYLOAD_INVALID', 'Event payload must be serializable JSON.'); }
+    catch { throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_PAYLOAD_INVALID', 'Event payload must be serializable JSON.'); }
     if (typeof serialized !== 'string' || Buffer.byteLength(serialized) > maxEventBytes) {
-      throw realtimeError(413, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE', 'Event payload exceeds the configured size limit.');
+      throw realtimeError(413, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_TOO_LARGE', 'Event payload exceeds the configured size limit.');
     }
 
     const event = Object.freeze({
-      eventId: typeof eventId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(eventId) ? eventId : (() => { throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_EVENT_ID_INVALID', 'eventId must be a safe identifier.'); })(),
+      eventId: typeof eventId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(eventId) ? eventId : (() => { throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_ID_INVALID', 'eventId must be a safe identifier.'); })(),
       schemaVersion: 1,
       topic: scope.topic,
       siteId: scope.siteId,
-      occurredAt: (() => { const timestamp = new Date(occurredAt); if (!Number.isFinite(timestamp.getTime())) throw realtimeError(400, 'ERR_SYSTEMFABRIC_REALTIME_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.'); return timestamp.toISOString(); })(),
+      occurredAt: (() => { const timestamp = new Date(occurredAt); if (!Number.isFinite(timestamp.getTime())) throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_REALTIME_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.'); return timestamp.toISOString(); })(),
       payload: JSON.parse(serialized)
     });
 
@@ -282,7 +282,7 @@ function createRealtimeHub({
         continue;
       }
       if (!subscription.enqueue(event)) {
-        subscription.close(realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_SLOW_CONSUMER', 'The subscription fell behind and must reconnect.'));
+        subscription.close(realtimeError(429, 'ERR_VIRGOSCORPIO_HUB_REALTIME_SLOW_CONSUMER', 'The subscription fell behind and must reconnect.'));
         incrementMetric('queue_overflows_total');
         dropped += 1;
       } else {

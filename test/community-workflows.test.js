@@ -12,7 +12,7 @@ function createContext({ method = 'GET', path = `/api/v1/sites/${siteId}/communi
   const ctx = {
     req: { method },
     res: {},
-    url: new URL(`http://systemfabric.local${path}${query}`),
+    url: new URL(`http://virgoscorpio-hub.local${path}${query}`),
     actor: { user: { id: actorId, email: 'actor@example.test' } },
     localPool: pool || { async query() { return { rows: [] }; }, async connect() { throw new Error('connect should not be called'); } },
     maxBody: 64_000,
@@ -44,7 +44,7 @@ test('direct conversation creation rejects malformed or self-recipient before da
       async query() { throw new Error('query should not be called'); },
       async connect() { throw new Error('connect should not be called'); }
     } });
-    await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_SYSTEMFABRIC_CONVERSATION_RECIPIENT' && error.statusCode === 400);
+    await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_RECIPIENT' && error.statusCode === 400);
   }
 });
 
@@ -54,7 +54,7 @@ test('message creation rejects empty content before opening a transaction', asyn
     async query() { throw new Error('query should not be called for an invalid message'); },
     async connect() { throw new Error('connect should not be called for an invalid message'); }
   } });
-  await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_SYSTEMFABRIC_MESSAGE_INVALID' && error.statusCode === 400);
+  await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_VIRGOSCORPIO_HUB_MESSAGE_INVALID' && error.statusCode === 400);
 });
 
 test('report submission rejects unsupported target and category values', async () => {
@@ -62,13 +62,13 @@ test('report submission rejects unsupported target and category values', async (
     async query() { throw new Error('query should not be called for invalid report'); },
     async connect() { throw new Error('connect should not be called for invalid report'); }
   } });
-  await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_SYSTEMFABRIC_REPORT_TARGET' && error.statusCode === 400);
+  await assert.rejects(handleCommunityWorkflowRoute(ctx), error => error.code === 'ERR_VIRGOSCORPIO_HUB_REPORT_TARGET' && error.statusCode === 400);
 
   const ctx2 = createContext({ method: 'POST', path: `/api/v1/sites/${siteId}/community/reports`, body: { targetType: 'user', targetId: recipientId, category: 'wrong' }, pool: {
     async query() { throw new Error('query should not be called for invalid report'); },
     async connect() { throw new Error('connect should not be called for invalid report'); }
   } });
-  await assert.rejects(handleCommunityWorkflowRoute(ctx2), error => error.code === 'ERR_SYSTEMFABRIC_REPORT_CATEGORY' && error.statusCode === 400);
+  await assert.rejects(handleCommunityWorkflowRoute(ctx2), error => error.code === 'ERR_VIRGOSCORPIO_HUB_REPORT_CATEGORY' && error.statusCode === 400);
 });
 
 test('notification read-all endpoint is recognized and scopes updates by user and site', async () => {

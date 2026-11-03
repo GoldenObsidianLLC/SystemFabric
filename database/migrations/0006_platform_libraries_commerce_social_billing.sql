@@ -1,5 +1,5 @@
--- SystemFabric 0.4.0: media/document/file libraries, commerce, communities, billing, and security.
--- PostgreSQL is the source of truth. Do not store cardholder data in SystemFabric.
+-- VirgoScorpio Hub 0.4.0: media/document/file libraries, commerce, communities, billing, and security.
+-- PostgreSQL is the source of truth. Do not store cardholder data in VirgoScorpio Hub.
 
 CREATE TABLE IF NOT EXISTS library_assets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

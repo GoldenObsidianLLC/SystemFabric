@@ -1,6 +1,6 @@
-# SystemFabric Contributor Recognition
+# VirgoScorpio Hub Contributor Recognition
 
-SystemFabric is built through the work, ideas, testing, feedback, and generosity of people who care about open-source software.
+VirgoScorpio Hub is built through the work, ideas, testing, feedback, and generosity of people who care about open-source software.
 
 We want to recognize contributions in a way that is meaningful, respectful, and transparent.
 
@@ -22,7 +22,7 @@ A contribution does not have to be a merged pull request to have value.
 
 ## 2. How Recognition Works
 
-With the contributor's permission, SystemFabric may recognize contributions through:
+With the contributor's permission, VirgoScorpio Hub may recognize contributions through:
 
 * GitHub pull request acknowledgements.
 * Release notes and project updates.
@@ -56,7 +56,7 @@ Recognition does not imply that a reviewer has certified the entire platform or 
 
 ## 5. Recognition Is Not Compensation
 
-SystemFabric is currently an unfunded open-source project.
+VirgoScorpio Hub is currently an unfunded open-source project.
 
 Recognition does not establish employment, a contractor relationship, payment, ownership, repository authority, maintainer status, or any financial benefit.
 
@@ -78,6 +78,6 @@ Recognition does not change copyright ownership or grant rights beyond those pro
 
 ## 8. Growing Together
 
-As the SystemFabric community grows, we hope to recognize the people who help improve its software, documentation, security, reliability, and research.
+As the VirgoScorpio Hub community grows, we hope to recognize the people who help improve its software, documentation, security, reliability, and research.
 
 Our intention is simple: give credit honestly, respect contributor preferences, and make every meaningful contribution count.

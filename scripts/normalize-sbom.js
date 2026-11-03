@@ -32,7 +32,7 @@ function normalizeSbom(sbom, manifest = packageInfo) {
 }
 
 function main() {
-  const target = path.resolve(process.argv[2] || path.join(root, 'artifacts', 'systemfabric.sbom.cdx.json'));
+  const target = path.resolve(process.argv[2] || path.join(root, 'artifacts', 'virgoscorpio-hub.sbom.cdx.json'));
   const sbom = JSON.parse(fs.readFileSync(target, 'utf8'));
   normalizeSbom(sbom);
   fs.writeFileSync(target, `${JSON.stringify(sbom, null, 2)}\n`, 'utf8');

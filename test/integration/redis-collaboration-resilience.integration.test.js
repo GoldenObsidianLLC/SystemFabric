@@ -10,7 +10,7 @@ const { createRealtimeMetrics } = require('../../packages/observability/src/metr
 
 const SITE_ID = '11111111-1111-4111-8111-111111111111';
 const CONTENT_ID = '22222222-2222-4222-8222-222222222222';
-const REDIS_URL = process.env.SYSTEMFABRIC_TEST_REDIS_URL || '';
+const REDIS_URL = process.env.VIRGOSCORPIO_HUB_TEST_REDIS_URL || '';
 
 function approvedRedisUrl(raw) {
   if (typeof raw !== 'string' || !raw) return false;
@@ -24,7 +24,7 @@ function approvedRedisUrl(raw) {
   }
 }
 
-const enabled = process.env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION === 'true' && approvedRedisUrl(REDIS_URL);
+const enabled = process.env.VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION === 'true' && approvedRedisUrl(REDIS_URL);
 
 function createHub(metrics = null, maxQueueSize = 64) {
   return createRealtimeHub({
@@ -74,7 +74,7 @@ test('real Redis document relay recovers after a transient publish interruption'
   skip: !enabled,
   timeout: 30_000
 }, async t => {
-  const channelPrefix = 'systemfabric:test:f1-11-recovery:' + randomUUID();
+  const channelPrefix = 'virgoscorpio_hub:test:f1-11-recovery:' + randomUUID();
   const hubA = createHub();
   const hubB = createHub();
   const metricsA = createRealtimeMetrics();
@@ -167,10 +167,10 @@ test('real Redis relay sustains bounded sequenced fan-out without loss or slow-c
   skip: !enabled,
   timeout: 120_000
 }, async t => {
-  const subscribersCount = boundedInteger('SYSTEMFABRIC_TEST_LOAD_SUBSCRIBERS', 10, 2, 40);
-  const messageCount = boundedInteger('SYSTEMFABRIC_TEST_LOAD_MESSAGES', 2_000, 100, 10_000);
-  const pacingMs = boundedInteger('SYSTEMFABRIC_TEST_LOAD_PACING_MS', 5, 0, 100);
-  const channelPrefix = 'systemfabric:test:f1-11-load:' + randomUUID();
+  const subscribersCount = boundedInteger('VIRGOSCORPIO_HUB_TEST_LOAD_SUBSCRIBERS', 10, 2, 40);
+  const messageCount = boundedInteger('VIRGOSCORPIO_HUB_TEST_LOAD_MESSAGES', 2_000, 100, 10_000);
+  const pacingMs = boundedInteger('VIRGOSCORPIO_HUB_TEST_LOAD_PACING_MS', 5, 0, 100);
+  const channelPrefix = 'virgoscorpio_hub:test:f1-11-load:' + randomUUID();
   const metricsB = createRealtimeMetrics();
   const hubA = createHub();
   const hubB = createHub(metricsB, Math.max(64, messageCount + 8));

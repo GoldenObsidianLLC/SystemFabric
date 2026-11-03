@@ -41,7 +41,7 @@ function isPlainObject(value) {
 function parseOccurredAt(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_TIMESTAMP_INVALID', 'occurredAt must be a valid timestamp.');
   }
   return date.toISOString();
 }
@@ -49,98 +49,98 @@ function parseOccurredAt(value) {
 function normalizeOptionalIdentifier(value, name, maxLength = 128) {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value !== 'string' || value.length > maxLength || !/^[A-Za-z0-9._:-]+$/.test(value)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_IDENTIFIER_INVALID', name + ' must be a safe identifier.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_IDENTIFIER_INVALID', name + ' must be a safe identifier.');
   }
   return value;
 }
 
 function validateEventEnvelope(input) {
   if (!isPlainObject(input)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_INVALID', 'The event envelope must be a plain object.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_INVALID', 'The event envelope must be a plain object.');
   }
 
   if (typeof input.eventId !== 'string' || !UUID_RE.test(input.eventId)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_ID_INVALID', 'eventId must be a UUID.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_ID_INVALID', 'eventId must be a UUID.');
   }
   if (typeof input.eventType !== 'string' || input.eventType.length > 96 || !EVENT_TYPE_RE.test(input.eventType)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_TYPE_INVALID', 'eventType must be a bounded dotted identifier.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_TYPE_INVALID', 'eventType must be a bounded dotted identifier.');
   }
 
   const schemaVersion = Number(input.schemaVersion);
   if (!Number.isInteger(schemaVersion) || schemaVersion !== EVENT_SCHEMA_VERSION) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_SCHEMA_UNSUPPORTED', 'The event schema version is not supported by this consumer.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_SCHEMA_UNSUPPORTED', 'The event schema version is not supported by this consumer.');
   }
 
   const occurredAt = parseOccurredAt(input.occurredAt);
   const classification = input.classification;
   if (!CLASSIFICATIONS.has(classification)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_CLASSIFICATION_INVALID', 'classification must be internal, site-private or public.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_CLASSIFICATION_INVALID', 'classification must be internal, site-private or public.');
   }
 
   const siteId = input.siteId === undefined || input.siteId === null ? null : input.siteId;
   if (siteId !== null && (typeof siteId !== 'string' || !UUID_RE.test(siteId))) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_SITE_INVALID', 'siteId must be a UUID when provided.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_SITE_INVALID', 'siteId must be a UUID when provided.');
   }
   if (classification !== 'internal' && !siteId) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_SITE_REQUIRED', 'Site-scoped and public domain events require siteId.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_SITE_REQUIRED', 'Site-scoped and public domain events require siteId.');
   }
 
   const expectedClassification = DOMAIN_EVENT_CLASSIFICATIONS[input.eventType];
   if (expectedClassification && expectedClassification !== classification) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_CLASSIFICATION_MISMATCH', 'The event type does not match its required classification.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_CLASSIFICATION_MISMATCH', 'The event type does not match its required classification.');
   }
   if (!expectedClassification && classification !== 'internal') {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_CLASSIFICATION_MISMATCH', 'Unregistered event types must remain internal until their classification is reviewed.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_CLASSIFICATION_MISMATCH', 'Unregistered event types must remain internal until their classification is reviewed.');
   }
   if (expectedClassification && !siteId) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_SITE_REQUIRED', 'Domain events require siteId.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_SITE_REQUIRED', 'Domain events require siteId.');
   }
 
   if (!isPlainObject(input.actor)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_ACTOR_INVALID', 'actor must be an object.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_ACTOR_INVALID', 'actor must be an object.');
   }
   const actorType = input.actor.type;
   const actorId = input.actor.id === undefined || input.actor.id === null ? null : input.actor.id;
   if (!['system', 'user'].includes(actorType)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_ACTOR_INVALID', 'actor.type must be system or user.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_ACTOR_INVALID', 'actor.type must be system or user.');
   }
   if ((actorType === 'user' && (typeof actorId !== 'string' || !UUID_RE.test(actorId))) ||
       (actorType === 'system' && actorId !== null)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_ACTOR_INVALID', 'actor.id must be a UUID for users and null for system events.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_ACTOR_INVALID', 'actor.id must be a UUID for users and null for system events.');
   }
 
   if (!isPlainObject(input.resource)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_RESOURCE_INVALID', 'resource must be an object.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_RESOURCE_INVALID', 'resource must be an object.');
   }
   if (typeof input.resource.type !== 'string' || !AGGREGATE_TYPE_RE.test(input.resource.type)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_RESOURCE_INVALID', 'resource.type must be a bounded identifier.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_RESOURCE_INVALID', 'resource.type must be a bounded identifier.');
   }
   if (typeof input.resource.id !== 'string' || !UUID_RE.test(input.resource.id)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_RESOURCE_INVALID', 'resource.id must be a UUID.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_RESOURCE_INVALID', 'resource.id must be a UUID.');
   }
   const resourceVersion = Number(input.resource.version);
   if (!Number.isSafeInteger(resourceVersion) || resourceVersion < 1) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_RESOURCE_INVALID', 'resource.version must be a positive safe integer.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_RESOURCE_INVALID', 'resource.version must be a positive safe integer.');
   }
 
   const correlationId = normalizeOptionalIdentifier(input.correlationId, 'correlationId');
   const causationId = normalizeOptionalIdentifier(input.causationId, 'causationId');
   if (causationId !== null && !UUID_RE.test(causationId)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_IDENTIFIER_INVALID', 'causationId must be a UUID.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_IDENTIFIER_INVALID', 'causationId must be a UUID.');
   }
 
   if (!isPlainObject(input.payload)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_PAYLOAD_INVALID', 'payload must be a plain JSON object.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_PAYLOAD_INVALID', 'payload must be a plain JSON object.');
   }
 
   let payloadJson;
   try {
     payloadJson = JSON.stringify(input.payload);
   } catch {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_PAYLOAD_INVALID', 'payload must be serializable JSON.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_PAYLOAD_INVALID', 'payload must be serializable JSON.');
   }
   if (typeof payloadJson !== 'string' || Buffer.byteLength(payloadJson) > MAX_EVENT_PAYLOAD_BYTES) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_PAYLOAD_TOO_LARGE', 'payload exceeds the 64 KiB event limit.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_PAYLOAD_TOO_LARGE', 'payload exceeds the 64 KiB event limit.');
   }
 
   const normalized = {
@@ -179,7 +179,7 @@ function validateEventEnvelope(input) {
  */
 function eventEnvelopeFromOutboxRow(row) {
   if (!isPlainObject(row)) {
-    throw eventError('ERR_SYSTEMFABRIC_EVENT_INVALID', 'An outbox row is required.');
+    throw eventError('ERR_VIRGOSCORPIO_HUB_EVENT_INVALID', 'An outbox row is required.');
   }
 
   const envelope = {

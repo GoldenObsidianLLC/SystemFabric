@@ -163,19 +163,19 @@ test('Redis realtime bridge rejects payloads that could expose presence records 
 
   await assert.rejects(
     bridge.publish({ siteId: SITE_A, topic: 'presence', payload: { kind: 'presence.refresh', principalId: 'user-a' } }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_PAYLOAD_INVALID'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_PAYLOAD_INVALID'
   );
   await assert.rejects(
     bridge.publish({ siteId: SITE_A, topic: 'content', payload: { kind: 'presence.refresh' } }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_SCOPE_INVALID'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_SCOPE_INVALID'
   );
   await assert.rejects(
     bridge.publish({ siteId: SITE_A, topic: 'presence', payload: { kind: 'presence.refresh' }, eventId: 'not-a-uuid' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_EVENT_ID_INVALID'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_ID_INVALID'
   );
   await assert.rejects(
     bridge.invalidateAuthorization({ principalId: 'local-developer' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE'
   );
 });
 
@@ -205,7 +205,7 @@ test('Redis realtime envelope validation enforces channel site, UUID identity an
   assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, payload: { kind: 'authorization.invalidate' } }), 4096), null);
   assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, payload: { ...authorization.payload, sessionToken: 'secret' } }), 4096), null);
   assert.equal(validateAuthorizationEnvelope(JSON.stringify({ ...authorization, sessionToken: 'secret' }), 4096), null);
-  assert.equal(DEFAULT_CHANNEL_PREFIX, 'systemfabric:realtime:v1');
+  assert.equal(DEFAULT_CHANNEL_PREFIX, 'virgoscorpio_hub:realtime:v1');
 });
 
 test('presence invalidation still fans out locally when Redis publish is interrupted', async t => {
@@ -262,7 +262,7 @@ test('authorization invalidation remains effective locally when Redis relay is u
 
   await assert.rejects(
     bridge.invalidateAuthorization({ sessionId: SESSION_A1 }),
-    error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_REALTIME_BRIDGE_UNAVAILABLE'
+    error => error.statusCode === 503 && error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_BRIDGE_UNAVAILABLE'
   );
   assert.equal(hub.subscriberCount, 0, 'local authorization is revoked before relay publication');
   assert.equal((await subscription.events[Symbol.asyncIterator]().next()).done, true);
@@ -458,13 +458,13 @@ test('Redis document queue saturation does not delay authorization invalidation'
   const broker = new FakeRedisBroker();
   const bridgeA = await createRedisRealtimeBridge({
     url: REDIS_URL,
-    channelPrefix: 'systemfabric:test:isolation',
+    channelPrefix: 'virgoscorpio_hub:test:isolation',
     createClient: () => broker.createClient()
   });
   const metricsB = createRealtimeMetrics();
   const bridgeB = await createRedisRealtimeBridge({
     url: REDIS_URL,
-    channelPrefix: 'systemfabric:test:isolation',
+    channelPrefix: 'virgoscorpio_hub:test:isolation',
     maxDocumentInboundQueue: 1,
     createClient: () => broker.createClient(),
     metrics: metricsB

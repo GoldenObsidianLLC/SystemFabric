@@ -1,6 +1,6 @@
-# SystemFabric 0.5.1 — Release Gate
+# VirgoScorpio Hub 0.5.1 — Release Gate
 
-> **Historical checklist — superseded as a current status report (1 November 2026).** This file preserves an earlier gate snapshot and older local/CI claims. The current candidate evidence, test results and release decision are in [the 1 November 2026 project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md) and [repository continuity review](REPOSITORY-COHERENCE-AND-CONTINUITY-REVIEW-2026-11-01.md). PR #36's hosted checks passed, but candidate readiness still has two blockers, five CodeQL results remain open, independent/provider/operations gates remain unaccepted, and production remains NO-GO. Historical checklist items below have not been retroactively rewritten as current test results.
+> **Historical checklist — superseded as a current status report (1 November 2026).** This file preserves an earlier gate snapshot and older local/CI claims. The current candidate evidence, test results and release decision are in [the 1 November 2026 project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md) and [repository continuity review](REPOSITORY-COHERENCE-AND-CONTINUITY-REVIEW-2026-11-01.md). PR #36's hosted checks passed, but candidate readiness still has two blockers, five CodeQL results remain open, independent/provider/operations gates remain unaccepted, and production remains NO-GO. Historical checklist items below have not been retroactively rewritten as current test results.
 
 **Current release state:** `EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED`.
 

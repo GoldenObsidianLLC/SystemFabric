@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 — Release Readiness Fixes
+# VirgoScorpio Hub 0.5.1 — Release Readiness Fixes
 
 This patch makes three limited corrections:
 

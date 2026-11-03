@@ -11,11 +11,11 @@ async function runBinary(command, args, { timeoutMs = 30_000, maxOutputBytes = 1
     const child = spawn(command, args, { stdio: ['ignore','pipe','pipe'], shell: false, windowsHide: true });
     const stdout = []; const stderr = []; let totalOut = 0; let totalErr = 0; let settled = false;
     const finish = (err, value) => { if (settled) return; settled = true; clearTimeout(timer); if (err) reject(err); else resolve(value); };
-    child.stdout.on('data', chunk => { totalOut += chunk.length; if (totalOut > maxOutputBytes) { child.kill('SIGKILL'); finish(Object.assign(new Error('Optimizer output exceeded its limit.'), { code: 'ERR_SYSTEMFABRIC_OPTIMIZER_OUTPUT_LIMIT' })); } else stdout.push(chunk); });
+    child.stdout.on('data', chunk => { totalOut += chunk.length; if (totalOut > maxOutputBytes) { child.kill('SIGKILL'); finish(Object.assign(new Error('Optimizer output exceeded its limit.'), { code: 'ERR_VIRGOSCORPIO_HUB_OPTIMIZER_OUTPUT_LIMIT' })); } else stdout.push(chunk); });
     child.stderr.on('data', chunk => { totalErr += chunk.length; if (totalErr < maxOutputBytes) stderr.push(chunk); });
-    child.on('error', error => finish(Object.assign(error, { code: error.code === 'ENOENT' ? 'ERR_SYSTEMFABRIC_OPTIMIZER_UNAVAILABLE' : 'ERR_SYSTEMFABRIC_OPTIMIZER_FAILED' })));
-    child.on('close', code => code === 0 ? finish(null, { stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString('utf8') }) : finish(Object.assign(new Error(`Optimizer exited with code ${code}.`), { code: 'ERR_SYSTEMFABRIC_OPTIMIZER_FAILED' })));
-    const timer = setTimeout(() => { child.kill('SIGKILL'); finish(Object.assign(new Error('Optimizer timed out.'), { code: 'ERR_SYSTEMFABRIC_OPTIMIZER_TIMEOUT' })); }, timeoutMs); timer.unref?.();
+    child.on('error', error => finish(Object.assign(error, { code: error.code === 'ENOENT' ? 'ERR_VIRGOSCORPIO_HUB_OPTIMIZER_UNAVAILABLE' : 'ERR_VIRGOSCORPIO_HUB_OPTIMIZER_FAILED' })));
+    child.on('close', code => code === 0 ? finish(null, { stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString('utf8') }) : finish(Object.assign(new Error(`Optimizer exited with code ${code}.`), { code: 'ERR_VIRGOSCORPIO_HUB_OPTIMIZER_FAILED' })));
+    const timer = setTimeout(() => { child.kill('SIGKILL'); finish(Object.assign(new Error('Optimizer timed out.'), { code: 'ERR_VIRGOSCORPIO_HUB_OPTIMIZER_TIMEOUT' })); }, timeoutMs); timer.unref?.();
   });
 }
 async function optimizeImage(buffer, { sharp = null, quality = 82, maxWidth = 2560 } = {}) {
@@ -27,8 +27,8 @@ async function optimizeImage(buffer, { sharp = null, quality = 82, maxWidth = 25
   return { optimized: output.length < buffer.length, reason: output.length < buffer.length ? 'converted-to-webp' : 'not-smaller', buffer: output.length < buffer.length ? output : buffer, mimeType: output.length < buffer.length ? 'image/webp' : null, bytesSaved: Math.max(0, buffer.length - output.length), sha256: sha256(output) };
 }
 async function optimizeVideoToWebm(buffer, { ffmpegPath = 'ffmpeg', timeoutMs = 120_000, maxBytes = 100 * 1024 * 1024 } = {}) {
-  if (buffer.length > maxBytes) { const e = new Error('Video exceeds the optimizer input limit.'); e.code='ERR_SYSTEMFABRIC_OPTIMIZER_SIZE_LIMIT'; throw e; }
-  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-video-'));
+  if (buffer.length > maxBytes) { const e = new Error('Video exceeds the optimizer input limit.'); e.code='ERR_VIRGOSCORPIO_HUB_OPTIMIZER_SIZE_LIMIT'; throw e; }
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-video-'));
   const input = path.join(dir, `${randomUUID()}.mp4`); const output = path.join(dir, `${randomUUID()}.webm`);
   try {
     await fs.promises.writeFile(input, buffer, { mode: 0o600, flag: 'wx' });

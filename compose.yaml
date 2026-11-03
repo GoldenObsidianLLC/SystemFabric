@@ -3,16 +3,16 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_DB: systemfabric
-      POSTGRES_USER: systemfabric
-      POSTGRES_PASSWORD: systemfabric_dev
+      POSTGRES_DB: virgoscorpio_hub
+      POSTGRES_USER: virgoscorpio_hub
+      POSTGRES_PASSWORD: virgoscorpio_hub_dev
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - systemfabric-postgres:/var/lib/postgresql
+      - virgoscorpio_hub-postgres:/var/lib/postgresql
       - ./docker/postgres/init/01-create-test-db.sh:/docker-entrypoint-initdb.d/01-create-test-db.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U systemfabric -d systemfabric"]
+      test: ["CMD-SHELL", "pg_isready -U virgoscorpio_hub -d virgoscorpio_hub"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -24,7 +24,7 @@ services:
       - "127.0.0.1:7687:7687"
       - "127.0.0.1:7444:7444"
     volumes:
-      - systemfabric-memgraph:/var/lib/memgraph
+      - virgoscorpio_hub-memgraph:/var/lib/memgraph
     restart: unless-stopped
 
   # Optional S3-compatible storage test fixture. Start with: docker compose --profile cloud up -d
@@ -33,13 +33,13 @@ services:
     profiles: ["cloud"]
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: systemfabric_minio
-      MINIO_ROOT_PASSWORD: systemfabric_minio_dev_only
+      MINIO_ROOT_USER: virgoscorpio_hub_minio
+      MINIO_ROOT_PASSWORD: virgoscorpio_hub_minio_dev_only
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
     volumes:
-      - systemfabric-minio:/data
+      - virgoscorpio_hub-minio:/data
     restart: unless-stopped
 
   minio-init:
@@ -50,10 +50,10 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: >-
       until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 2; done;
-      mc mb --ignore-existing local/systemfabric-assets
+      mc mb --ignore-existing local/virgoscorpio-hub-assets
     environment:
-      MINIO_ROOT_USER: systemfabric_minio
-      MINIO_ROOT_PASSWORD: systemfabric_minio_dev_only
+      MINIO_ROOT_USER: virgoscorpio_hub_minio
+      MINIO_ROOT_PASSWORD: virgoscorpio_hub_minio_dev_only
     restart: "no"
 
   # The VS Code container has the clamdscan client; this service supplies clamd.
@@ -64,13 +64,13 @@ services:
     ports:
       - "127.0.0.1:3310:3310"
     volumes:
-      - systemfabric-clamav-db:/var/lib/clamav
+      - virgoscorpio_hub-clamav-db:/var/lib/clamav
     restart: unless-stopped
 
   # Local-only, authenticated OTLP/HTTP collector. Debug exporter is ephemeral.
   # Configure the shared token first: npm run otel:dev:setup
   otel-collector:
-    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${SYSTEMFABRIC_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:${VIRGOSCORPIO_HUB_OTEL_COLLECTOR_IMAGE_TAG:-0.164.0-amd64}
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     user: "10001:10001"
@@ -90,11 +90,11 @@ services:
     restart: unless-stopped
 
 volumes:
-  systemfabric-postgres:
-  systemfabric-memgraph:
-  systemfabric-minio:
-  systemfabric-clamav-db:
+  virgoscorpio_hub-postgres:
+  virgoscorpio_hub-memgraph:
+  virgoscorpio_hub-minio:
+  virgoscorpio_hub-clamav-db:
 
 secrets:
   otel_receiver_token:
-    file: ${SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE:-./var/secrets/otel-collector-token.txt}
+    file: ${VIRGOSCORPIO_HUB_OTEL_AUTH_TOKEN_FILE:-./var/secrets/otel-collector-token.txt}

@@ -4,8 +4,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { retrieveStripeSubscription } = require('../packages/billing/src/stripe');
 
-const SECRET_KEY = 'sk_test_systemfabric_subscription_fixture';
-const SUBSCRIPTION_ID = 'sub_systemfabricfixture123';
+const SECRET_KEY = 'sk_test_virgoscorpio_hub_subscription_fixture';
+const SUBSCRIPTION_ID = 'sub_virgoscorpiohubfixture123';
 const metadata = {
   purchase_type: 'membership',
   site_id: '11111111-1111-4111-8111-111111111111',
@@ -48,15 +48,15 @@ test('subscription retrieval rejects unsafe configuration before provider I/O', 
 
   await assert.rejects(
     retrieveStripeSubscription({ secretKey: 'not-a-secret', subscriptionId: SUBSCRIPTION_ID, fetchImpl }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_DISABLED', statusCode: 503 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_DISABLED', statusCode: 503 }
   );
   await assert.rejects(
     retrieveStripeSubscription({ secretKey: SECRET_KEY, subscriptionId: 'sub_invalid-id', fetchImpl }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_WEBHOOK_INVALID', statusCode: 400 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_WEBHOOK_INVALID', statusCode: 400 }
   );
   await assert.rejects(
     retrieveStripeSubscription({ secretKey: SECRET_KEY, subscriptionId: SUBSCRIPTION_ID, fetchImpl, timeoutMs: 10 }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_CONFIG', statusCode: 503 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_CONFIG', statusCode: 503 }
   );
   assert.equal(calls, 0);
 });
@@ -69,7 +69,7 @@ test('transient provider failures remain retryable but definitive resource error
         subscriptionId: SUBSCRIPTION_ID,
         fetchImpl: async () => jsonResponse({ error: 'provider unavailable' }, status)
       }),
-      { code: 'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
+      { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
     );
   }
 
@@ -79,7 +79,7 @@ test('transient provider failures remain retryable but definitive resource error
       subscriptionId: SUBSCRIPTION_ID,
       fetchImpl: async () => jsonResponse({ error: 'not found' }, 404)
     }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_PROVIDER', statusCode: 502 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER', statusCode: 502 }
   );
 
   await assert.rejects(
@@ -88,7 +88,7 @@ test('transient provider failures remain retryable but definitive resource error
       subscriptionId: SUBSCRIPTION_ID,
       fetchImpl: async () => { throw new Error('network unavailable'); }
     }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
   );
 });
 
@@ -106,7 +106,7 @@ test('subscription retrieval rejects malformed or mismatched provider responses'
         subscriptionId: SUBSCRIPTION_ID,
         fetchImpl: async () => jsonResponse(response)
       }),
-      { code: 'ERR_SYSTEMFABRIC_BILLING_PROVIDER', statusCode: 502 }
+      { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER', statusCode: 502 }
     );
   }
 
@@ -116,6 +116,6 @@ test('subscription retrieval rejects malformed or mismatched provider responses'
       subscriptionId: SUBSCRIPTION_ID,
       fetchImpl: async () => ({ ok: true, status: 200, async text() { throw new Error('interrupted'); } })
     }),
-    { code: 'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE', statusCode: 503 }
   );
 });

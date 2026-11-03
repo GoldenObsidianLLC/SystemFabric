@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 async function snapshotCommunitySite(pool, siteId) {
@@ -53,7 +53,7 @@ async function snapshotCommunitySite(pool, siteId) {
       [siteId],
     ],
     moderation: [
-      'SELECT id,site_id,actor_id,target_type,target_id,action,reason,created_at FROM systemfabric_moderation_actions WHERE site_id=$1 ORDER BY id',
+      'SELECT id,site_id,actor_id,target_type,target_id,action,reason,created_at FROM virgoscorpio_hub_moderation_actions WHERE site_id=$1 ORDER BY id',
       [siteId],
     ],
   };
@@ -85,13 +85,13 @@ test(
       REQUIRE_VERIFIED_EMAIL: 'false',
       AI_PROVIDER: 'mock',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
     const identity = createIdentityService({ pool, env });
 
     t.after(async () => {
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM sites WHERE id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -271,7 +271,7 @@ test(
     const base = `http://127.0.0.1:${server.address().port}`;
     const headers = {
       authorization: `Bearer ${session.token}`,
-      'x-systemfabric-site-id': siteB,
+      'x-virgoscorpio-hub-site-id': siteB,
     };
     const before = await snapshotCommunitySite(pool, siteA);
 
@@ -300,7 +300,7 @@ test(
         body: JSON.stringify({}),
       });
       assert.equal(response.status, 404);
-      assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_GROUP_NOT_FOUND');
+      assert.equal((await response.json()).code, 'ERR_VIRGOSCORPIO_HUB_GROUP_NOT_FOUND');
       const membership = await pool.query(
         'SELECT 1 FROM social_group_memberships WHERE group_id=$1 AND user_id=$2',
         [groupA, actorB.id]
@@ -318,7 +318,7 @@ test(
 
       const messageList = await fetch(`${base}/api/v1/sites/${siteB}/community/conversations/${conversationA}/messages`, { headers });
       assert.equal(messageList.status, 404);
-      assert.equal((await messageList.json()).code, 'ERR_SYSTEMFABRIC_CONVERSATION_NOT_FOUND');
+      assert.equal((await messageList.json()).code, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_NOT_FOUND');
 
       const send = await fetch(`${base}/api/v1/sites/${siteB}/community/conversations/${conversationA}/messages`, {
         method: 'POST',
@@ -326,7 +326,7 @@ test(
         body: JSON.stringify({ body: 'Attempted cross-site message' }),
       });
       assert.equal(send.status, 404);
-      assert.equal((await send.json()).code, 'ERR_SYSTEMFABRIC_CONVERSATION_NOT_FOUND');
+      assert.equal((await send.json()).code, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_NOT_FOUND');
 
       const read = await fetch(`${base}/api/v1/sites/${siteB}/community/conversations/${conversationA}/read`, {
         method: 'POST',
@@ -334,7 +334,7 @@ test(
         body: JSON.stringify({}),
       });
       assert.equal(read.status, 404);
-      assert.equal((await read.json()).code, 'ERR_SYSTEMFABRIC_CONVERSATION_NOT_FOUND');
+      assert.equal((await read.json()).code, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -349,14 +349,14 @@ test(
         body: JSON.stringify({ userId: userA.id, reason: 'Cross-site block attempt' }),
       });
       assert.equal(createBlock.status, 404);
-      assert.equal((await createBlock.json()).code, 'ERR_SYSTEMFABRIC_COMMUNITY_USER_NOT_FOUND');
+      assert.equal((await createBlock.json()).code, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_USER_NOT_FOUND');
 
       const removeBlock = await fetch(`${base}/api/v1/sites/${siteB}/community/blocks/${userA2.id}`, {
         method: 'DELETE',
         headers,
       });
       assert.equal(removeBlock.status, 404);
-      assert.equal((await removeBlock.json()).code, 'ERR_SYSTEMFABRIC_BLOCK_NOT_FOUND');
+      assert.equal((await removeBlock.json()).code, 'ERR_VIRGOSCORPIO_HUB_BLOCK_NOT_FOUND');
 
       const friends = await fetch(`${base}/api/v1/sites/${siteB}/community/friends`, { headers });
       assert.equal(friends.status, 200);
@@ -367,14 +367,14 @@ test(
         headers,
       });
       assert.equal(createFriend.status, 404);
-      assert.equal((await createFriend.json()).code, 'ERR_SYSTEMFABRIC_COMMUNITY_USER_NOT_FOUND');
+      assert.equal((await createFriend.json()).code, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_USER_NOT_FOUND');
 
       const acceptForeign = await fetch(`${base}/api/v1/sites/${siteB}/community/friends/${userA.id}`, {
         method: 'PUT',
         headers,
       });
       assert.equal(acceptForeign.status, 404);
-      assert.equal((await acceptForeign.json()).code, 'ERR_SYSTEMFABRIC_FRIEND_REQUEST_NOT_FOUND');
+      assert.equal((await acceptForeign.json()).code, 'ERR_VIRGOSCORPIO_HUB_FRIEND_REQUEST_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -389,7 +389,7 @@ test(
         body: JSON.stringify({ targetType: 'user', targetId: userA.id, category: 'harassment', detail: 'Cross-site report attempt' }),
       });
       assert.equal(createReport.status, 404);
-      assert.equal((await createReport.json()).code, 'ERR_SYSTEMFABRIC_REPORT_TARGET_NOT_FOUND');
+      assert.equal((await createReport.json()).code, 'ERR_VIRGOSCORPIO_HUB_REPORT_TARGET_NOT_FOUND');
 
       const review = await fetch(`${base}/api/v1/sites/${siteB}/community/reports/${reportA}`, {
         method: 'PATCH',
@@ -397,7 +397,7 @@ test(
         body: JSON.stringify({ status: 'dismissed', moderationNote: 'Cross-site review attempt' }),
       });
       assert.equal(review.status, 404);
-      assert.equal((await review.json()).code, 'ERR_SYSTEMFABRIC_REPORT_NOT_FOUND');
+      assert.equal((await review.json()).code, 'ERR_VIRGOSCORPIO_HUB_REPORT_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -408,7 +408,7 @@ test(
         body: JSON.stringify({ targetType: 'activity', targetId: activityA, action: 'hide', reason: 'Cross-site moderation attempt' }),
       });
       assert.equal(response.status, 404);
-      assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_MODERATION_TARGET_NOT_FOUND');
+      assert.equal((await response.json()).code, 'ERR_VIRGOSCORPIO_HUB_MODERATION_TARGET_NOT_FOUND');
 
       const foreignMessage = await fetch(`${base}/api/v1/sites/${siteB}/community/moderation`, {
         method: 'POST',
@@ -416,7 +416,7 @@ test(
         body: JSON.stringify({ targetType: 'message', targetId: messageA, action: 'hide', reason: 'Cross-site message moderation attempt' }),
       });
       assert.equal(foreignMessage.status, 404);
-      assert.equal((await foreignMessage.json()).code, 'ERR_SYSTEMFABRIC_MODERATION_TARGET_NOT_FOUND');
+      assert.equal((await foreignMessage.json()).code, 'ERR_VIRGOSCORPIO_HUB_MODERATION_TARGET_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -432,7 +432,7 @@ test(
         headers,
       });
       assert.equal(readForeign.status, 404);
-      assert.equal((await readForeign.json()).code, 'ERR_SYSTEMFABRIC_NOTIFICATION_NOT_FOUND');
+      assert.equal((await readForeign.json()).code, 'ERR_VIRGOSCORPIO_HUB_NOTIFICATION_NOT_FOUND');
 
       const readAll = await fetch(`${base}/api/v1/sites/${siteB}/community/notifications/read-all`, {
         method: 'POST',

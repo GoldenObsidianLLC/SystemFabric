@@ -31,7 +31,7 @@ blob-report/
 /artifacts/release-readiness.md
 /artifacts/release-readiness-ci.json
 /artifacts/release-readiness-ci.md
-/artifacts/systemfabric.sbom.cdx.json
+/artifacts/virgoscorpio-hub.sbom.cdx.json
 # Deployment-specific observability evidence stays in the deployment's controlled evidence store.
 /artifacts/evidence/observability-production.json
 

@@ -12,7 +12,7 @@ function validManifest() {
   return {
     schemaVersion: 1,
     environment: 'production',
-    deploymentId: 'systemfabric-prod-region-a',
+    deploymentId: 'virgoscorpio_hub-prod-region-a',
     sourceRevision: '5d9a99541a23670c07af1425cbc21df454af19c8',
     decision: {
       status: 'approved',
@@ -36,7 +36,7 @@ function validManifest() {
       minimumTlsVersion: '1.2',
       authentication: {
         mode: 'mtls',
-        credentialReference: 'certificate:systemfabric/otel/client'
+        credentialReference: 'certificate:virgoscorpio_hub/otel/client'
       },
       network: {
         privateIngress: true,
@@ -70,7 +70,7 @@ function validManifest() {
       technicalOwner: 'team:observability',
       dataOwner: 'team:data-governance',
       securityOwner: 'team:platform-security',
-      onCallRoute: 'pager:systemfabric-platform'
+      onCallRoute: 'pager:virgoscorpio_hub-platform'
     },
     delivery: {
       queue: {
@@ -229,7 +229,7 @@ test('legal-hold behavior and supported authentication identity types must be ex
   manifest.governance.legalHoldProcedureReference = 'policy:observability/legal-hold';
   manifest.transport.tlsMode = 'tls';
   manifest.transport.authentication.mode = 'workload-identity';
-  manifest.transport.authentication.credentialReference = 'identity:systemfabric-prod';
+  manifest.transport.authentication.credentialReference = 'identity:virgoscorpio_hub-prod';
   const result = validateObservabilityDeploymentManifest(manifest, { now: NOW });
 
   assert.ok(result.errors.some(error => error.code === 'must_be_null_when_unsupported'));

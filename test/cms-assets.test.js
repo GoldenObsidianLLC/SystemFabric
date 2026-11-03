@@ -11,7 +11,7 @@ const { configFromEnv } = require('../packages/auth/src/oidc');
  test('design tokens are constrained and produce only approved CSS variables', () => {
   const tokens = { colors: { brand: '#123456', paper: '#ffffff' }, spacing: { small: '8px' }, fontFamilies: { body: 'Inter, system-ui' }, fontWeights: { regular: '400' }, breakpoints: { tablet: 900 } };
   assert.equal(validateDesignTokens(tokens).valid, true);
-  assert.match(cssVariables(tokens), /--sf-colors-brand:#123456/);
+  assert.match(cssVariables(tokens), /--vsh-colors-brand:#123456/);
   assert.equal(validateDesignTokens({ colors: { brand: 'red;position:fixed' } }).valid, false);
   assert.equal(validateDesignTokens({ fontFamilies: { body: 'x;position:fixed' } }).valid, false);
   assert.equal(validateDesignTokens({ spacing: { gap: 'calc(1px + 2px)' } }).valid, false);
@@ -35,12 +35,12 @@ test('TOTP enrollment verifies a fresh time step and rejects step replay', () =>
 });
 
 test('MFA secrets are encrypted with authenticated encryption and require a 32-byte key', () => {
-  const env = { SYSTEMFABRIC_MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64url') };
+  const env = { VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64url') };
   const ciphertext = encryptSecret('BASE32SECRET', env);
   assert.notEqual(ciphertext, 'BASE32SECRET');
   assert.equal(decryptSecret(ciphertext, env), 'BASE32SECRET');
-  assert.throws(() => decryptSecret(ciphertext, { SYSTEMFABRIC_MFA_ENCRYPTION_KEY: randomBytes(16).toString('base64url') }), { code: 'ERR_SYSTEMFABRIC_MFA_KEY_INVALID' });
-  assert.throws(() => decryptSecret(ciphertext, { SYSTEMFABRIC_MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64url') }));
+  assert.throws(() => decryptSecret(ciphertext, { VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY: randomBytes(16).toString('base64url') }), { code: 'ERR_VIRGOSCORPIO_HUB_MFA_KEY_INVALID' });
+  assert.throws(() => decryptSecret(ciphertext, { VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY: randomBytes(32).toString('base64url') }));
 });
 
 test('notification templates escape untrusted HTML and disabled delivery fails closed', async () => {
@@ -49,11 +49,11 @@ test('notification templates escape untrusted HTML and disabled delivery fails c
   assert.match(email.html, /&lt;script&gt;site&lt;\/script&gt;/);
   assert.match(email.html, /&lt;SCRIPT&gt;upper&lt;\/SCRIPT&gt;/);
   assert.match(email.html, /&quot;x&quot;/);
-  await assert.rejects(() => sendEmail({ recipient: 'person@example.test', template: 'generic', payload: {} }, { SYSTEMFABRIC_MAIL_PROVIDER: 'disabled' }), { code: 'ERR_SYSTEMFABRIC_MAIL_DISABLED' });
+  await assert.rejects(() => sendEmail({ recipient: 'person@example.test', template: 'generic', payload: {} }, { VIRGOSCORPIO_HUB_MAIL_PROVIDER: 'disabled' }), { code: 'ERR_VIRGOSCORPIO_HUB_MAIL_DISABLED' });
 });
 
 test('OIDC configuration requires HTTPS in production and never accepts URL credentials', () => {
-  assert.throws(() => configFromEnv({ NODE_ENV: 'production', OIDC_ISSUER: 'http://issuer.example', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'secret', OIDC_REDIRECT_URI: 'https://cms.example/api/v1/auth/oidc/callback' }), { code: 'ERR_SYSTEMFABRIC_OIDC_HTTPS_REQUIRED' });
-  assert.throws(() => configFromEnv({ NODE_ENV: 'production', OIDC_ISSUER: 'https://issuer.example', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'secret', OIDC_REDIRECT_URI: 'https://user:pass@cms.example/callback' }), { code: 'ERR_SYSTEMFABRIC_OIDC_CONFIG' });
+  assert.throws(() => configFromEnv({ NODE_ENV: 'production', OIDC_ISSUER: 'http://issuer.example', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'secret', OIDC_REDIRECT_URI: 'https://cms.example/api/v1/auth/oidc/callback' }), { code: 'ERR_VIRGOSCORPIO_HUB_OIDC_HTTPS_REQUIRED' });
+  assert.throws(() => configFromEnv({ NODE_ENV: 'production', OIDC_ISSUER: 'https://issuer.example', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'secret', OIDC_REDIRECT_URI: 'https://user:pass@cms.example/callback' }), { code: 'ERR_VIRGOSCORPIO_HUB_OIDC_CONFIG' });
   assert.equal(configFromEnv({ NODE_ENV: 'production', OIDC_ISSUER: 'https://issuer.example', OIDC_CLIENT_ID: 'client', OIDC_CLIENT_SECRET: 'secret', OIDC_REDIRECT_URI: 'https://cms.example/api/v1/auth/oidc/callback' }).issuer, 'https://issuer.example');
 });

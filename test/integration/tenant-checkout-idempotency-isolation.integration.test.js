@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 async function orderState(pool, siteId, orderId) {
@@ -53,11 +53,11 @@ test(
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL,
       REQUIRE_VERIFIED_EMAIL: 'false',
-      STRIPE_SECRET_KEY: 'sk_test_systemfabric_fixture_not_real',
+      STRIPE_SECRET_KEY: 'sk_test_virgoscorpio_hub_fixture_not_real',
       STRIPE_CHECKOUT_SUCCESS_URL: 'https://shop.example.test/checkout/success',
       STRIPE_CHECKOUT_CANCEL_URL: 'https://shop.example.test/checkout/cancel',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
 
     global.fetch = async (input, options = {}) => {
       if (String(input) === 'https://api.stripe.com/v1/checkout/sessions') {
@@ -91,7 +91,7 @@ test(
       global.fetch = originalFetch;
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM sites WHERE id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -305,7 +305,7 @@ test(
       });
       const payload = await response.json();
       assert.equal(response.status, 422);
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_CART_PRODUCT');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_CART_PRODUCT');
       assert.equal(providerCalls.length, 1, 'invalid cross-site cart must not invoke Stripe');
 
       assert.deepEqual(

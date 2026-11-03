@@ -15,7 +15,7 @@ const APPROVED_GENERATED_OUTPUTS = new Set([
   'artifacts/evidence/npm-audit-all.log',
   'artifacts/evidence/npm-audit.log',
   'artifacts/evidence/sbom-generation.log',
-  'artifacts/systemfabric.sbom.cdx.json',
+  'artifacts/virgoscorpio-hub.sbom.cdx.json',
   'artifacts/release-readiness.json',
   'artifacts/release-readiness.md',
 ]);

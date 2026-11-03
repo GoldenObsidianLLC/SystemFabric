@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://systemfabric.invalid/schemas/page-document.schema.json",
-  "title": "SystemFabric Page Document v1",
+  "$id": "https://virgoscorpio-hub.invalid/schemas/page-document.schema.json",
+  "title": "VirgoScorpio Hub Page Document v1",
   "type": "object",
   "additionalProperties": false,
   "required": [

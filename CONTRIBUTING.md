@@ -1,6 +1,6 @@
-# Contributing to SystemFabric
+# Contributing to VirgoScorpio Hub
 
-Thank you for considering a contribution. Focused changes, reproducible tests, and clear documentation help keep SystemFabric maintainable and safe to evaluate.
+Thank you for considering a contribution. Focused changes, reproducible tests, and clear documentation help keep VirgoScorpio Hub maintainable and safe to evaluate.
 
 ## Before opening an issue
 
@@ -55,4 +55,4 @@ Read [Documentation standards](docs/DOCUMENTATION_STANDARDS.md). Prefer concise 
 
 ## Attribution and licensing
 
-By submitting a contribution, you agree that it may be distributed under the repository's applicable license, GPL-2.0-or-later for original SystemFabric materials, unless the maintainers agree to an alternate arrangement in writing. Preserve third-party licensing and copyright notices. See [LICENSE](LICENSE), [COPYRIGHT](COPYRIGHT), and [TRADEMARKS.md](TRADEMARKS.md). Contributions do not automatically grant permission to use project names or branding to imply official endorsement.
+By submitting a contribution, you agree that it may be distributed under the repository's applicable license, GPL-2.0-or-later for original VirgoScorpio Hub materials, unless the maintainers agree to an alternate arrangement in writing. Preserve third-party licensing and copyright notices. See [LICENSE](LICENSE), [COPYRIGHT](COPYRIGHT), and [TRADEMARKS.md](TRADEMARKS.md). Contributions do not automatically grant permission to use project names or branding to imply official endorsement.

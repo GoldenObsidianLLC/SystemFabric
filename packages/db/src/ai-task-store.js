@@ -5,13 +5,13 @@ const TASK_TYPES = new Set(['page_draft', 'content_assist', 'seo', 'translate'])
 const TASK_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'blocked']);
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'blocked']);
 
-function invalid(message, code = 'ERR_SYSTEMFABRIC_AI_TASK_INVALID') {
+function invalid(message, code = 'ERR_VIRGOSCORPIO_HUB_AI_TASK_INVALID') {
   return Object.assign(new TypeError(message), { code, statusCode: 400 });
 }
 
 function conflict(message) {
   return Object.assign(new Error(message), {
-    code: 'ERR_SYSTEMFABRIC_AI_TASK_CONFLICT',
+    code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_CONFLICT',
     statusCode: 409
   });
 }
@@ -32,7 +32,7 @@ function requireNonNegativeInteger(value, name) {
 function safeErrorCode(value) {
   if (value === null || value === undefined) return null;
   const code = String(value);
-  return /^[A-Z0-9_]{1,100}$/.test(code) ? code : 'ERR_SYSTEMFABRIC_AI_FAILURE';
+  return /^[A-Z0-9_]{1,100}$/.test(code) ? code : 'ERR_VIRGOSCORPIO_HUB_AI_FAILURE';
 }
 
 function toTask(row) {
@@ -122,7 +122,7 @@ function createAITaskStore({ pool }) {
         return toTask(existing);
       }
       if (!existing) throw Object.assign(new Error('AI task not found.'), {
-        code: 'ERR_SYSTEMFABRIC_AI_TASK_NOT_FOUND',
+        code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_NOT_FOUND',
         statusCode: 404
       });
       throw conflict('AI task cannot transition to running from its current state.');
@@ -152,7 +152,7 @@ function createAITaskStore({ pool }) {
 
       const existing = await findTask({ taskId, siteId });
       if (!existing) throw Object.assign(new Error('AI task not found.'), {
-        code: 'ERR_SYSTEMFABRIC_AI_TASK_NOT_FOUND',
+        code: 'ERR_VIRGOSCORPIO_HUB_AI_TASK_NOT_FOUND',
         statusCode: 404
       });
       if (existing.status === status) return toTask(existing);

@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 async function membershipSideEffects(pool, siteId, watchedRecipient) {
@@ -59,15 +59,15 @@ test(
       NODE_ENV: 'test',
       DATABASE_URL: process.env.DATABASE_URL,
       REQUIRE_VERIFIED_EMAIL: 'false',
-      SYSTEMFABRIC_EXPOSE_DEV_TOKENS: 'false',
+      VIRGOSCORPIO_HUB_EXPOSE_DEV_TOKENS: 'false',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
     const identity = createIdentityService({ pool, env });
 
     t.after(async () => {
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM audit_events WHERE site_id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -169,7 +169,7 @@ test(
       });
       const payload = await response.json();
       assert.equal(response.status, 403, `${method} ${url} must reject an administrator from a different site`);
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
       assert.doesNotMatch(JSON.stringify(payload), /Site B Existing Member|cross-site-invite/);
     }
 

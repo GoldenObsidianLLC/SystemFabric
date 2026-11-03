@@ -1,13 +1,13 @@
-# Golden Obsidian LLC - SystemFabric 0.5.1 Project Status Report
+# Golden Obsidian LLC - VirgoScorpio Hub 0.5.1 Project Status Report
 **As of:** 1 November 2026, 14:58 CST (America/Chicago)
 **Overall:** Engineering-positive / production NO-GO
 **Release classification:** Expanded developer preview; NOT_PRODUCTION_CERTIFIED
 
-> **Executive decision:** SystemFabric 0.5.1 is not ready for production. Candidate PR #36 has passed its hosted engineering checks, but five CodeQL alerts remain open, 13 formal certification gates lack accepted evidence, the release-readiness artifact reports two blockers, and company scope/governance approvals remain pending.
+> **Executive decision:** VirgoScorpio Hub 0.5.1 is not ready for production. Candidate PR #36 has passed its hosted engineering checks, but five CodeQL alerts remain open, 13 formal certification gates lack accepted evidence, the release-readiness artifact reports two blockers, and company scope/governance approvals remain pending.
 
 ## 1. Executive decision
 
-Overall project assessment: engineering progress is strong, but production certification readiness remains RED / NO-GO. SystemFabric 0.5.1 should continue to be treated only as an expanded, isolated developer preview. The recommended release-scope document is not yet approved by a named release owner. No production deployment, live customer data, live payment collection, provider certification, independent tenant-isolation review, or independent security assessment is evidenced.
+Overall project assessment: engineering progress is strong, but production certification readiness remains RED / NO-GO. VirgoScorpio Hub 0.5.1 should continue to be treated only as an expanded, isolated developer preview. The recommended release-scope document is not yet approved by a named release owner. No production deployment, live customer data, live payment collection, provider certification, independent tenant-isolation review, or independent security assessment is evidenced.
 
 ## Executive status at a glance
 
@@ -17,7 +17,7 @@ The current candidate branch has passed the hosted engineering checks on both No
 | Dimension | Current state | Meaning |
 | --- | --- | --- |
 | Engineering CI | GREEN | Both hosted workflow runs on candidate PR #36 completed all five jobs successfully. |
-| Application tests | GREEN | 245/245 SystemFabric tests and 92/92 EnginEx tests passed on Linux CI with zero skips. |
+| Application tests | GREEN | 245/245 VirgoScorpio Hub tests and 92/92 EnginEx tests passed on Linux CI with zero skips. |
 | Live integration | GREEN | 22/22 PostgreSQL/Memgraph/product integration tests passed; fresh migrations, outage recovery, and graph rebuild passed. |
 | Browser smoke | GREEN / LIMITED | 9/9 Chromium Playwright tests passed; this is not full WCAG or screen-reader acceptance. |
 | Supply chain | AMBER | Audits clean and SBOMs generated; optional inventory variance, LGPL notices, provenance, and maintainer sign-off remain open. |
@@ -35,7 +35,7 @@ This report is a point-in-time assessment prepared for 1 November 2026 at 14:58 
 ### Revision identifiers
 | Item | Verified value | Interpretation |
 | --- | --- | --- |
-| Repository | GoldenObsidianLLC/SystemFabric | Public repository; current default branch is main. |
+| Repository | GoldenObsidianLLC/VirgoScorpio-Hub | Public repository; current default branch is main. |
 | main | 1a903b8eab4304dd61b2489381b091d34f1ea546 | Current main SHA at report time; candidate fixes are not merged into main. |
 | Candidate branch | fix/codeql-high-alert-remediation | Branch proposed by PR #36. |
 | Candidate head | f9d463ef9ca82d15c9220e15cf50df2ba6367a11 | Latest PR #36 source commit. |
@@ -53,7 +53,7 @@ The local candidate worktree was on f9d463e and had one untracked file, test/int
 
 ## 3. Product and supported 0.5.1 scope
 
-SystemFabric is an AI-integrated headless CMS and site platform with visual page editing/rendering, media and document library foundations, commerce and membership workflows, community features, plugin infrastructure, AI-assisted content workflows, and collaborative editing/realtime foundations. The presence of adapters and code does not make every provider or capability supported. The current recommended 0.5.1 boundary is an isolated, self-hosted developer preview, not a production-ready SaaS, not a production-certified multi-tenant service, and not a parity replacement for WooCommerce, BuddyPress, or Elementor.
+VirgoScorpio Hub is an AI-integrated headless CMS and site platform with visual page editing/rendering, media and document library foundations, commerce and membership workflows, community features, plugin infrastructure, AI-assisted content workflows, and collaborative editing/realtime foundations. The presence of adapters and code does not make every provider or capability supported. The current recommended 0.5.1 boundary is an isolated, self-hosted developer preview, not a production-ready SaaS, not a production-certified multi-tenant service, and not a parity replacement for WooCommerce, BuddyPress, or Elementor.
 
 ### Recommended preview profile (approval still pending)
 | Area | Current preview boundary | Not yet certified / excluded |
@@ -142,7 +142,7 @@ CodeQL has materially improved on the candidate branch, but the current open-ale
 
 ## 7. Tenant isolation and authorization assurance
 
-This is the most consequential open engineering/security gate. SystemFabric is multi-site by design. The source contains site selector resolution, capability authorization, own-content rules, object-store scoping, event envelopes, graph partitions, Redis site-qualified channels and realtime reauthorization. Those patterns are positive design evidence but cannot prove every route and side-effect path is isolated.
+This is the most consequential open engineering/security gate. VirgoScorpio Hub is multi-site by design. The source contains site selector resolution, capability authorization, own-content rules, object-store scoping, event envelopes, graph partitions, Redis site-qualified channels and realtime reauthorization. Those patterns are positive design evidence but cannot prove every route and side-effect path is isolated.
 
 ### Evidence now present on the candidate
 - A preliminary 146-line route/capability/data-access map covers the API, platform routes, public paths, provider callbacks, PostgreSQL/outbox, Memgraph, Redis/realtime, collaboration, community, media/library, commerce and privileged operations.
@@ -159,7 +159,7 @@ The route map pins source commit 3a378f17635ccb046dca96f3660314c88ad3a260, which
 
 ## 8. Dependency, SBOM, licensing and provenance
 
-The committed package-lock.json identity is consistent across the two latest Linux CI matrix jobs: SHA-256 5b2b79b4fff771a6f0209f51737b320b0513685db5997b1dce9c437adf0d1ad3. Both jobs generated CycloneDX 1.5 SBOMs for SystemFabric 0.5.1. The refreshed generator corrects an older static-log count/date defect and records live runtime, npm, hashes, inventory counts and licenses.
+The committed package-lock.json identity is consistent across the two latest Linux CI matrix jobs: SHA-256 5b2b79b4fff771a6f0209f51737b320b0513685db5997b1dce9c437adf0d1ad3. Both jobs generated CycloneDX 1.5 SBOMs for VirgoScorpio Hub 0.5.1. The refreshed generator corrects an older static-log count/date defect and records live runtime, npm, hashes, inventory counts and licenses.
 
 ### Latest SBOM matrix
 | Runtime | SBOM counts | SBOM SHA-256 | Observed licensing |
@@ -267,28 +267,28 @@ The following sequence prioritises no-cost work first and avoids creating obliga
 
 ## 13. Final assessment
 
-SystemFabric 0.5.1 has a credible and improving engineering baseline: reproducible installs on the tested matrix, clean vulnerability audits, passing unit and EnginEx tests, successful live database/graph integration, successful Chromium collaboration smoke, targeted tenant authorization tests, and meaningful source-level remediation. The candidate branch is materially stronger than current main, but it is not merged and is not independently assessed. Four High cookie data-flow alerts and one Medium legacy-code alert remain open; supply-chain/legal questions remain; the 13 formal evidence gates are missing; the latest readiness artifact still has two blocked checks; the release-scope decision and corporate zero-reserve controls are not adopted. The project is therefore ENGINEERING-POSITIVE / PRODUCTION-NO-GO. Preserve the developer-preview boundary, keep the company unfunded/no-spend constraint explicit, and do not infer production assurance from green CI.
+VirgoScorpio Hub 0.5.1 has a credible and improving engineering baseline: reproducible installs on the tested matrix, clean vulnerability audits, passing unit and EnginEx tests, successful live database/graph integration, successful Chromium collaboration smoke, targeted tenant authorization tests, and meaningful source-level remediation. The candidate branch is materially stronger than current main, but it is not merged and is not independently assessed. Four High cookie data-flow alerts and one Medium legacy-code alert remain open; supply-chain/legal questions remain; the 13 formal evidence gates are missing; the latest readiness artifact still has two blocked checks; the release-scope decision and corporate zero-reserve controls are not adopted. The project is therefore ENGINEERING-POSITIVE / PRODUCTION-NO-GO. Preserve the developer-preview boundary, keep the company unfunded/no-spend constraint explicit, and do not infer production assurance from green CI.
 
 ## Appendix A. Primary references reviewed
 
 Repository and evidence references below were read or queried directly for this report. CI timestamps are UTC; local report time is America/Chicago.
 
 ### GitHub repository and change sets
-- Repository: https://github.com/GoldenObsidianLLC/SystemFabric
+- Repository: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub
 - main branch: 1a903b8eab4304dd61b2489381b091d34f1ea546
-- PR #36 (draft candidate): https://github.com/GoldenObsidianLLC/SystemFabric/pull/36
-- PR #35 (overlapping earlier remediation): https://github.com/GoldenObsidianLLC/SystemFabric/pull/35
-- Candidate push run 41340896118: https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41340896118
-- Candidate pull-request run 41340899584: https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41340899584
-- Candidate CodeQL alerts: https://github.com/GoldenObsidianLLC/SystemFabric/security/code-scanning
+- PR #36 (draft candidate): https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/36
+- PR #35 (overlapping earlier remediation): https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/35
+- Candidate push run 41340896118: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41340896118
+- Candidate pull-request run 41340899584: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41340899584
+- Candidate CodeQL alerts: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/security/code-scanning
 
 ### Key open execution and governance issues
-- Release scope: https://github.com/GoldenObsidianLLC/SystemFabric/issues/13
-- Independent tenant review: https://github.com/GoldenObsidianLLC/SystemFabric/issues/14
+- Release scope: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/13
+- Independent tenant review: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14
 - Identity: #15; malware scanning: #16; cloud storage: #17; Stripe: #18; accessibility: #19.
 - Commerce: #20; community: #21; plugin isolation: #22; dependency/SBOM/CodeQL: #23.
 - Load/backup/restore: #24; independent security assessment: #25; operations/release approval: #26.
-- Zero-reserve corporate controls: https://github.com/GoldenObsidianLLC/SystemFabric/issues/32
+- Zero-reserve corporate controls: https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/32
 
 ### Repository documents read
 - docs/RELEASE-SCOPE.md; docs/RELEASE_READINESS.md; docs/PRODUCTION-CERTIFICATION-PLAN.md; docs/SECURITY-AND-THREAT-MODEL.md.

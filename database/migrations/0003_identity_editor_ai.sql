@@ -1,4 +1,4 @@
--- SystemFabric 0.3.0: account lifecycle, MFA, reusable design assets, and plugin provenance.
+-- VirgoScorpio Hub 0.3.0: account lifecycle, MFA, reusable design assets, and plugin provenance.
 -- Forward-only. Validate this migration on a disposable PostgreSQL instance before production.
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz;

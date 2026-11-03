@@ -60,7 +60,7 @@ test('reconciliation batch size is bounded', () => {
   assert.equal(validateBatchSize(1), 1);
   assert.equal(validateBatchSize(1_000), 1_000);
   for (const value of [0, -1, 1.5, 1_001, '10', NaN]) {
-    assert.throws(() => validateBatchSize(value), error => error.code === 'ERR_SYSTEMFABRIC_CHECKOUT_RECONCILIATION_BATCH');
+    assert.throws(() => validateBatchSize(value), error => error.code === 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_RECONCILIATION_BATCH');
   }
 });
 
@@ -139,5 +139,5 @@ test('orders without a Stripe session ID are retained for manual or idempotent r
 
 test('reconciliation validates the database pool before querying', async () => {
   await assert.rejects(reconcileExpiredStripeCheckouts(null), /PostgreSQL-compatible pool/);
-  await assert.rejects(reconcileExpiredStripeCheckouts(fakePool(), { batchSize: 0 }), error => error.code === 'ERR_SYSTEMFABRIC_CHECKOUT_RECONCILIATION_BATCH');
+  await assert.rejects(reconcileExpiredStripeCheckouts(fakePool(), { batchSize: 0 }), error => error.code === 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_RECONCILIATION_BATCH');
 });

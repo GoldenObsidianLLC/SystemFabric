@@ -1,4 +1,4 @@
--- SystemFabric 0.5.3: explicit event-type subscriptions for consumer groups.
+-- VirgoScorpio Hub 0.5.3: explicit event-type subscriptions for consumer groups.
 -- Empty arrays represent an intentionally unsubscribed legacy group (fail closed).
 ALTER TABLE outbox_consumer_groups
   ADD COLUMN IF NOT EXISTS event_types text[] NOT NULL DEFAULT ARRAY[]::text[];

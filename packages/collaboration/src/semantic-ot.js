@@ -54,11 +54,11 @@ function ownKeysMatch(value, allowed) {
 function invalid(message) {
   const error = new Error(message);
   error.statusCode = 400;
-  error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+  error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION';
   return error;
 }
 
-function conflict(message, code = 'ERR_SYSTEMFABRIC_OT_CONFLICT') {
+function conflict(message, code = 'ERR_VIRGOSCORPIO_HUB_OT_CONFLICT') {
   const error = new Error(message);
   error.statusCode = 409;
   error.code = code;
@@ -237,7 +237,7 @@ function transformCollaborationOperation(operation, acceptedOperations = []) {
         if (previousOffset <= offset) {
           offset += insertedLength;
         } else if (previousOffset < end) {
-          throw conflict('A concurrent insertion falls inside the stale delete range.', 'ERR_SYSTEMFABRIC_OT_CONFLICT');
+          throw conflict('A concurrent insertion falls inside the stale delete range.', 'ERR_VIRGOSCORPIO_HUB_OT_CONFLICT');
         }
       } else {
         const mappedStart = mapPointThroughDelete(offset, previousOffset, previous.payload.length);
@@ -273,16 +273,16 @@ function applyCollaborationOperation(document, operation) {
     }
     case 'node.delete': {
       const target = findNode(next, payload.nodeId);
-      if (!target) throw conflict('The operation target was deleted.', 'ERR_SYSTEMFABRIC_OT_TARGET_DELETED');
+      if (!target) throw conflict('The operation target was deleted.', 'ERR_VIRGOSCORPIO_HUB_OT_TARGET_DELETED');
       target.siblings.splice(target.index, 1);
       break;
     }
     case 'node.move': {
       const target = findNode(next, payload.nodeId);
-      if (!target) throw conflict('The operation target was deleted.', 'ERR_SYSTEMFABRIC_OT_TARGET_DELETED');
+      if (!target) throw conflict('The operation target was deleted.', 'ERR_VIRGOSCORPIO_HUB_OT_TARGET_DELETED');
       const destination = getContainer(next, payload.parentId);
       if (destination.node && isWithin(target.node, destination.node.id)) {
-        throw conflict('A node cannot be moved into itself or one of its descendants.', 'ERR_SYSTEMFABRIC_OT_CYCLE');
+        throw conflict('A node cannot be moved into itself or one of its descendants.', 'ERR_VIRGOSCORPIO_HUB_OT_CYCLE');
       }
       if (payload.afterNodeId === payload.nodeId) throw conflict('A node cannot be positioned after itself.');
       target.siblings.splice(target.index, 1);
@@ -292,7 +292,7 @@ function applyCollaborationOperation(document, operation) {
     }
     case 'node.set_prop': {
       const target = findNode(next, payload.nodeId);
-      if (!target) throw conflict('The operation target was deleted.', 'ERR_SYSTEMFABRIC_OT_TARGET_DELETED');
+      if (!target) throw conflict('The operation target was deleted.', 'ERR_VIRGOSCORPIO_HUB_OT_TARGET_DELETED');
       if (!TYPE_PROPS[target.node.type]?.has(payload.key)) throw conflict('The property is not approved for this node type.');
       target.node.props[payload.key] = clone(payload.value);
       break;
@@ -300,7 +300,7 @@ function applyCollaborationOperation(document, operation) {
     case 'text.insert':
     case 'text.delete': {
       const target = findNode(next, payload.nodeId);
-      if (!target) throw conflict('The operation target was deleted.', 'ERR_SYSTEMFABRIC_OT_TARGET_DELETED');
+      if (!target) throw conflict('The operation target was deleted.', 'ERR_VIRGOSCORPIO_HUB_OT_TARGET_DELETED');
       const { type } = target.node;
       const { key, offset } = payload;
       if (!TEXT_NODE_TYPES.has(type) || !TYPE_PROPS[type]?.has(key) || (key === 'cite' && type !== 'widget.quote')) {
@@ -327,7 +327,7 @@ function applyCollaborationOperation(document, operation) {
   if (!validation.valid) {
     const error = new Error(`Operation would create an invalid page document: ${validation.errors.join('; ')}`);
     error.statusCode = 422;
-    error.code = 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT';
+    error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT';
     error.details = validation.errors;
     throw error;
   }

@@ -1,9 +1,9 @@
-# SystemFabric 0.5.1 — preliminary tenant-isolation route/capability map
+# VirgoScorpio Hub 0.5.1 — preliminary tenant-isolation route/capability map
 
-**Repository:** `GoldenObsidianLLC/SystemFabric`
+**Repository:** `GoldenObsidianLLC/VirgoScorpio-Hub`
 **Branch:** `fix/codeql-high-alert-remediation`
 **Reviewed source commit:** `3a378f17635ccb046dca96f3660314c88ad3a260`
-**Coordination gate:** GitHub issue [#14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14)
+**Coordination gate:** GitHub issue [#14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14)
 **Status:** internal static source map and test-coverage preflight; not exhaustive, not an independent review, not a pass/fail assessment.
 
 > **Critical boundary:** no independent tenant-isolation assessment has been performed. This map records code paths and test references observed in the pinned repository. It does not prove that all handlers, SQL statements, stores, projections, or provider callbacks enforce tenant isolation. The independent reviewer must build their own complete inventory, execute adversarial tests, record limitations, and populate the final evidence file for the exact reviewed commit.
@@ -12,7 +12,7 @@
 
 The primary security question is whether a caller, authenticated actor, administrator, background worker, realtime connection, public endpoint, or signed provider callback can read, mutate, infer, or cause side effects against a different site's data without explicit authorization.
 
-SystemFabric has several distinct boundaries:
+VirgoScorpio Hub has several distinct boundaries:
 
 1. **Account/session boundary:** identity, password, MFA, invitation, verification, federation, and session lifecycle.
 2. **Site boundary:** authenticated requests that select or address a site, and the site's rows in PostgreSQL or related stores.
@@ -29,7 +29,7 @@ A green test suite, a route helper, a `site_id` SQL predicate, or a successful C
 `apps/api/src/server.js:348-380` implements `siteIdFor({ req, url, body, actor, required, routeSiteId })`.
 
 It:
-- Collects the route path selector, `x-systemfabric-site-id`, query `siteId`, and body `siteId`.
+- Collects the route path selector, `x-virgoscorpio-hub-site-id`, query `siteId`, and body `siteId`.
 - Rejects repeated query selectors, non-string selector values, malformed UUIDs, and conflicting selectors.
 - Resolves a missing selector from a configured developer default or the actor's sole membership; multi-site actors must select a site when required.
 - For non-developer actors, confirms site membership (using live authorization plus the authenticated membership snapshot as a membership fallback).

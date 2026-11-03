@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '..');
 const evidenceDir = path.join(root, 'artifacts', 'evidence');
 const logLines = [];
 const evidence = {
-  schemaVersion: 1, product: 'SystemFabric', version: '0.5.1',
+  schemaVersion: 1, product: 'VirgoScorpio Hub', version: '0.5.1',
   gate: 'fresh-migrations', generatedAt: new Date().toISOString(),
   status: 'BLOCKED',
   environment: { node: process.version, platform: process.platform, arch: process.arch },
@@ -48,7 +48,7 @@ async function main() {
   if (!/(?:^|[_-])test$/i.test(baseDatabaseName)) throw new Error('Safety stop: TEST_DATABASE_URL database name must end in "test".');
   if (!/^[A-Za-z0-9_]+$/.test(username)) throw new Error('Safety stop: PostgreSQL test role name contains unsupported characters.');
 
-  const targetDatabaseName = 'systemfabric_fresh_' + randomUUID().replaceAll('-', '').slice(0, 12) + '_test';
+  const targetDatabaseName = 'virgoscorpio_hub_fresh_' + randomUUID().replaceAll('-', '').slice(0, 12) + '_test';
   const targetUrl = new URL(testDatabaseUrl);
   targetUrl.pathname = '/' + targetDatabaseName;
   evidence.databaseName = targetDatabaseName;
@@ -73,7 +73,7 @@ async function main() {
 
     const verifyPool = new Pool({ connectionString: targetUrl.toString(), connectionTimeoutMillis: 4000, max: 1 });
     try {
-      const rows = await verifyPool.query('SELECT version FROM systemfabric_schema_migrations ORDER BY version');
+      const rows = await verifyPool.query('SELECT version FROM virgoscorpio_hub_schema_migrations ORDER BY version');
       const actual = rows.rows.map(row => row.version);
       if (actual.length !== migrationFiles.length || actual.some((value, index) => value !== migrationFiles[index])) {
         throw new Error('Migration ledger mismatch: expected 17 ordered versions; found ' + actual.length + '.');

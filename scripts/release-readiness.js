@@ -31,7 +31,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'RELEASE-MANIFEST.json'), 'utf8'));
 const report = {
   schemaVersion: 1,
-  product: 'SystemFabric',
+  product: 'VirgoScorpio Hub',
   version: pkg.version,
   generatedAt: new Date().toISOString(),
   host: { node: process.version, platform: process.platform, arch: process.arch },
@@ -186,7 +186,7 @@ if (!skipTests) {
   const unit = runNode(['--test', '--test-reporter=tap', '--test-concurrency=1', ...unitFiles]);
   const unitLog = saveLog('unit-tests.tap.log', unit.output);
   const unitCounts = parseTap(unit.output);
-  addCheck('unit-tests', 'SystemFabric unit/security tests', unit.exitCode === 0 && unitCounts.fail === 0 ? 'PASS' : 'BLOCKED',
+  addCheck('unit-tests', 'VirgoScorpio Hub unit/security tests', unit.exitCode === 0 && unitCounts.fail === 0 ? 'PASS' : 'BLOCKED',
     `Exit ${unit.exitCode}; ${JSON.stringify(unitCounts)}; ${unit.elapsedMs} ms. Test execution is on ${process.version}.`, unitLog);
 
   const vendorFiles = fs.readdirSync(path.join(root, 'vendor/enginex/test')).filter(file => file.endsWith('.test.js')).sort().map(file => `test/${file}`);
@@ -200,8 +200,8 @@ if (!skipTests) {
   const integrationEnv = configureReleaseRedisIntegrationEnv(process.env);
   // Never point the release-readiness integration sweep at DATABASE_URL implicitly.
   // Opt into database tests only when a dedicated local TEST_DATABASE_URL is configured.
-  delete integrationEnv.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION;
-  delete integrationEnv.SYSTEMFABRIC_RUN_MEMGRAPH_INTEGRATION;
+  delete integrationEnv.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION;
+  delete integrationEnv.VIRGOSCORPIO_HUB_RUN_MEMGRAPH_INTEGRATION;
   const testDatabaseUrl = process.env.TEST_DATABASE_URL;
   const graphUrl = process.env.MEMGRAPH_TEST_URL || process.env.MEMGRAPH_URL;
   let safeTestDatabase = false;
@@ -214,8 +214,8 @@ if (!skipTests) {
   if (safeTestDatabase && graphUrl) {
     integrationEnv.DATABASE_URL = testDatabaseUrl;
     integrationEnv.MEMGRAPH_URL = graphUrl;
-    integrationEnv.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION = 'true';
-    integrationEnv.SYSTEMFABRIC_RUN_MEMGRAPH_INTEGRATION = 'true';
+    integrationEnv.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION = 'true';
+    integrationEnv.VIRGOSCORPIO_HUB_RUN_MEMGRAPH_INTEGRATION = 'true';
   } else {
     delete integrationEnv.DATABASE_URL;
     delete integrationEnv.MEMGRAPH_URL;
@@ -228,7 +228,7 @@ if (!skipTests) {
   addCheck('integration-tests', 'PostgreSQL/Memgraph/product integration tests', integrationStatus,
     `Exit ${integration.exitCode}; ${JSON.stringify(integrationCounts)}; ${integration.elapsedMs} ms. Skipped tests do not count as production validation.`, integrationLog);
 } else {
-  for (const [id, title] of [['syntax-artifact-check', 'Required artifacts and JavaScript syntax'], ['unit-tests', 'SystemFabric unit/security tests'], ['enginex-tests', 'Vendored EnginEx unit tests'], ['integration-tests', 'PostgreSQL/Memgraph/product integration tests']]) {
+  for (const [id, title] of [['syntax-artifact-check', 'Required artifacts and JavaScript syntax'], ['unit-tests', 'VirgoScorpio Hub unit/security tests'], ['enginex-tests', 'Vendored EnginEx unit tests'], ['integration-tests', 'PostgreSQL/Memgraph/product integration tests']]) {
     addCheck(id, title, 'NOT_RUN', 'Skipped because --skip-tests was supplied.');
   }
 }
@@ -358,15 +358,15 @@ supplementalFile('library-reconciliation-dry-run', 'Local library-object reconci
   },
   'Dry-run used TEST_DATABASE_URL and an isolated temporary directory; no candidates or deletions.');
 try {
-  const sbom = JSON.parse(fs.readFileSync(path.join(artifactsDir, 'systemfabric.sbom.cdx.json'), 'utf8'));
+  const sbom = JSON.parse(fs.readFileSync(path.join(artifactsDir, 'virgoscorpio-hub.sbom.cdx.json'), 'utf8'));
   supplemental.push({
     id: 'cyclonedx-sbom-artifact', title: 'CycloneDX SBOM artifact schema',
     status: sbom.bomFormat === 'CycloneDX' && Array.isArray(sbom.components) ? 'PASS' : 'BLOCKED',
-    evidencePath: 'artifacts/systemfabric.sbom.cdx.json',
+    evidencePath: 'artifacts/virgoscorpio-hub.sbom.cdx.json',
     details: `Format ${sbom.bomFormat || 'unknown'} ${sbom.specVersion || ''}; ${sbom.components?.length || 0} components and ${sbom.dependencies?.length || 0} dependency records. Human review/provenance remain open.`
   });
 } catch (error) {
-  supplemental.push({ id: 'cyclonedx-sbom-artifact', title: 'CycloneDX SBOM artifact schema', status: 'MISSING', evidencePath: 'artifacts/systemfabric.sbom.cdx.json', details: error.message });
+  supplemental.push({ id: 'cyclonedx-sbom-artifact', title: 'CycloneDX SBOM artifact schema', status: 'MISSING', evidencePath: 'artifacts/virgoscorpio-hub.sbom.cdx.json', details: error.message });
 }
 report.supplementalEvidence = supplemental;
 
@@ -390,7 +390,7 @@ const escapeMarkdownTableCell = (value) => String(value)
   .replace(/\r?\n/g, ' ');
 const rows = [...report.checks, ...report.evidenceGates].map(item => `| ${escapeMarkdownTableCell(item.title)} | **${item.status}** | ${escapeMarkdownTableCell(item.details)} |`).join('\n');
 const supplementalRows = report.supplementalEvidence.map(item => `| ${escapeMarkdownTableCell(item.title)} | **${item.status}** | ${escapeMarkdownTableCell(item.details)} |`).join('\n');
-const markdown = `# SystemFabric ${pkg.version} — Release Readiness Report\n\n- Generated: ${report.generatedAt}\n- Node.js: ${process.version} (${process.platform}/${process.arch})\n- Production-ready: **${report.readyForProduction ? 'YES' : 'NO'}**\n- Release classification: \`${report.releaseClassification}\`\n- Summary: ${report.summary.pass} pass; ${report.summary.partial} partial; ${report.summary.blocked} blocked; ${report.summary.missingEvidence} missing evidence; ${report.summary.notRun} not run.\n\n> A successful source test suite does not substitute for live integrations, independent review, deployment drills, or parity acceptance. Missing or skipped evidence is not a pass.\n\n| Gate | Status | Details |\n|---|---|---|\n${rows}\n\n## Supplemental local evidence (not included in the formal gate count)\n\nThese additional local checks passed. They do not replace the independent/external acceptance gates above.\n\n| Local check | Status | Details |\n|---|---|---|\n${supplementalRows}\n\nJSON source of truth: \`artifacts/release-readiness.json\`. See \`docs/RELEASE-EVIDENCE.md\` for evidence format.\n`;
+const markdown = `# VirgoScorpio Hub ${pkg.version} — Release Readiness Report\n\n- Generated: ${report.generatedAt}\n- Node.js: ${process.version} (${process.platform}/${process.arch})\n- Production-ready: **${report.readyForProduction ? 'YES' : 'NO'}**\n- Release classification: \`${report.releaseClassification}\`\n- Summary: ${report.summary.pass} pass; ${report.summary.partial} partial; ${report.summary.blocked} blocked; ${report.summary.missingEvidence} missing evidence; ${report.summary.notRun} not run.\n\n> A successful source test suite does not substitute for live integrations, independent review, deployment drills, or parity acceptance. Missing or skipped evidence is not a pass.\n\n| Gate | Status | Details |\n|---|---|---|\n${rows}\n\n## Supplemental local evidence (not included in the formal gate count)\n\nThese additional local checks passed. They do not replace the independent/external acceptance gates above.\n\n| Local check | Status | Details |\n|---|---|---|\n${supplementalRows}\n\nJSON source of truth: \`artifacts/release-readiness.json\`. See \`docs/RELEASE-EVIDENCE.md\` for evidence format.\n`;
 fs.writeFileSync(markdownFile, markdown);
 console.log(markdown);
 console.log(`Wrote ${path.relative(root, jsonFile)} and ${path.relative(root, markdownFile)}.`);

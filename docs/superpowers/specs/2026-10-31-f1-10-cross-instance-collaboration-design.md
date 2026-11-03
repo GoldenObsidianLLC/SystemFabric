@@ -182,7 +182,7 @@ Metric failures remain isolated from publication and WebSocket paths.
 - API tests: REST and WebSocket both route through the shared document publisher and preserve committed acknowledgements when Redis is unavailable.
 - Multi-instance Playwright proof: two separate API server instances, two browser contexts/sessions and actual WebSockets. Prove A-to-B and B-to-A updates, operation order, same-document only, lost Pub/Sub notification repaired while sockets remain connected, and reconnect from a replacement API instance restores state.
 - 2/5/10-editor matrix distributed across two API instances: no missing accepted sequence after reconciliation, no duplicate sequence delivered to a socket, bounded queue sizes, no unhandled errors, and record p50/p95/p99 operation-to-peer-delivery and heartbeat reconciliation latency. The matrix is a correctness/resource baseline, not a production capacity certification.
-- Run the suite against an approved local Redis endpoint with `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true`. Use fake Redis for deterministic failure injection. Do not modify or migrate any primary database.
+- Run the suite against an approved local Redis endpoint with `VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true`. Use fake Redis for deterministic failure injection. Do not modify or migrate any primary database.
 - Run `npm run check`, focused Redis/API/WebSocket tests, multi-instance browser proof and `git diff --check`.
 
 ## 12. Release gates left open after F1.10

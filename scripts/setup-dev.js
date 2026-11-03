@@ -52,7 +52,7 @@ function updateEnvFile({ target = envFile, template = envExample } = {}) {
     // Add test-only endpoints without replacing existing credentials/endpoints.
     let envText = fs.readFileSync(descriptor, 'utf8');
     const defaults = {
-      TEST_DATABASE_URL: 'postgres://systemfabric:systemfabric_dev@127.0.0.1:5432/systemfabric_test',
+      TEST_DATABASE_URL: 'postgres://virgoscorpio_hub:virgoscorpio_hub_dev@127.0.0.1:5432/virgoscorpio_hub_test',
       MEMGRAPH_TEST_URL: 'bolt://127.0.0.1:7687'
     };
     let changed = false;

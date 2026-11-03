@@ -60,7 +60,7 @@ test('site-addressed route families deny a member without the required capabilit
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   });
 
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -99,7 +99,7 @@ test('site-addressed route families deny a member without the required capabilit
       const payload = await response.json();
 
       assert.equal(response.status, 403, 'missing route capability must be denied');
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
       assert.ok(
         authorizationCalls.slice(beforeAuthorization).some(call =>
           call.userId === USER_A && call.siteId === SITE_A && call.capability === route.capability
@@ -167,7 +167,7 @@ test('community group member listing is reachable only with the site moderation 
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   });
 
   const base = 'http://127.0.0.1:' + server.address().port;

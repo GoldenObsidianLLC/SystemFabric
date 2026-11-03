@@ -20,13 +20,13 @@ The backend's terms and configuration must be reviewed for data processing, subp
 
 The contract requires HTTPS OTLP/HTTP endpoints ending exactly in /v1/traces and /v1/logs, TLS 1.2 or later, explicit receiver authentication, private ingress, restricted ingress sources, and controlled egress. It accepts TLS with workload identity, bearer token or API key authentication, or mTLS with certificate identity. The selected reference must point to a deployment-managed secret, identity or certificate; it must never contain the credential value.
 
-The deployment must name its secret manager, rotation owner, rotation interval and last rotation time. Rotation evidence is checked against the deployment-declared interval. mTLS and its authentication mode must agree. Credential references use typed, non-secret identifiers such as secret:observability/receiver, identity:systemfabric/api, or certificate:systemfabric/collector-client; bearer/API-key modes require a secret reference, workload identity requires an identity reference, and mTLS requires a certificate reference.
+The deployment must name its secret manager, rotation owner, rotation interval and last rotation time. Rotation evidence is checked against the deployment-declared interval. mTLS and its authentication mode must agree. Credential references use typed, non-secret identifiers such as secret:observability/receiver, identity:virgoscorpio_hub/api, or certificate:virgoscorpio_hub/collector-client; bearer/API-key modes require a secret reference, workload identity requires an identity reference, and mTLS requires a certificate reference.
 
 ### 3. Access, retention and deletion
 
 The data owner must approve the classification, data-residency statement, retention duration, deletion service level, and legal-hold behavior. The access owner must document the actual authorization model, least-privilege review, access logging, and review cadence. If legal holds are supported, include the approved procedure; if unsupported, record that explicitly.
 
-No retention period or access role is prescribed by SystemFabric. The deployment must use its own approved legal, contractual, privacy and records-management rules.
+No retention period or access role is prescribed by VirgoScorpio Hub. The deployment must use its own approved legal, contractual, privacy and records-management rules.
 
 ### 4. Delivery reliability and capacity
 
@@ -77,4 +77,4 @@ The validator is intentionally strict about unknown keys so that secrets or unre
 
 A successful result means that the declarations are complete and internally consistent under this schema. It does not prove that a provider exists, a secret reference resolves, a TLS certificate is trusted, an ACL is correctly deployed, a queue is durable, an alert fired, a deletion occurred, or a measured test was honestly performed.
 
-SystemFabric remains **NOT_PRODUCTION_CERTIFIED / NO-GO** until all independent security, deployment, operational, backup/restore, legal/governance and release gates are satisfied.
+VirgoScorpio Hub remains **NOT_PRODUCTION_CERTIFIED / NO-GO** until all independent security, deployment, operational, backup/restore, legal/governance and release gates are satisfied.

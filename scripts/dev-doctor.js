@@ -80,7 +80,7 @@ async function main() {
     add(label, reachable, reachable ? `${endpoint.host}:${endpoint.port} accepts TCP connections.` : `Cannot connect to ${endpoint.host}:${endpoint.port}; start Compose services or check the URL.`, false);
   }
 
-  console.log('\nSystemFabric VS Code development preflight');
+  console.log('\nVirgoScorpio Hub VS Code development preflight');
   console.log('==========================================');
   for (const result of results) console.log(`${result.ok ? 'PASS' : (result.fatal ? 'BLOCK' : 'WARN')}  ${result.name}: ${result.details}`);
   const blockers = results.filter(result => !result.ok && result.fatal);

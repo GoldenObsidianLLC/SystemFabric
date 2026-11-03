@@ -1,4 +1,4 @@
--- SystemFabric 0.5.2: keep unregistered legacy outbox event types internal.
+-- VirgoScorpio Hub 0.5.2: keep unregistered legacy outbox event types internal.
 -- New event types must be added to the reviewed DOMAIN_EVENT_CLASSIFICATIONS
 -- registry before they can claim site-private or public classification.
 

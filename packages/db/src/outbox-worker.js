@@ -3,7 +3,7 @@
 const { randomUUID } = require('node:crypto');
 const { eventEnvelopeFromOutboxRow } = require('../../realtime/src/event-contract');
 
-function createOutboxWorker({ pool, projector, workerId = `sf-${randomUUID()}`, batchSize = 25, leaseMs = 30_000, maxAttempts = 10, onError = () => {} }) {
+function createOutboxWorker({ pool, projector, workerId = `vsh-${randomUUID()}`, batchSize = 25, leaseMs = 30_000, maxAttempts = 10, onError = () => {} }) {
   if (!pool || !projector || typeof projector.apply !== 'function') throw new TypeError('pool and projector.apply are required.');
   async function claimBatch() {
     const client = await pool.connect();

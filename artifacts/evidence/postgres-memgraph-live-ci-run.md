@@ -4,7 +4,7 @@
 
 **Application source commit:** `fc95ea3628c88c9bc1eb29e5d07e36edb07fb31a`
 
-**Current-main hosted CI run:** [SystemFabric CI — all five jobs successful](https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/41232584439)
+**Current-main hosted CI run:** [VirgoScorpio Hub CI — all five jobs successful](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41232584439)
 
 **CI commit:** `fc95ea3628c88c9bc1eb29e5d07e36edb07fb31a`
 
@@ -13,16 +13,16 @@
 ## Environment
 
 - Local Windows x64 development environment, Node.js `26.12.1`.
-- Dedicated PostgreSQL test database: `systemfabric_test`, reached through `TEST_DATABASE_URL`.
+- Dedicated PostgreSQL test database: `virgoscorpio_hub_test`, reached through `TEST_DATABASE_URL`.
 - Local Memgraph `memgraph/memgraph:3.13.1` and loopback Memurai/Redis service.
-- Fresh migration verification used a generated disposable database named `systemfabric_fresh_0b58b856619f_test`; only that disposable database was dropped.
+- Fresh migration verification used a generated disposable database named `virgoscorpio_hub_fresh_0b58b856619f_test`; only that disposable database was dropped.
 - The live graph-outage rehearsal used a separate disposable Memgraph `3.13.1` container and restored/removed it after the test.
 - No production database, production graph, or external provider credentials were used.
 
 ## Verified results
 
 1. **Fresh migrations and idempotency:** all 14 migrations applied to an empty disposable PostgreSQL database; a second migration pass skipped all 14; the disposable database was dropped.
-2. **Live PostgreSQL/Memgraph/Redis integration:** `npm run test:integration:live` completed **22 tests, 22 passed, 0 failed, 0 skipped** against the dedicated `systemfabric_test` database and local services.
+2. **Live PostgreSQL/Memgraph/Redis integration:** `npm run test:integration:live` completed **22 tests, 22 passed, 0 failed, 0 skipped** against the dedicated `virgoscorpio_hub_test` database and local services.
 3. **PostgreSQL correctness:** the integration suite covered the v0008 upgrade fixture through the current schema, transaction rollback, concurrent outbox workers, poison-event dead-lettering, projection retries, and tenant/site selector isolation.
 4. **Redis collaboration:** the integration suite exercised real Redis document relay recovery, bounded 2,000-message fan-out to 10 subscribers (20,000 expected and observed deliveries), site/document routing, cross-instance presence and SSE behavior, and authorization invalidation.
 5. **Real Memgraph outage/recovery:** stopping the isolated graph container left the durable event pending and released its lease; after graph restart, the event replayed, projected the expected content, and was not delivered a second time.

@@ -1,4 +1,4 @@
-# SystemFabric Architecture Decision Records
+# VirgoScorpio Hub Architecture Decision Records
 
 ## ADR-001: PostgreSQL is authoritative
 
@@ -28,9 +28,9 @@
 
 ## ADR-005: EnginEx is isolated behind a rendering adapter
 
-**Decision:** SystemFabric uses vendored EnginEx 6.2.0 through `packages/render`. The renderer consumes validated documents and prepared data rather than issuing CMS SQL queries.
+**Decision:** VirgoScorpio Hub uses vendored EnginEx 6.2.0 through `packages/render`. The renderer consumes validated documents and prepared data rather than issuing CMS SQL queries.
 
-**Trade-off:** SystemFabric's supported Node.js minimum follows the vendored package declaration (>=22.23.4); this build has only been locally tested on 22.16.0.
+**Trade-off:** VirgoScorpio Hub's supported Node.js minimum follows the vendored package declaration (>=22.23.4); this build has only been locally tested on 22.16.0.
 
 ## ADR-006: AI is provider-neutral and optional
 
@@ -64,7 +64,7 @@
 
 ## ADR-011: Third-party plugins execute outside the API process
 
-**Decision:** Plugin metadata is registered and reviewed in SystemFabric, while execution is delegated to a separate runner that accepts only pinned, allow-listed OCI image digests and applies runtime constraints.
+**Decision:** Plugin metadata is registered and reviewed in VirgoScorpio Hub, while execution is delegated to a separate runner that accepts only pinned, allow-listed OCI image digests and applies runtime constraints.
 
 **Release gate:** A package archive inspector is not a secure build pipeline. An archive-to-OCI provenance/signature process and adversarial tests against a real isolated runtime remain mandatory. Manifest capability declarations are not themselves a sandbox.
 
@@ -145,7 +145,7 @@
 
 ## ADR-020: Structured logs use opt-in, allow-listed OTLP/HTTP transport
 
-**Decision:** SystemFabric structured application events remain the source interface for operational logs. Each supported process may independently enable the OpenTelemetry Logs SDK and send curated records over OTLP/HTTP to a deployment-managed collector. The provider is private to the SystemFabric structured logger and is not registered globally. Log events use a bounded event key as their body, a strict attribute allow-list, and request-scoped trace/span correlation when available. Export is asynchronous, batched, bounded, best-effort and disabled by default. The local development collector accepts authenticated traces and logs but writes only to its ephemeral debug exporter.
+**Decision:** VirgoScorpio Hub structured application events remain the source interface for operational logs. Each supported process may independently enable the OpenTelemetry Logs SDK and send curated records over OTLP/HTTP to a deployment-managed collector. The provider is private to the VirgoScorpio Hub structured logger and is not registered globally. Log events use a bounded event key as their body, a strict attribute allow-list, and request-scoped trace/span correlation when available. Export is asynchronous, batched, bounded, best-effort and disabled by default. The local development collector accepts authenticated traces and logs but writes only to its ephemeral debug exporter.
 
 **Reason:** OTLP/HTTP separates application instrumentation from collector/backend choice without silently capturing arbitrary process output or application payloads. Reusing the established structured logger preserves its redaction contract and provides a consistent correlation point for API, plugin runner, workers and AI audit events. Independent enablement lets deployments adopt traces and logs at different stages.
 
@@ -162,6 +162,6 @@
 
 **Reason:** OTLP transport is intentionally backend-neutral. Production safety depends on deployment-specific contracts and evidence that cannot be inferred from source code or a local debug Collector. Explicit evidence prevents a passing unit suite, example endpoint, or unreviewed provider choice from being mistaken for production approval.
 
-**Consequences:** SystemFabric does not choose a provider, region, retention period, classification, allowed data-loss tolerance, recovery objective or owner. Those values must come from the deployment's accountable owners and applicable legal/security policies. Evidence references point to an external controlled evidence system; the validator checks their syntax and declared validity, not their contents. Independent reviewers must verify approvals and artifacts. The local manifest is Git-ignored and must not contain secrets or raw telemetry. A structural pass is not production certification.
+**Consequences:** VirgoScorpio Hub does not choose a provider, region, retention period, classification, allowed data-loss tolerance, recovery objective or owner. Those values must come from the deployment's accountable owners and applicable legal/security policies. Evidence references point to an external controlled evidence system; the validator checks their syntax and declared validity, not their contents. Independent reviewers must verify approvals and artifacts. The local manifest is Git-ignored and must not contain secrets or raw telemetry. A structural pass is not production certification.
 
 **Revisit when:** A deployment standardizes a governed backend and infrastructure-as-code workflow, or the OTLP deployment contract changes; update the schema and its release gate with backward-compatible evidence migration.

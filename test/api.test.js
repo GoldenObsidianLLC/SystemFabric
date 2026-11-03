@@ -19,13 +19,13 @@ test('shared secret comparison is byte-safe, constant-time for equal lengths, an
 
 async function withServer(fn, envExtra = {}, serverOptions = {}) {
   const server = createApiServer({
-    env: { NODE_ENV: 'test', SYSTEMFABRIC_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock', MAX_REQUEST_BYTES: '16384', RATE_LIMIT_MAX_REQUESTS: '100', ...envExtra },
+    env: { NODE_ENV: 'test', VIRGOSCORPIO_HUB_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock', MAX_REQUEST_BYTES: '16384', RATE_LIMIT_MAX_REQUESTS: '100', ...envExtra },
     logger: { error() {} },
     ...serverOptions
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   try { await fn(`http://127.0.0.1:${server.address().port}`); }
-  finally { await new Promise(resolve => server.close(resolve)); await server.systemfabric.close(); }
+  finally { await new Promise(resolve => server.close(resolve)); await server.virgoScorpioHub.close(); }
 }
 
 test('health endpoint is public and reports renderer and AI', async () => {
@@ -33,7 +33,7 @@ test('health endpoint is public and reports renderer and AI', async () => {
     const res = await fetch(`${base}/health`);
     const data = await res.json();
     assert.equal(res.status, 200);
-    assert.equal(data.service, 'systemfabric-api');
+    assert.equal(data.service, 'virgoscorpio-hub-api');
     assert.equal(data.version, require('../package.json').version);
     assert.equal(data.ai.provider, 'mock');
   });
@@ -43,7 +43,7 @@ test('API requires bearer token', async () => {
   await withServer(async base => {
     const res = await fetch(`${base}/api/v1/ai/status`);
     assert.equal(res.status, 401);
-    assert.equal((await res.json()).code, 'ERR_SYSTEMFABRIC_UNAUTHORIZED');
+    assert.equal((await res.json()).code, 'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED');
   });
 });
 
@@ -99,7 +99,7 @@ test('client disconnect cancels the governed AI task and releases the request ha
         const abort = () => {
           cancelledResolve();
           reject(Object.assign(new Error('cancelled by client disconnect'), {
-            code: 'ERR_SYSTEMFABRIC_AI_CANCELLED',
+            code: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED',
             statusCode: 499
           }));
         };
@@ -127,8 +127,8 @@ test('client disconnect cancels the governed AI task and releases the request ha
     await taskTerminal;
     assert.equal(providerSignal.aborted, true);
     assert.equal(taskRecord.status, 'cancelled');
-    assert.equal(taskRecord.errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
-  }, { SYSTEMFABRIC_DEFAULT_SITE_ID: siteId }, { aiService, aiTaskStore });
+    assert.equal(taskRecord.errorCode, 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED');
+  }, { VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: siteId }, { aiService, aiTaskStore });
 });
 
 test('preview endpoint returns HTML with restrictive CSP', async () => {
@@ -161,7 +161,7 @@ test('draft persistence is disabled when no database is configured', async () =>
       body: JSON.stringify({ document: draft.document, reviewed: true })
     });
     assert.equal(res.status, 503);
-    assert.equal((await res.json()).code, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED');
+    assert.equal((await res.json()).code, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED');
   });
 });
 
@@ -177,7 +177,7 @@ test('rejects bodies above configured byte limit', async () => {
       body: JSON.stringify({ text: 'x'.repeat(3000), operation: 'rewrite' })
     });
     assert.equal(res.status, 413);
-    assert.equal((await res.json()).code, 'ERR_SYSTEMFABRIC_BODY_TOO_LARGE');
+    assert.equal((await res.json()).code, 'ERR_VIRGOSCORPIO_HUB_BODY_TOO_LARGE');
   }, { MAX_REQUEST_BYTES: '1024' });
 });
 
@@ -197,8 +197,8 @@ test('draft validation rejects malformed IDs and locale tags', () => {
     schemaVersion: 1, documentId: 'doc-1', type: 'page', title: 'My page',
     children: [{ id: 'heading-1', type: 'widget.heading', props: { text: 'Hello', level: 1 }, children: [] }]
   };
-  assert.throws(() => validateSaveDraftBody({ document, id: 'not-a-uuid', reviewed: true }), { code: 'ERR_SYSTEMFABRIC_INVALID_ID' });
-  assert.throws(() => validateSaveDraftBody({ document, locale: 'en\nmalicious', reviewed: true }), { code: 'ERR_SYSTEMFABRIC_INVALID_LOCALE' });
+  assert.throws(() => validateSaveDraftBody({ document, id: 'not-a-uuid', reviewed: true }), { code: 'ERR_VIRGOSCORPIO_HUB_INVALID_ID' });
+  assert.throws(() => validateSaveDraftBody({ document, locale: 'en\nmalicious', reviewed: true }), { code: 'ERR_VIRGOSCORPIO_HUB_INVALID_LOCALE' });
   assert.equal(validateSaveDraftBody({ document, locale: 'en-US', reviewed: true }).locale, 'en-US');
 });
 
@@ -221,20 +221,20 @@ test('session cookie writes require CSRF validation, same-origin context, and Ht
     const cookieHeader = 'sf_session=' + 's'.repeat(43) + '; sf_csrf=' + 'c'.repeat(43);
     const missingOrigin = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(missingOrigin.status, 403);
-    assert.equal((await missingOrigin.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
+    assert.equal((await missingOrigin.json()).code, 'ERR_VIRGOSCORPIO_HUB_CSRF');
     const invalidBearerWithCookie = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, authorization: 'Bearer invalid-token', 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(invalidBearerWithCookie.status, 403, 'an invalid bearer header must not bypass cookie CSRF validation');
-    assert.equal((await invalidBearerWithCookie.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
+    assert.equal((await invalidBearerWithCookie.json()).code, 'ERR_VIRGOSCORPIO_HUB_CSRF');
     const rejected = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, origin: base } });
     assert.equal(rejected.status, 403);
-    assert.equal((await rejected.json()).code, 'ERR_SYSTEMFABRIC_CSRF');
+    assert.equal((await rejected.json()).code, 'ERR_VIRGOSCORPIO_HUB_CSRF');
     const accepted = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { cookie: cookieHeader, origin: base, 'x-csrf-token': 'c'.repeat(43) } });
     assert.equal(accepted.status, 200);
     const bearerAccepted = await fetch(`${base}/api/v1/auth/logout`, { method: 'POST', headers: { authorization: `Bearer ${'s'.repeat(43)}` } });
     assert.equal(bearerAccepted.status, 200, 'valid explicit bearer credentials remain usable without cookie CSRF headers');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
@@ -274,7 +274,7 @@ test('secure-cookie configuration marks the session and CSRF cookies Secure', as
     assert.doesNotMatch(csrfCookie, /; HttpOnly/i, 'CSRF token remains readable for the double-submit header');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
@@ -312,7 +312,7 @@ test('MFA challenge cookie is HttpOnly, Secure when configured, path-limited and
     assert.match(challengeCookie, /; Max-Age=300/i);
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
@@ -321,7 +321,7 @@ test('Platform Hub and its static assets are served without exposing database-ba
     const page = await fetch(`${base}/platform`);
     const html = await page.text();
     assert.equal(page.status, 200);
-    assert.match(html, /SystemFabric Platform Hub/);
+    assert.match(html, /VirgoScorpio Hub Platform Hub/);
     assert.match(html, /platform\.js/);
     const script = await fetch(`${base}/assets/platform.js`);
     assert.equal(script.status, 200);
@@ -353,10 +353,10 @@ test('public commerce catalog paths are reachable without API credentials and fa
     const siteId = '11111111-1111-4111-8111-111111111111';
     const products = await fetch(`${base}/api/v1/public/sites/${siteId}/products`);
     assert.equal(products.status, 503);
-    assert.equal((await products.json()).code, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED');
+    assert.equal((await products.json()).code, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED');
     const plans = await fetch(`${base}/api/v1/public/sites/${siteId}/membership-plans`);
     assert.equal(plans.status, 503);
-    assert.equal((await plans.json()).code, 'ERR_SYSTEMFABRIC_DATABASE_DISABLED');
+    assert.equal((await plans.json()).code, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED');
   });
 });
 
@@ -448,7 +448,7 @@ test('governed AI generation returns a tenant-scoped task ID and status endpoint
       headers: { authorization: 'Bearer test-secret-token' }
     });
     assert.equal(crossSiteResponse.status, 404);
-    assert.equal((await crossSiteResponse.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_NOT_FOUND');
+    assert.equal((await crossSiteResponse.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_NOT_FOUND');
   }, {}, { aiTaskStore });
 });
 
@@ -484,8 +484,8 @@ test('governed AI remains available when the task lifecycle migration has not be
       headers: { authorization: 'Bearer test-secret-token' }
     });
     assert.equal(taskResponse.status, 503);
-    assert.equal((await taskResponse.json()).code, 'ERR_SYSTEMFABRIC_AI_TASKS_DISABLED');
-  }, { SYSTEMFABRIC_DEFAULT_SITE_ID: siteId }, { aiTaskStore });
+    assert.equal((await taskResponse.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASKS_DISABLED');
+  }, { VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: siteId }, { aiTaskStore });
 });
 
 test('a task-status persistence failure does not discard a completed AI proposal', async () => {
@@ -543,7 +543,7 @@ test('AI task state records provider failures without retaining prompt or respon
     },
     async generatePageDraft() {
       throw Object.assign(new Error('simulated provider outage'), {
-        code: 'ERR_SYSTEMFABRIC_TEST_PROVIDER_UNAVAILABLE',
+        code: 'ERR_VIRGOSCORPIO_HUB_TEST_PROVIDER_UNAVAILABLE',
         statusCode: 503
       });
     }
@@ -557,7 +557,7 @@ test('AI task state records provider failures without retaining prompt or respon
     });
     assert.equal(response.status, 503);
     assert.equal(task.status, 'failed');
-    assert.equal(task.errorCode, 'ERR_SYSTEMFABRIC_TEST_PROVIDER_UNAVAILABLE');
+    assert.equal(task.errorCode, 'ERR_VIRGOSCORPIO_HUB_TEST_PROVIDER_UNAVAILABLE');
     assert.equal(Object.hasOwn(task, 'prompt'), false);
     assert.equal(Object.hasOwn(task, 'response'), false);
   }, {}, { aiTaskStore, aiService });
@@ -613,7 +613,7 @@ test('AI task collection paginates with actor, site, and filter-bound cursors', 
       headers: { authorization: 'Bearer test-secret-token' }
     });
     assert.equal(crossSite.status, 400);
-    assert.equal((await crossSite.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_CURSOR_INVALID');
+    assert.equal((await crossSite.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_CURSOR_INVALID');
   }, {}, { aiTaskStore });
 });
 
@@ -623,12 +623,12 @@ test('AI task collection rejects duplicate and invalid query parameters', async 
     const headers = { authorization: 'Bearer test-secret-token' };
     const duplicate = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&limit=2&limit=3', { headers });
     assert.equal(duplicate.status, 400);
-    assert.equal((await duplicate.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_QUERY_INVALID');
+    assert.equal((await duplicate.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_QUERY_INVALID');
     const invalidLimit = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&limit=51', { headers });
     assert.equal(invalidLimit.status, 400);
-    assert.equal((await invalidLimit.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_LIMIT_INVALID');
+    assert.equal((await invalidLimit.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_LIMIT_INVALID');
     const invalidStatus = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&status=unknown', { headers });
     assert.equal(invalidStatus.status, 400);
-    assert.equal((await invalidStatus.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_STATUS_INVALID');
+    assert.equal((await invalidStatus.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_STATUS_INVALID');
   }, {}, { aiTaskStore });
 });

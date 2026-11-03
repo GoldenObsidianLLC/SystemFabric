@@ -1,11 +1,11 @@
-# SystemFabric API Contracts v1
+# VirgoScorpio Hub API Contracts v1
 
 ## Common behavior
 
 - Base prefix: `/api/v1`.
 - JSON request bodies are bounded by `MAX_REQUEST_BYTES` by default; media uploads use a separate bounded ceiling. A request identifier is emitted in `x-request-id` and error JSON.
 - Errors use `{ "error", "code", "requestId", "details?" }`.
-- Interactive browser clients use an HttpOnly `sf_session` cookie plus the `sf_csrf` cookie and `x-csrf-token` header on unsafe requests. Bearer `SYSTEMFABRIC_API_TOKEN` is a local development facility and is rejected in production mode.
+- Interactive browser clients use an HttpOnly `sf_session` cookie plus the `sf_csrf` cookie and `x-csrf-token` header on unsafe requests. Bearer `VIRGOSCORPIO_HUB_API_TOKEN` is a local development facility and is rejected in production mode.
 - Site-bound APIs require a verified membership/capability or a local development token. An explicitly selected `siteId` is recommended even when the user belongs to one site.
 - Public page delivery reads immutable published snapshots; it never returns a draft body.
 

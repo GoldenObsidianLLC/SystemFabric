@@ -96,7 +96,7 @@ test('provider transport distinguishes caller cancellation from its own timeout'
   await started;
   controller.abort(new Error('test client disconnect'));
 
-  await assert.rejects(pending, { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 });
+  await assert.rejects(pending, { code: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED', statusCode: 499 });
   assert.equal(transportSignal.aborted, true);
 
   await assert.rejects(
@@ -111,7 +111,7 @@ test('provider transport distinguishes caller cancellation from its own timeout'
         })
       }
     ),
-    { code: 'ERR_SYSTEMFABRIC_AI_TIMEOUT' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_TIMEOUT' }
   );
 });
 
@@ -143,6 +143,6 @@ test('OpenAI Responses provider forwards caller cancellation into its HTTP reque
   await started;
   controller.abort(new Error('caller disconnected'));
 
-  await assert.rejects(pending, { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 });
+  await assert.rejects(pending, { code: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED', statusCode: 499 });
   assert.equal(transportSignal.aborted, true);
 });

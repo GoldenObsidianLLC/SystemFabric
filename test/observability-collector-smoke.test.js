@@ -9,7 +9,7 @@ const { configureLocalCollector } = require('../scripts/configure-otel-dev');
 const { smokeTestLocalCollector } = require('../scripts/test-otel-collector');
 
 function temporaryRoot(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'systemfabric-otel-smoke-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'virgoscorpio_hub-otel-smoke-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -52,7 +52,7 @@ test('collector smoke test proves auth rejection and OTLP acceptance for traces 
   assert.equal(tracePayload.resourceSpans[0].scopeSpans[0].spans[0].name, 'collector.authenticated_smoke');
   assert.equal(tracePayload.resourceSpans[0].scopeSpans[0].spans.length, 1);
   const logsPayload = JSON.parse(requests[3].options.body);
-  assert.equal(logsPayload.resourceLogs[0].scopeLogs[0].logRecords[0].body.stringValue, 'systemfabric.observability.logs_smoke');
+  assert.equal(logsPayload.resourceLogs[0].scopeLogs[0].logRecords[0].body.stringValue, 'virgoscorpio_hub.observability.logs_smoke');
   assert.equal(logsPayload.resourceLogs[0].scopeLogs[0].logRecords.length, 1);
   assert.equal(JSON.stringify(result).includes(token), false);
 });
@@ -63,8 +63,8 @@ test('collector smoke test never sends traces or logs to endpoints other than lo
   const envFile = path.join(root, '.env');
   const env = fs.readFileSync(envFile, 'utf8');
   fs.writeFileSync(envFile, env.replace(
-    'SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=http://127.0.0.1:4318/v1/logs',
-    'SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=https://external.example/v1/logs'
+    'VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT=http://127.0.0.1:4318/v1/logs',
+    'VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT=https://external.example/v1/logs'
   ));
 
   let calls = 0;

@@ -1,8 +1,8 @@
-# SystemFabric Research & Collaboration
+# VirgoScorpio Hub Research & Collaboration
 
 ## Purpose
 
-SystemFabric is an early-stage, open-source modular Node.js platform developed through Golden Obsidian LLC.
+VirgoScorpio Hub is an early-stage, open-source modular Node.js platform developed through Golden Obsidian LLC.
 
 The project brings together application services for content workflows, identity, commerce, community, AI integrations, and extensible application functionality.
 
@@ -16,7 +16,7 @@ This is an invitation to collaborate and investigate—not a claim that the proj
 
 ### 1. PostgreSQL and Memgraph Consistency and Recovery
 
-SystemFabric uses PostgreSQL for transactional and relational workflows and Memgraph for graph projections.
+VirgoScorpio Hub uses PostgreSQL for transactional and relational workflows and Memgraph for graph projections.
 
 Research questions include:
 
@@ -46,7 +46,7 @@ Security findings should be reported through the project's [Security Policy](SEC
 
 ### 3. Plugin Execution Isolation
 
-SystemFabric contains plugin-related validation and execution components. The security of an actual execution sandbox must be evaluated in its intended runtime.
+VirgoScorpio Hub contains plugin-related validation and execution components. The security of an actual execution sandbox must be evaluated in its intended runtime.
 
 Research questions include:
 
@@ -75,7 +75,7 @@ Research should produce repeatable procedures and evidence rather than relying o
 
 ### 5. External Provider and Workflow Validation
 
-SystemFabric includes integration paths involving services such as Stripe, AI providers, email, object storage, and malware scanning.
+VirgoScorpio Hub includes integration paths involving services such as Stripe, AI providers, email, object storage, and malware scanning.
 
 Potential work includes:
 
@@ -105,7 +105,7 @@ Negative results are valuable. Demonstrating that an approach is unsuitable can 
 
 ## Research Integrity and Expectations
 
-SystemFabric values reproducibility, technical accuracy, constructive criticism, and transparent reporting.
+VirgoScorpio Hub values reproducibility, technical accuracy, constructive criticism, and transparent reporting.
 
 Contributors should:
 
@@ -122,7 +122,7 @@ See [GOVERNANCE.md](GOVERNANCE.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [CON
 
 ## Funding and Compensation
 
-SystemFabric is currently an unfunded open-source project.
+VirgoScorpio Hub is currently an unfunded open-source project.
 
 There is no established paid research program, contributor compensation program, official donation channel, or formal sponsorship or grant program.
 
@@ -136,8 +136,8 @@ Please do not send money through unofficial channels or assume that a funding op
 
 The best starting points are:
 
-* [GitHub Discussions](https://github.com/GoldenObsidianLLC/SystemFabric/discussions) — research questions, ideas, and technical conversations.
-* [GitHub Issues](https://github.com/GoldenObsidianLLC/SystemFabric/issues) — scoped tasks, bugs, and proposed improvements.
+* [GitHub Discussions](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/discussions) — research questions, ideas, and technical conversations.
+* [GitHub Issues](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues) — scoped tasks, bugs, and proposed improvements.
 * [Architecture](docs/ARCHITECTURE.md) — the current application and data-flow overview.
 * [Roadmap](docs/ROADMAP.md) — planned engineering and reliability work.
 * [Release Readiness](docs/RELEASE_READINESS.md) — outstanding evidence and certification requirements.

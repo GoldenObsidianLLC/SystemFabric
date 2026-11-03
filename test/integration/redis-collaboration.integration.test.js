@@ -67,11 +67,11 @@ function operation(opId, title) {
   };
 }
 
-const redisUrl = process.env.SYSTEMFABRIC_TEST_REDIS_URL || '';
-const enabled = process.env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION === 'true' && approvedRedisUrl(redisUrl);
+const redisUrl = process.env.VIRGOSCORPIO_HUB_TEST_REDIS_URL || '';
+const enabled = process.env.VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION === 'true' && approvedRedisUrl(redisUrl);
 
 test('real Redis document Pub/Sub routes only to the matching site and document', { skip: !enabled }, async t => {
-  const channelPrefix = 'systemfabric:test:f1-10:' + randomUUID();
+  const channelPrefix = 'virgoscorpio_hub:test:f1-10:' + randomUUID();
   const hubA = createHub();
   const hubB = createHub();
   let bridgeA;
@@ -123,7 +123,7 @@ test('real Redis document Pub/Sub routes only to the matching site and document'
 });
 
 test('real Redis document publish remains local-first and reports relay failure as degraded', { skip: !enabled }, async t => {
-  const channelPrefix = 'systemfabric:test:f1-10:' + randomUUID();
+  const channelPrefix = 'virgoscorpio_hub:test:f1-10:' + randomUUID();
   const hubA = createHub();
   const hubB = createHub();
   let bridgeA;

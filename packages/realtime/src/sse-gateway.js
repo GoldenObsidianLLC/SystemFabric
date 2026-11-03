@@ -50,7 +50,7 @@ function createSseGateway({ hub, heartbeatMs = 15_000, metrics = null, connectio
 
   async function handle(req, res, { principal, siteId, topic = 'presence', sessionId = null, expiresAt = null }) {
     if (gatewayClosed) {
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_CLOSED', 'The SSE gateway is shutting down.');
+      throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_CLOSED', 'The SSE gateway is shutting down.');
     }
     const openedAt = Date.now();
     const lease = connectionLimiter
@@ -123,7 +123,7 @@ function createSseGateway({ hub, heartbeatMs = 15_000, metrics = null, connectio
           if (!blocked && !res.destroyed && !res.writableEnded) {
             res.write('event: reconnect-required\ndata: {"reason":"connection-lease-expired","recovery":"snapshot-refresh"}\n\n');
           }
-          subscription.close(realtimeError(429, 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_EXPIRED', 'The real-time connection lease expired.'));
+          subscription.close(realtimeError(429, 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_EXPIRED', 'The real-time connection lease expired.'));
           return;
         }
         if (typeof hub.reauthorize === 'function' && !(await hub.reauthorize(subscription))) {
@@ -136,7 +136,7 @@ function createSseGateway({ hub, heartbeatMs = 15_000, metrics = null, connectio
           return;
         }
       } catch {
-        subscription.close(realtimeError(503, 'ERR_SYSTEMFABRIC_REALTIME_UNAVAILABLE', 'The real-time connection requires recovery.'));
+        subscription.close(realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_REALTIME_UNAVAILABLE', 'The real-time connection requires recovery.'));
         return;
       } finally {
         reauthorizing = false;
