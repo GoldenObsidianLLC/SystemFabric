@@ -433,6 +433,7 @@ test('governed AI generation returns a tenant-scoped task ID and status endpoint
     const aiStatus = await aiStatusResponse.json();
     assert.equal(aiStatus.durableTaskStatus, true);
     assert.equal(aiStatus.capabilities.includes('task-status'), true);
+    assert.equal(aiStatus.capabilities.includes('task-list'), false);
 
     const statusResponse = await fetch(base + '/api/v1/ai/tasks/' + taskId + '?siteId=' + siteA, {
       headers: { authorization: 'Bearer test-secret-token' }
@@ -560,4 +561,74 @@ test('AI task state records provider failures without retaining prompt or respon
     assert.equal(Object.hasOwn(task, 'prompt'), false);
     assert.equal(Object.hasOwn(task, 'response'), false);
   }, {}, { aiTaskStore, aiService });
+});
+
+test('AI task collection paginates with actor, site, and filter-bound cursors', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const otherSiteId = '22222222-2222-4222-8222-222222222222';
+  const firstTask = {
+    id: '33333333-3333-4333-8333-333333333333', siteId, requestId: 'request-a',
+    taskType: 'page_draft', status: 'succeeded', provider: 'mock', model: 'mock-v1',
+    inputChars: 10, outputChars: 20, latencyMs: 30, errorCode: null, version: 3,
+    createdAt: '2026-11-02T20:00:00.000Z', startedAt: null, completedAt: null, updatedAt: '2026-11-02T20:00:00.000Z'
+  };
+  const secondTask = { ...firstTask, id: '44444444-4444-4444-8444-444444444444', createdAt: '2026-11-02T19:00:00.000Z' };
+  const calls = [];
+  const aiTaskStore = {
+    async isAvailable() { return true; },
+    async list(input) {
+      calls.push(input);
+      return calls.length === 1 ? { tasks: [firstTask], hasMore: true } : { tasks: [secondTask], hasMore: false };
+    }
+  };
+
+  await withServer(async base => {
+    const query = 'siteId=' + siteId + '&limit=1&status=succeeded&taskType=page_draft';
+    const firstResponse = await fetch(base + '/api/v1/ai/tasks?' + query, {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(firstResponse.status, 200);
+    const firstPage = await firstResponse.json();
+    assert.equal(firstPage.tasks.length, 1);
+    assert.equal(firstPage.tasks[0].id, firstTask.id);
+    assert.equal(typeof firstPage.nextCursor, 'string');
+    assert.equal(calls[0].siteId, siteId);
+    assert.equal(calls[0].status, 'succeeded');
+    assert.equal(calls[0].taskType, 'page_draft');
+    assert.equal(calls[0].limit, 1);
+    assert.equal(calls[0].before, null);
+
+    const secondResponse = await fetch(base + '/api/v1/ai/tasks?' + query + '&cursor=' + encodeURIComponent(firstPage.nextCursor), {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(secondResponse.status, 200);
+    const secondPage = await secondResponse.json();
+    assert.equal(secondPage.tasks[0].id, secondTask.id);
+    assert.equal(secondPage.nextCursor, null);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].before.id, firstTask.id);
+    assert.equal(calls[1].before.createdAt, firstTask.createdAt);
+
+    const crossSite = await fetch(base + '/api/v1/ai/tasks?siteId=' + otherSiteId + '&limit=1&status=succeeded&taskType=page_draft&cursor=' + encodeURIComponent(firstPage.nextCursor), {
+      headers: { authorization: 'Bearer test-secret-token' }
+    });
+    assert.equal(crossSite.status, 400);
+    assert.equal((await crossSite.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_CURSOR_INVALID');
+  }, {}, { aiTaskStore });
+});
+
+test('AI task collection rejects duplicate and invalid query parameters', async () => {
+  const aiTaskStore = { async isAvailable() { return true; }, async list() { return { tasks: [], hasMore: false }; } };
+  await withServer(async base => {
+    const headers = { authorization: 'Bearer test-secret-token' };
+    const duplicate = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&limit=2&limit=3', { headers });
+    assert.equal(duplicate.status, 400);
+    assert.equal((await duplicate.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_QUERY_INVALID');
+    const invalidLimit = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&limit=51', { headers });
+    assert.equal(invalidLimit.status, 400);
+    assert.equal((await invalidLimit.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_LIMIT_INVALID');
+    const invalidStatus = await fetch(base + '/api/v1/ai/tasks?siteId=11111111-1111-4111-8111-111111111111&status=unknown', { headers });
+    assert.equal(invalidStatus.status, 400);
+    assert.equal((await invalidStatus.json()).code, 'ERR_SYSTEMFABRIC_AI_TASK_STATUS_INVALID');
+  }, {}, { aiTaskStore });
 });

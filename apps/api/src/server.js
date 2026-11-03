@@ -149,6 +149,45 @@ function createRateLimiter(env) {
 function fail(statusCode, code, message, details) {
   const error = new Error(message); error.statusCode = statusCode; error.code = code; if (details) error.details = details; return error;
 }
+const AI_TASK_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'blocked']);
+const AI_TASK_TYPES = new Set(['page_draft', 'content_assist', 'seo', 'translate']);
+function encodeAITaskCursor({ task, siteId, actorId, status, taskType }) {
+  const createdAt = new Date(task.createdAt);
+  if (!ID_RE.test(task.id) || !Number.isFinite(createdAt.getTime())) {
+    throw fail(500, 'ERR_SYSTEMFABRIC_AI_TASK_CURSOR_SOURCE_INVALID', 'The task list could not produce a valid pagination cursor.');
+  }
+  const payload = { v: 1, siteId, actorId, status, taskType, createdAt: createdAt.toISOString(), id: task.id };
+  return Buffer.from(JSON.stringify(payload)).toString('base64url');
+}
+function decodeAITaskCursor(value, expected) {
+  const invalidCursor = () => fail(400, 'ERR_SYSTEMFABRIC_AI_TASK_CURSOR_INVALID', 'cursor is invalid or does not match this actor, site, or filter set.');
+  if (typeof value !== 'string' || value.length < 1 || value.length > 2048 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw invalidCursor();
+  }
+  let payload;
+  try {
+    const decoded = Buffer.from(value, 'base64url');
+    if (decoded.toString('base64url') !== value) throw new Error('Non-canonical cursor encoding.');
+    payload = JSON.parse(decoded.toString('utf8'));
+  } catch {
+    throw invalidCursor();
+  }
+  const keys = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? Object.keys(payload).sort().join(',')
+    : '';
+  if (keys !== 'actorId,createdAt,id,siteId,status,taskType,v' ||
+      payload.v !== 1 || payload.siteId !== expected.siteId ||
+      payload.actorId !== expected.actorId || payload.status !== expected.status ||
+      payload.taskType !== expected.taskType || typeof payload.createdAt !== 'string' ||
+      !ID_RE.test(payload.id)) {
+    throw invalidCursor();
+  }
+  const createdAt = new Date(payload.createdAt);
+  if (!Number.isFinite(createdAt.getTime()) || createdAt.toISOString() !== payload.createdAt) {
+    throw invalidCursor();
+  }
+  return { createdAt: payload.createdAt, id: payload.id };
+}
 function validateSaveDraftBody(body) {
   if (!body || typeof body !== 'object' || !body.document || typeof body.document !== 'object') throw fail(400, 'ERR_SYSTEMFABRIC_DOCUMENT_REQUIRED', 'document is required.');
   const validation = validatePageDocument(body.document);
@@ -1429,15 +1468,53 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         return sendJson(res, 200, { ...result, reauthenticationRequired: true, requestId });
       }
       if (req.method === 'GET' && url.pathname === '/api/v1/ai/status') {
-        const taskStatusAvailable = Boolean(await getAvailableAITaskStore());
+        const taskStore = await getAvailableAITaskStore();
+        const taskStatusAvailable = Boolean(taskStore);
+        const taskListAvailable = Boolean(taskStore && typeof taskStore.list === 'function');
         return sendJson(res, 200, {
           ...ai.providerInfo(),
-          capabilities: ['page-draft','content-assist','seo-suggestion','translation','document-validation','preview','widget-suggestion', ...(taskStatusAvailable ? ['task-status'] : [])],
+          capabilities: ['page-draft','content-assist','seo-suggestion','translation','document-validation','preview','widget-suggestion', ...(taskStatusAvailable ? ['task-status'] : []), ...(taskListAvailable ? ['task-list'] : [])],
           requiresHumanReviewForDraftPersistence: true,
           durableTaskStatus: taskStatusAvailable,
           requestId
         });
       }
+      if (req.method === 'GET' && url.pathname === '/api/v1/ai/tasks') {
+        const taskStore = await getAvailableAITaskStore();
+        if (!taskStore || typeof taskStore.list !== 'function') {
+          return sendJson(res, 503, { error: 'AI task history requires PostgreSQL and the AI task collection store.', code: 'ERR_SYSTEMFABRIC_AI_TASK_LIST_DISABLED', requestId });
+        }
+        for (const name of ['siteId', 'limit', 'status', 'taskType', 'cursor']) {
+          if (url.searchParams.getAll(name).length > 1) {
+            throw fail(400, 'ERR_SYSTEMFABRIC_AI_TASK_QUERY_INVALID', name + ' must be provided at most once.');
+          }
+        }
+        const siteId = await ensureSiteCapabilityForAI(actor, url, {}, 'ai:use');
+        if (!siteId) throw fail(400, 'ERR_SYSTEMFABRIC_SITE_REQUIRED', 'Select a site using the siteId query parameter.');
+        const limitValue = url.searchParams.get('limit');
+        const limit = limitValue === null ? 20 : Number(limitValue);
+        if (limitValue !== null && (!/^\d{1,2}$/.test(limitValue) || !Number.isSafeInteger(limit) || limit < 1 || limit > 50)) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_AI_TASK_LIMIT_INVALID', 'limit must be an integer between 1 and 50.');
+        }
+        const status = url.searchParams.get('status');
+        const taskType = url.searchParams.get('taskType');
+        if (status !== null && !AI_TASK_STATUSES.has(status)) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_AI_TASK_STATUS_INVALID', 'status is not a supported AI task status.');
+        }
+        if (taskType !== null && !AI_TASK_TYPES.has(taskType)) {
+          throw fail(400, 'ERR_SYSTEMFABRIC_AI_TASK_TYPE_INVALID', 'taskType is not supported.');
+        }
+        const actorId = actor.user?.id || null;
+        const cursorValue = url.searchParams.get('cursor');
+        const before = cursorValue === null ? null : decodeAITaskCursor(cursorValue, { siteId, actorId, status, taskType });
+        const result = await taskStore.list({ siteId, actorId, status, taskType, limit, before });
+        const tasks = Array.isArray(result?.tasks) ? result.tasks : [];
+        const nextCursor = result?.hasMore && tasks.length
+          ? encodeAITaskCursor({ task: tasks[tasks.length - 1], siteId, actorId, status, taskType })
+          : null;
+        return sendJson(res, 200, { tasks, nextCursor, requestId });
+      }
+
       const aiTaskPrefix = '/api/v1/ai/tasks/';
       const aiTaskId = url.pathname.startsWith(aiTaskPrefix) ? url.pathname.slice(aiTaskPrefix.length) : '';
       const aiTaskMatch = /^[0-9a-f-]{36}$/i.test(aiTaskId) ? [null, aiTaskId] : null;

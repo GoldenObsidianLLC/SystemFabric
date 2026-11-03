@@ -214,3 +214,42 @@ test('AI task store detects whether the lifecycle migration is installed', async
   assert.equal(await readyStore.isAvailable(), true);
   assert.equal(await missingStore.isAvailable(), false);
 });
+
+test('AI task store lists actor/site-scoped tasks with bounded keyset pagination', async () => {
+  let captured;
+  const createdAt = '2026-11-02T20:00:00.000Z';
+  const rows = [taskId, '44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555'].map((id, index) => ({
+    id, site_id: siteId, request_id: 'request-' + index, task_type: 'page_draft',
+    status: 'succeeded', provider: 'mock', model: 'mock-v1', input_chars: 10,
+    output_chars: 20, latency_ms: 30, error_code: null, task_version: 3,
+    created_at: new Date(Date.parse(createdAt) - index), started_at: new Date(createdAt),
+    completed_at: new Date(createdAt), updated_at: new Date(createdAt)
+  }));
+  const store = createAITaskStore({
+    pool: { async query(sql, values) { captured = { sql, values }; return { rows }; } }
+  });
+  const page = await store.list({
+    siteId, actorId, status: 'succeeded', taskType: 'page_draft', limit: 2,
+    before: { createdAt, id: taskId }
+  });
+  assert.equal(page.tasks.length, 2);
+  assert.equal(page.tasks[0].id, taskId);
+  assert.equal(page.hasMore, true);
+  assert.ok(captured.sql.includes('site_id=$1'));
+  assert.ok(captured.sql.includes('actor_id IS NOT DISTINCT FROM $2::uuid'));
+  assert.ok(captured.sql.includes('ORDER BY created_at DESC,id DESC'));
+  assert.ok(captured.sql.includes('LIMIT $7'));
+  assert.deepEqual(captured.values, [siteId, actorId, 'succeeded', 'page_draft', createdAt, taskId, 3]);
+  assert.equal(Object.hasOwn(page.tasks[0], 'prompt'), false);
+  assert.equal(Object.hasOwn(page.tasks[0], 'output'), false);
+});
+
+test('AI task store rejects invalid list filters, limits, and cursors before querying', async () => {
+  let calls = 0;
+  const store = createAITaskStore({ pool: { async query() { calls += 1; return { rows: [] }; } } });
+  await assert.rejects(store.list({ siteId, actorId, status: 'unknown' }), { statusCode: 400 });
+  await assert.rejects(store.list({ siteId, actorId, taskType: 'shell' }), { statusCode: 400 });
+  await assert.rejects(store.list({ siteId, actorId, limit: 51 }), { statusCode: 400 });
+  await assert.rejects(store.list({ siteId, actorId, before: { createdAt: 'not-a-date', id: taskId } }), { statusCode: 400 });
+  assert.equal(calls, 0);
+});

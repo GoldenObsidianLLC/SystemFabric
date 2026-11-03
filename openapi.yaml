@@ -220,6 +220,35 @@ paths:
       summary: AI provider status without credentials
       responses:
         '200': { description: Provider and task capability metadata }
+  /api/v1/ai/tasks:
+    get:
+      summary: List the caller's metadata-only AI task history
+      parameters:
+        - in: query
+          name: siteId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - in: query
+          name: status
+          required: false
+          schema: { type: string, enum: [queued, running, succeeded, failed, cancelled, blocked] }
+        - in: query
+          name: taskType
+          required: false
+          schema: { type: string, enum: [page_draft, content_assist, seo, translate] }
+        - in: query
+          name: cursor
+          required: false
+          schema: { type: string, maxLength: 2048 }
+      responses:
+        '200': { description: Actor/site-scoped task page with an optional nextCursor bookmark; task payloads exclude prompts and model output }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: PostgreSQL or the AI task collection store is unavailable }
   /api/v1/ai/tasks/{taskId}:
     get:
       summary: Retrieve the caller's metadata-only AI task status

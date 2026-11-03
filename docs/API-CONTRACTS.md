@@ -54,6 +54,7 @@
 ## AI and MCP
 
 - `GET /api/v1/ai/status` — configured provider/model status without credentials; reports whether PostgreSQL-backed task status is available.
+- `GET /api/v1/ai/tasks?siteId=...` — list metadata-only AI task history for the same actor/site with `ai:use`; supports bounded keyset pagination (default 20, maximum 50), status/task-type filters, and actor/site/filter-bound cursors.
 - `GET /api/v1/ai/tasks/{taskId}?siteId=...` — retrieve metadata-only task state for the same actor/site with `ai:use`; available after migration `0017` is applied.
 - `POST /api/v1/ai/page-draft` — return a validated, unsaved page proposal.
 - `POST /api/v1/ai/content-assist` — return a content edit suggestion.
