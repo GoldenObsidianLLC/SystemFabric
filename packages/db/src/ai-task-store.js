@@ -2,6 +2,7 @@
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TASK_TYPES = new Set(['page_draft', 'content_assist', 'seo', 'translate']);
+const TASK_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'blocked']);
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'blocked']);
 
 function invalid(message, code = 'ERR_SYSTEMFABRIC_AI_TASK_INVALID') {
@@ -156,6 +157,50 @@ function createAITaskStore({ pool }) {
       });
       if (existing.status === status) return toTask(existing);
       throw conflict('AI task is already terminal or cannot transition to the requested state.');
+    },
+
+    async list({ siteId, actorId = null, status = null, taskType = null, limit = 20, before = null }) {
+      requireUuid(siteId, 'siteId');
+      requireUuid(actorId, 'actorId', true);
+      if (status !== null && !TASK_STATUSES.has(status)) {
+        throw invalid('status is not a supported AI task status.');
+      }
+      if (taskType !== null && !TASK_TYPES.has(taskType)) throw invalid('taskType is not supported.');
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50) {
+        throw invalid('limit must be an integer between 1 and 50.');
+      }
+
+      let beforeCreatedAt = null;
+      let beforeId = null;
+      if (before !== null) {
+        if (!before || typeof before !== 'object' || Array.isArray(before) ||
+            typeof before.createdAt !== 'string' || !Number.isFinite(Date.parse(before.createdAt)) ||
+            new Date(before.createdAt).toISOString() !== before.createdAt) {
+          throw invalid('before must contain a canonical createdAt timestamp and task UUID.');
+        }
+        beforeCreatedAt = before.createdAt;
+        beforeId = requireUuid(before.id, 'before.id');
+      }
+
+      const result = await pool.query(
+        `SELECT id,site_id,request_id,task_type,status,provider,model,
+                input_chars,output_chars,latency_ms,error_code,task_version,
+                created_at,started_at,completed_at,updated_at
+           FROM ai_tasks
+          WHERE site_id=$1
+            AND actor_id IS NOT DISTINCT FROM $2::uuid
+            AND ($3::text IS NULL OR status=$3)
+            AND ($4::text IS NULL OR task_type=$4)
+            AND ($5::timestamptz IS NULL OR (created_at,id) < ($5::timestamptz,$6::uuid))
+          ORDER BY created_at DESC,id DESC
+          LIMIT $7`,
+        [siteId, actorId, status, taskType, beforeCreatedAt, beforeId, limit + 1]
+      );
+      const rows = Array.isArray(result.rows) ? result.rows : [];
+      return {
+        tasks: rows.slice(0, limit).map(toTask),
+        hasMore: rows.length > limit
+      };
     },
 
     async get({ taskId, siteId, actorId = null }) {
