@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const { createPostgresPool, createPostgresStore } = require('../../packages/db/src/postgres-store');
+const { createAITaskStore } = require('../../packages/db/src/ai-task-store');
 const { createOutboxWorker } = require('../../packages/db/src/outbox-worker');
 const { eventEnvelopeFromOutboxRow } = require('../../packages/realtime/src/event-contract');
 
@@ -437,4 +438,78 @@ test('PostgreSQL integration: expired delivery leases are reclaimed after worker
     [inserted.rows[0].id, consumerGroup]
   );
   assert.deepEqual(state.rows[0], { status: 'processed', attempts: 2, locked_by: null });
+});
+
+
+test('PostgreSQL integration: metadata-only AI task state is durable and actor/site scoped', { skip: !enabled }, async t => {
+  const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '3' });
+  const siteId = (await pool.query(
+    'INSERT INTO sites(slug,name) VALUES($1,$2) RETURNING id',
+    ['ai-task-' + randomUUID().slice(0, 8), 'AI Task Integration']
+  )).rows[0].id;
+  const actorId = (await pool.query(
+    'INSERT INTO users(email,display_name) VALUES($1,$2) RETURNING id',
+    ['ai-task-' + randomUUID() + '@example.test', 'AI Task Integration Actor']
+  )).rows[0].id;
+  const store = createAITaskStore({ pool });
+
+  t.after(async () => {
+    await pool.query('DELETE FROM sites WHERE id=$1', [siteId]);
+    await pool.query('DELETE FROM users WHERE id=$1', [actorId]);
+    await pool.end();
+  });
+
+  const queued = await store.create({
+    siteId,
+    actorId,
+    requestId: 'integration-' + randomUUID(),
+    taskType: 'page_draft',
+    inputChars: 120
+  });
+  assert.equal(queued.status, 'queued');
+  assert.equal(await store.get({
+    taskId: queued.id,
+    siteId,
+    actorId: '99999999-9999-4999-8999-999999999999'
+  }), null);
+
+  const running = await store.start({
+    taskId: queued.id,
+    siteId,
+    provider: 'mock',
+    model: 'integration-v1'
+  });
+  assert.equal(running.status, 'running');
+  const complete = await store.finish({
+    taskId: queued.id,
+    siteId,
+    status: 'succeeded',
+    outputChars: 240,
+    latencyMs: 25
+  });
+  assert.equal(complete.status, 'succeeded');
+  assert.equal(complete.version, 3);
+  assert.ok(complete.completedAt);
+
+  const queuedCancellation = await store.create({
+    siteId,
+    actorId,
+    requestId: 'integration-' + randomUUID(),
+    taskType: 'translate',
+    inputChars: 40
+  });
+  const cancelled = await store.finish({
+    taskId: queuedCancellation.id,
+    siteId,
+    status: 'cancelled',
+    errorCode: 'ERR_SYSTEMFABRIC_AI_CANCELLED'
+  });
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(cancelled.errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
+  assert.ok(cancelled.completedAt);
+
+  const persisted = await pool.query('SELECT * FROM ai_tasks WHERE id=$1', [queued.id]);
+  assert.equal(persisted.rows[0].status, 'succeeded');
+  assert.equal(Object.hasOwn(persisted.rows[0], 'prompt'), false);
+  assert.equal(Object.hasOwn(persisted.rows[0], 'response'), false);
 });

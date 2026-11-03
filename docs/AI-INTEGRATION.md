@@ -67,6 +67,16 @@ Returns `title`, `description`, and `keywords` as suggestions. Review facts, cha
 
 Translation is a proposal and must preserve placeholders, legal notices, and brand terms according to project-specific rules.
 
+## Task status and persisted metadata
+
+When PostgreSQL is configured and migration `0017_ai_task_lifecycle.sql` has been applied, each governed generation response includes a `taskId`. The caller can retrieve its task metadata with:
+
+`GET /api/v1/ai/tasks/{taskId}?siteId={siteId}`
+
+The status endpoint requires the existing `ai:use` site capability and returns a task only to the same actor in the same site. It exposes the lifecycle state (`queued`, `running`, `succeeded`, `failed`, `cancelled`, or `blocked`), provider/model identifiers, character counts, latency, timestamps, and a sanitized error code. Task records do not store prompts, site context, source text, or generated output. Without the migration-backed task store, responses omit `taskId`, `durableTaskStatus` is false, and the `task-status` capability is not advertised.
+
+These records track the lifecycle of the synchronous HTTP request; they do not represent an independently scheduled worker queue. A client disconnect cancels provider work. Leases, crash recovery, retries, resumability, task retention/deletion policy, quotas, and provider fallback are not implemented by this contract.
+
 ### 5. Validate and preview
 
 - `POST /api/v1/pages/validate` validates the document against the domain contract.
