@@ -782,8 +782,6 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           // codeql[js/clear-text-storage-of-sensitive-data]
-
-
           res.setHeader('set-cookie', cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
           return sendJson(res, 200, { authenticated: false, mfaRequired: true, user: { id: session.user.id, email: session.user.email }, expiresAt: session.expiresAt, requestId });
         }
@@ -807,8 +805,6 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
          */
         // Required browser transport: the opaque random session is digest-stored and HttpOnly; CSRF remains a separate double-submit token.
         // codeql[js/clear-text-storage-of-sensitive-data]
-
-
         res.setHeader('set-cookie', [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('vsh_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
         return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
       }
@@ -883,8 +879,6 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           // codeql[js/clear-text-storage-of-sensitive-data]
-
-
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
         }
         const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
@@ -916,8 +910,6 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
            */
           // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
           // codeql[js/clear-text-storage-of-sensitive-data]
-
-
           res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
           return res.end();
         }
