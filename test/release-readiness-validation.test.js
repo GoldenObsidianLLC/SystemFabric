@@ -29,15 +29,15 @@ function git(cwd, args) {
 test('fresh migration evidence must match the current migration count and idempotency result', () => {
   const current = {
     status: 'PASS',
-    migrationCount: 17,
-    firstPass: '17/17 migrations applied',
-    secondPass: '17/17 migrations skipped as already applied',
+    migrationCount: 18,
+    firstPass: '18/18 migrations applied',
+    secondPass: '18/18 migrations skipped as already applied',
     cleanup: 'disposable database dropped',
   };
-  assert.equal(isFreshMigrationEvidence(current, 17), true);
-  assert.equal(isFreshMigrationEvidence(current, 16), false);
-  assert.equal(isFreshMigrationEvidence({ ...current, secondPass: '15/15 migrations skipped as already applied' }, 17), false);
-  assert.equal(isFreshMigrationEvidence({ ...current, status: 'BLOCKED' }, 17), false);
+  assert.equal(isFreshMigrationEvidence(current, 18), true);
+  assert.equal(isFreshMigrationEvidence(current, 17), false);
+  assert.equal(isFreshMigrationEvidence({ ...current, secondPass: '15/15 migrations skipped as already applied' }, 18), false);
+  assert.equal(isFreshMigrationEvidence({ ...current, status: 'BLOCKED' }, 18), false);
 });
 
 test('Playwright validation requires a positive passed count and rejects failures or skips', () => {

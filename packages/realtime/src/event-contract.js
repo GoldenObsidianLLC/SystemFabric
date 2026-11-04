@@ -2,7 +2,7 @@
 
 const EVENT_SCHEMA_VERSION = 1;
 const MAX_EVENT_PAYLOAD_BYTES = 64 * 1024;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE } = require('../../domain/src/identifiers');
 const EVENT_TYPE_RE = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const AGGREGATE_TYPE_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 const CLASSIFICATIONS = new Set(['internal', 'site-private', 'public']);

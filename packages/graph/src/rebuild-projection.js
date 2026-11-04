@@ -1,5 +1,7 @@
 'use strict';
 
+const { withTransaction } = require('../../db/src/transaction');
+
 /**
  * Rebuild the Memgraph projection from canonical PostgreSQL records.
  *
@@ -13,10 +15,7 @@
  *   terms are projected as active records; taxonomy deletion is not inferred.
  */
 async function readCanonicalSnapshot(pool, maxRows) {
-  const client = await pool.connect();
-
-  try {
-    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+  return withTransaction(pool, async client => {
 
     const countsResult = await client.query(`
       SELECT
@@ -61,8 +60,6 @@ async function readCanonicalSnapshot(pool, maxRows) {
        ORDER BY id
     `);
 
-    await client.query('COMMIT');
-
     const snapshot = {
       content: contentResult.rows,
       taxonomy: taxonomyResult.rows,
@@ -82,12 +79,7 @@ async function readCanonicalSnapshot(pool, maxRows) {
     }
 
     return snapshot;
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
+  }, { mode: 'readOnlyRepeatableRead' });
 }
 
 async function clearProjection(driver) {

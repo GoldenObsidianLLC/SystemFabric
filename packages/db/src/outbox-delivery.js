@@ -6,7 +6,7 @@ const { withSpan } = require('../../observability/src/tracing');
 
 const CONSUMER_GROUP_PATTERN = /^[a-z][a-z0-9._-]{0,99}$/;
 const EVENT_TYPE_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE: UUID_PATTERN } = require('../../domain/src/identifiers');
 const REPLAYABLE_STATUSES = new Set(['dead', 'processed']);
 
 function validateConsumerGroup(consumerGroup) {

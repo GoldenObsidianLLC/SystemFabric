@@ -2,7 +2,7 @@
 
 const { randomUUID } = require('node:crypto');
 
-const SITE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE: SITE_ID_RE } = require('../../domain/src/identifiers');
 const TOPIC_RE = /^[a-z][a-z0-9]*(?:[._:-][a-z0-9]+)*$/;
 
 function realtimeError(statusCode, code, message) {

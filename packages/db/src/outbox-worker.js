@@ -2,13 +2,15 @@
 
 const { randomUUID } = require('node:crypto');
 const { eventEnvelopeFromOutboxRow } = require('../../realtime/src/event-contract');
+const { withTransaction } = require('./transaction');
 
 function createOutboxWorker({ pool, projector, workerId = `vsh-${randomUUID()}`, batchSize = 25, leaseMs = 30_000, maxAttempts = 10, onError = () => {} }) {
-  if (!pool || !projector || typeof projector.apply !== 'function') throw new TypeError('pool and projector.apply are required.');
+  if (!pool || typeof pool.query !== 'function' || typeof pool.connect !== 'function' ||
+      !projector || typeof projector.apply !== 'function') {
+    throw new TypeError('A PostgreSQL pool and projector.apply are required.');
+  }
   async function claimBatch() {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
+    return withTransaction(pool, async client => {
       const selected = await client.query(
         `SELECT id,aggregate_type,aggregate_id,aggregate_version,event_type,payload,attempts,
                 schema_version,site_id,actor_id,correlation_id,causation_id,classification,created_at
@@ -23,10 +25,8 @@ function createOutboxWorker({ pool, projector, workerId = `vsh-${randomUUID()}`,
           [selected.rows.map(row => row.id), workerId, leaseMs]
         );
       }
-      await client.query('COMMIT');
       return selected.rows;
-    } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
-    finally { client.release(); }
+    });
   }
   async function processOne(event) {
     try {
