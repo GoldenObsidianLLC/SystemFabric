@@ -1,0 +1,108 @@
+# Codebase Optimization Review — 4 November 2026
+
+**Baseline:** `main` at `a8ca0afec79cf68258906de2cdc65e1a347c1053` (PR #61).
+**Working branch:** `refactor/codebase-patterns-2026-11`.
+**Release candidate:** `0.5.2` (SemVer patch; unreleased).
+**Scope:** repository-wide source/test inventory and pattern scan, followed by representative implementation review. This is an engineering architecture review, not an independent security audit or production-readiness certification.
+
+## Executive summary
+
+The repository has useful package seams and several already-centralized cross-cutting helpers. The highest-return optimization was not a broad rewrite: it was to remove repeated PostgreSQL transaction lifecycle boilerplate from two cohesive modules and route those transactions through the existing `withTransaction` helper. The change preserves the domain SQL, ordering, tenant predicates, advisory locks, and response contracts.
+
+The review deliberately leaves large, policy-sensitive modules intact. Their size is a genuine maintainability concern, but extracting them without strong route-family and authorization seams would increase risk rather than improve architecture.
+
+## Review method and inventory
+
+The scan enumerated **198 JavaScript source and test files** across `apps/`, `packages/`, `scripts/`, and `test/` (10 app files, 76 package files, 26 script files, and 86 test files). It compared repeated transaction lifecycles, identifier handling, output encoding, request parsing, error normalization, worker lifecycle patterns, and module/file-size pressure points. It also reviewed the existing architecture map, roadmap, prior architecture review, and representative implementations/tests.
+
+Pattern-search results were treated as leads, not as proof that two code paths have identical contracts. Several representative call paths were inspected in detail. This method is broad and systematic, but it is not a line-by-line audit of every implementation, test, configuration, or dependency.
+
+## Reusable modules already established
+
+The repository now has these shared modules:
+
+- `packages/domain/src/version.js` (added in this candidate) — derives the SemVer product version from the root package metadata and is reused by verification, CI evidence, migration evidence, and OpenTelemetry defaults so version bumps do not leave stale runtime literals behind.
+- `packages/domain/src/identifiers.js` — canonical UUID syntax and validation.
+- `packages/security/src/output-encoding.js` — HTML text and quoted-attribute encoding. It is not a general sanitizer for script, CSS, URL, or raw markup contexts.
+- `packages/db/src/transaction.js` — explicit PostgreSQL transaction modes, client acquisition/release, commit, best-effort rollback, and preservation of the original failure.
+- `packages/observability/src/trace-identifiers.js` — canonical trace/span/flags/request identifier syntax.
+
+The current change extends the transaction helper to the community workflows and Stripe checkout reconciliation modules.
+
+## Changes implemented in 0.5.2
+
+### Community transaction lifecycle
+
+`packages/community/src/workflows.js` now uses `withTransaction` for all five manually managed transactions:
+
+1. Direct conversation creation.
+2. Message creation and notification fan-out.
+3. Report submission, including serialized rate-limit accounting.
+4. Report status changes and dismissal audit records.
+5. Activity/message moderation and moderation audit records.
+
+The transaction callbacks return result data. HTTP response writing occurs only after the helper has committed and released the PostgreSQL client. Existing authorization checks, site-scoped SQL predicates, advisory locks, state transitions, notification writes, and response status/payload shapes remain in place.
+
+### Checkout reconciliation
+
+`packages/billing/src/checkout-reconciliation.js` now uses the same transaction helper for the locked pending-order reconciliation. The callback returns a small outcome (`paid`, `expired`, or `held`); in-memory summary counters are updated only after the transaction helper has resolved successfully. This keeps the reported summary aligned with committed transitions rather than work attempted inside a transaction.
+
+### Regression coverage
+
+New community workflow tests verify that direct conversation creation commits before the response is returned, releases its client, and rolls back/releases when the block policy denies creation. Existing transaction and checkout reconciliation tests were included in the focused run.
+
+**Focused validation:** 21 tests passed, 0 failed, 0 skipped across `community-workflows`, `checkout-reconciliation`, and `db-transaction` suites. The full repository check is recorded in CI/PR evidence for this candidate.
+
+No database migration, external provider call, or public HTTP contract change was introduced.
+
+## Architecture pressure points
+
+The largest application and package modules found by the inventory include:
+
+| Module | Approx. lines | Assessment |
+| --- | ---: | --- |
+| `apps/api/src/server.js` | 2,484 | API composition, routing, authorization dispatch, and domain orchestration are too concentrated. Extract cohesive route families behind narrow explicit contexts; keep authentication, site resolution, and policy enforcement authoritative. |
+| `scripts/ci-evidence.js` | 742 | Large evidence aggregation module. Consider separating evidence schemas/validation from report formatting only where the contract is stable. |
+| `packages/realtime/src/websocket-gateway.js` | 696 | Complex authorization, reconnect, subscription, quotas, and lifecycle behavior. Prefer internal helpers with behavior-focused tests; preserve delivery guarantees. |
+| `packages/db/src/postgres-store.js` | 651 | Several content persistence capabilities share tenant and revision invariants. Extract by cohesive data capability, not by arbitrary file size. |
+| `packages/realtime/src/redis-realtime.js` | 609 | Keep ephemeral transport/fan-out semantics explicit and separate from durable PostgreSQL event delivery. |
+| `packages/auth/src/service.js` | 546 | Candidate internal seams include session lifecycle, MFA, verification, invitations, and site membership. Retain one authoritative identity and authorization model. |
+| `apps/api/src/platform-routes.js` | 552 | Move route families incrementally, passing only the dependencies and policy functions they require. |
+| `apps/admin/assets/studio.js` | 502 | Potential UI module split by editor responsibility; preserve browser event and state contracts. |
+
+These are prioritization signals, not mandates to split every large file.
+
+## Reuse opportunities and boundaries
+
+### High-value next steps
+
+1. **API route-family extraction (P1).** Start with a bounded route family whose dependencies are explicit. Its interface should receive a small context containing only required stores, policy checks, and response helpers. Do not pass the entire server closure or a broad mutable registry.
+2. **Authentication module deepening (P1).** Identify cohesive internal seams for session, MFA, verification, invitations, and site membership. Keep credential verification, authorization, audit, and invalidation ordering explicit; prove each extraction with existing security tests.
+3. **Remaining transaction adoption (P1).** Evaluate smaller persistence modules individually. Adopt `withTransaction` when a block is genuinely one PostgreSQL transaction and all external effects can safely remain outside it. Continue with authentication or content persistence only after each operation's side effects and invariants are mapped.
+4. **Content-store capabilities (P2).** Consider separating revision/publication and owner-scoped read capabilities behind narrow store interfaces. Preserve site/actor predicates close to the queries and test against the store seam.
+5. **Real-time internals (P2).** Extract helpers only where lease, authorization, backpressure, and reconnect behavior can be defined independently and tested without weakening the gateway's delivery guarantees.
+
+### Deliberately not generalized
+
+- **Worker loops:** outbox delivery, graph projection, mail, scheduler, and AI task processing differ in durability, acknowledgment, ordering, lease, retry, and idempotency semantics. Do not create one generic worker abstraction until two concrete adapters demonstrably share the same contract.
+- **HTTP body parsing:** API and plugin-runner paths have different body limits, trust contexts, and failure responses. Define the complete parsing contract before sharing implementation.
+- **Error-code normalization:** provider/database/application error identifiers have different fallback and allow-list requirements. Agree on semantics before centralizing.
+- **Constant-time comparisons:** callers have different input encodings, empty-secret handling, and policy gates. Share only a byte comparison primitive if it does not absorb those caller policies.
+- **Object storage and filesystem work:** library upload/replacement crosses PostgreSQL and object storage/filesystem. Those systems do not share one atomic transaction. Retain explicit compensating cleanup/reconciliation rather than hiding external effects inside a generic SQL helper.
+- **Rendering encoders:** context-specific escaping remains context-specific. HTML encoding is not a replacement for URL validation, JavaScript serialization, CSS escaping, or trusted markup policy.
+
+## SemVer and release notes
+
+Version is advanced from **0.5.1 to 0.5.2**, a patch increment under Semantic Versioning: these are compatible internal refactors and regression tests, with no declared public API contract change. The version is an **unreleased candidate**; no release tag or package publication is implied. The release manifest remains `EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED`.
+
+## Verification limits and safety
+
+- A clean `npm ci --no-audit --no-fund` completed on Windows / Node.js 26.12.1.
+- The focused test suites passed 22/22 after the transaction refactors.
+- Full `npm run check` passed on this candidate: 189 required artifact paths, 200 JavaScript files syntax-checked, and 427 tests (424 passed, 0 failed, 3 platform-specific skips). The three skips are explicitly reported by the test suite; none is a failure.
+- `npm audit --audit-level=high` reported 0 vulnerabilities on this installed dependency tree.
+- Local PostgreSQL/Memgraph live integration was not independently run during this review unless the candidate CI evidence explicitly says otherwise.
+- GitHub Code Scanning was checked against the base `main` commit `a8ca0af` on 4 November 2026: five open alerts were reported on that exact commit (four High `js/clear-text-storage-of-sensitive-data` findings in `apps/api/src/server.js` at lines 844, 866, 939, and 969; one Medium `js/unsafe-code-construction` finding in `vendor/enginex/engine-legacy.js` at line 569). They remain open and were not dismissed or waived. Recheck after the candidate merge; a successful build or unit suite is not a security audit.
+- The work does not certify production readiness, provider connectivity, disaster recovery, capacity, accessibility, or external integration behavior.
+
+**Design rule:** deepen a module only where it reduces the facts callers must know. Prefer a small interface with a strong implementation, and keep domain policy, authorization, and cross-system consistency visible where contracts differ.

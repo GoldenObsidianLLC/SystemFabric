@@ -2,6 +2,16 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
+## 0.5.2 (unreleased patch candidate)
+
+### Architecture and maintainability
+
+- Reuse the shared PostgreSQL transaction lifecycle module across all five community workflow transactions and Stripe checkout reconciliation; keep response writes outside transactions and update reconciliation counters only after commit succeeds.
+- Add commit/rollback/client-release regression coverage for community conversation creation and checkout reconciliation commit failure; the focused community, checkout-reconciliation, and transaction suites pass 22/22.
+- Add a canonical product-version module derived from `package.json`, then reuse it in verification, CI/SBOM evidence, fresh-migration evidence, and OpenTelemetry service-version defaults to prevent hard-coded version drift.
+- Add the 4 November 2026 repository-wide codebase optimization review, covering the 198-file baseline inventory, current module-size pressure points, reusable-pattern boundaries, and staged architecture priorities.
+- Bump the package and lockfile version from 0.5.1 to 0.5.2 as a SemVer patch. No public HTTP contract or database migration change is intended; this is an unreleased candidate, not a published release.
+
 ## Unreleased
 
 ### Documentation and assurance

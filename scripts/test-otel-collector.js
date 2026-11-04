@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadEnvFile } = require('./load-env');
 const { readRegularFile } = require('./configure-otel-dev');
+const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 
 const LOCAL_TRACE_URL = 'http://127.0.0.1:4318/v1/traces';
 const LOCAL_LOGS_URL = 'http://127.0.0.1:4318/v1/logs';
@@ -117,7 +118,7 @@ function createSmokeLogPayload(now = Date.now()) {
         }]
       },
       scopeLogs: [{
-        scope: { name: 'virgoscorpio-hub.local-collector-smoke', version: '0.5.1' },
+        scope: { name: 'virgoscorpio-hub.local-collector-smoke', version: PRODUCT_VERSION },
         logRecords: [{
           timeUnixNano: timestamp,
           observedTimeUnixNano: timestamp,

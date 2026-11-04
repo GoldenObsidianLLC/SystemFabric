@@ -4,6 +4,7 @@ const {
   releaseOrderStockReservations,
   commitOrderStockReservations
 } = require('../../commerce/src/stock-reservations');
+const { withTransaction } = require('../../db/src/transaction');
 
 const MAX_BATCH_SIZE = 1_000;
 const DEFAULT_BATCH_SIZE = 100;
@@ -107,10 +108,7 @@ async function reconcileExpiredStripeCheckouts(pool, {
       continue;
     }
 
-    const client = await pool.connect();
-    let transitioned = false;
-    try {
-      await client.query('BEGIN');
+    const outcome = await withTransaction(pool, async client => {
       const current = await client.query(
         `SELECT id,site_id,status,provider_session_id
            FROM commerce_orders
@@ -119,43 +117,35 @@ async function reconcileExpiredStripeCheckouts(pool, {
         [order.site_id, order.order_id]
       );
       const row = current.rows[0];
-      if (row && row.status === 'pending_payment' && row.provider_session_id === order.provider_session_id) {
-        if (isExpired) {
-          const update = await client.query(
-            `UPDATE commerce_orders SET status='failed',updated_at=now()
-              WHERE site_id=$1 AND id=$2 AND status='pending_payment'
-                AND provider_session_id=$3 RETURNING id`,
-            [order.site_id, order.order_id, order.provider_session_id]
-          );
-          if (update.rows[0]) {
-            await releaseOrderStockReservations(client, { siteId: order.site_id, orderId: order.order_id, status: 'expired' });
-            transitioned = true;
-            summary.expired += 1;
-          }
-        } else {
-          const paymentIntent = typeof session.payment_intent === 'string' ? session.payment_intent : null;
-          const update = await client.query(
-            `UPDATE commerce_orders SET status='paid',provider='stripe',provider_session_id=$3,
-                    provider_payment_id=COALESCE($4,provider_payment_id),updated_at=now()
-              WHERE site_id=$1 AND id=$2 AND status='pending_payment'
-                AND provider_session_id=$3 RETURNING id`,
-            [order.site_id, order.order_id, order.provider_session_id, paymentIntent]
-          );
-          if (update.rows[0]) {
-            await commitOrderStockReservations(client, { siteId: order.site_id, orderId: order.order_id });
-            transitioned = true;
-            summary.paid += 1;
-          }
-        }
+      if (!row || row.status !== 'pending_payment' || row.provider_session_id !== order.provider_session_id) {
+        return 'held';
       }
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally {
-      client.release();
-    }
-    if (!transitioned) summary.held += 1;
+      if (isExpired) {
+        const update = await client.query(
+          `UPDATE commerce_orders SET status='failed',updated_at=now()
+            WHERE site_id=$1 AND id=$2 AND status='pending_payment'
+              AND provider_session_id=$3 RETURNING id`,
+          [order.site_id, order.order_id, order.provider_session_id]
+        );
+        if (!update.rows[0]) return 'held';
+        await releaseOrderStockReservations(client, { siteId: order.site_id, orderId: order.order_id, status: 'expired' });
+        return 'expired';
+      }
+      const paymentIntent = typeof session.payment_intent === 'string' ? session.payment_intent : null;
+      const update = await client.query(
+        `UPDATE commerce_orders SET status='paid',provider='stripe',provider_session_id=$3,
+                provider_payment_id=COALESCE($4,provider_payment_id),updated_at=now()
+          WHERE site_id=$1 AND id=$2 AND status='pending_payment'
+            AND provider_session_id=$3 RETURNING id`,
+        [order.site_id, order.order_id, order.provider_session_id, paymentIntent]
+      );
+      if (!update.rows[0]) return 'held';
+      await commitOrderStockReservations(client, { siteId: order.site_id, orderId: order.order_id });
+      return 'paid';
+    });
+    if (outcome === 'expired') summary.expired += 1;
+    else if (outcome === 'paid') summary.paid += 1;
+    else summary.held += 1;
   }
   return summary;
 }
