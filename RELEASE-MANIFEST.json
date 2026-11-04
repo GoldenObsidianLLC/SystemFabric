@@ -1,7 +1,7 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
@@ -190,31 +190,103 @@
       "disposition": "Open; not dismissed or waived."
     }
   },
+  "authArchitectureRefactor": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "70335d74fd0ddaeb70eb76aee3a7ad0c5b40ae91",
+    "branch": "fix/security-hardening-2026-11",
+    "modules": [
+      "apps/api/src/auth-routes.js",
+      "apps/api/src/auth-cookies.js"
+    ],
+    "responsibilities": {
+      "authRoutes": "Public login/recovery/SSO and authenticated account/session/MFA route handlers with explicit injected dependencies.",
+      "authCookies": "Cookie parsing, strict authentication cookie serialization, and constant-time CSRF double-submit comparison."
+    },
+    "preservedInServer": [
+      "HTTP request lifecycle and route dispatch",
+      "session authentication and server-side token digest validation",
+      "site authorization and capability checks",
+      "same-origin and CSRF enforcement before authenticated route handling"
+    ],
+    "publicHttpContractChanged": false,
+    "databaseMigrationsAdded": false,
+    "codeScanningDisposition": "No alerts dismissed or waived. Re-evaluate on the candidate commit; cookie alerts require security-owner review and the vendored unsafe legacy template alert remains an explicit unsafe-compatibility decision."
+  },
+  "versionHistory": [
+    {
+      "version": "0.5.3",
+      "changeType": "patch",
+      "status": "unreleased-candidate",
+      "date": "2026-11-04",
+      "summary": "Extract auth route and cookie protocol modules; validate cookie serialization attributes without changing browser auth contracts."
+    }
+  ],
+  "historicalValidation": {
+    "0.5.2": {
+      "reviewedAt": "2026-11-04",
+      "branch": "refactor/codebase-patterns-2026-11",
+      "runtime": {
+        "node": "26.12.1",
+        "platform": "win32",
+        "arch": "x64"
+      },
+      "artifactCheck": {
+        "status": "PASS",
+        "requiredPaths": 189,
+        "javascriptFilesSyntaxChecked": 200
+      },
+      "unitTests": {
+        "status": "PASS",
+        "tests": 427,
+        "passed": 424,
+        "failed": 0,
+        "skipped": 3
+      },
+      "focusedTests": {
+        "status": "PASS",
+        "tests": 22,
+        "passed": 22,
+        "failed": 0,
+        "skipped": 0
+      },
+      "npmAuditHigh": {
+        "status": "PASS",
+        "vulnerabilities": 0
+      },
+      "hostedCi": "PASS (Node 22/24, PostgreSQL/Memgraph, browser/accessibility, CodeQL, evidence consolidation).",
+      "productionCertified": false
+    }
+  },
   "candidateValidation": {
     "reviewedAt": "2026-11-04",
-    "branch": "refactor/codebase-patterns-2026-11",
+    "branch": "fix/security-hardening-2026-11",
     "runtime": {
       "node": "26.12.1",
       "platform": "win32",
       "arch": "x64"
     },
-    "npmCi": "PASS (180 packages installed; no dependency versions changed for this patch).",
+    "semver": {
+      "previousVersion": "0.5.2",
+      "candidateVersion": "0.5.3",
+      "changeType": "patch",
+      "released": false
+    },
     "artifactCheck": {
       "status": "PASS",
-      "requiredPaths": 189,
-      "javascriptFilesSyntaxChecked": 200
+      "requiredPaths": 192,
+      "javascriptFilesSyntaxChecked": 203
     },
     "unitTests": {
       "status": "PASS",
-      "tests": 427,
-      "passed": 424,
+      "tests": 431,
+      "passed": 428,
       "failed": 0,
       "skipped": 3
     },
     "focusedTests": {
       "status": "PASS",
-      "tests": 22,
-      "passed": 22,
+      "tests": 33,
+      "passed": 33,
       "failed": 0,
       "skipped": 0
     },
@@ -222,7 +294,7 @@
       "status": "PASS",
       "vulnerabilities": 0
     },
-    "livePostgresMemgraphIntegration": "NOT_RUN_LOCALLY; requires external services and separate integration evidence.",
+    "hostedCi": "PENDING_PULL_REQUEST",
     "productionCertified": false
   }
 }

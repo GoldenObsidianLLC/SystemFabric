@@ -2,6 +2,16 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
+## 0.5.3 (unreleased patch candidate)
+
+### Security and API architecture
+
+- Extract browser authentication route families from the API composition module into `apps/api/src/auth-routes.js`, separating unauthenticated login/recovery/SSO routes from authenticated account/session/MFA routes while retaining session authentication, site policy, Origin checks, and CSRF enforcement in the API request pipeline.
+- Centralize authentication cookie parsing, serialization, and CSRF double-submit comparison in `apps/api/src/auth-cookies.js`; validate cookie names, opaque token values, flags, expiry, SameSite, and path attributes before emitting Set-Cookie headers.
+- Add regression coverage for cookie attribute safety and preserve the existing login, MFA, session, and CSRF HTTP behavior.
+- Record the CodeQL alert re-review without dismissing or waiving the four High cookie findings or the Medium legacy template-code finding. The alerts require explicit security-owner disposition; this refactor does not claim they are fixed.
+- Bump the package and lockfile from 0.5.2 to 0.5.3 as a SemVer patch. No public HTTP contract or database migration change is intended; this remains an unreleased developer-preview candidate.
+
 ## 0.5.2 (unreleased patch candidate)
 
 ### Architecture and maintainability

@@ -51,3 +51,15 @@ This finding is not being represented as a false positive. Keep the legacy path 
 - VirgoScorpio Hub remains `NOT_PRODUCTION_CERTIFIED`; no production release approval is implied.
 
 No vendor, assessor, contractor, subscription, or paid service was engaged for this work.
+
+## Revalidation on 2026-11-04
+
+**Reviewed repository baseline:** `70335d74fd0ddaeb70eb76aee3a7ad0c5b40ae91` (PR #62 merge).
+
+GitHub Code Scanning was queried on this baseline after PR #62. It still reported five open findings: #30–#33 (High, `js/clear-text-storage-of-sensitive-data`, four auth-cookie writes in `apps/api/src/server.js`) and #14 (Medium, `js/unsafe-code-construction`, the vendored EnginEx legacy renderer). The alerts were open on the exact baseline commit, not dismissed or waived.
+
+The 0.5.3 candidate moves browser auth route handling into `apps/api/src/auth-routes.js` and the cookie parser/serializer/CSRF comparison into `apps/api/src/auth-cookies.js`. The serializer now rejects unsafe cookie names, non-base64url token values, invalid flags/expiry/SameSite settings, insecure `SameSite=None`, and unsafe paths. Existing session and MFA cookies remain opaque bearer tokens by design; this change does not encrypt or replace them, and it does not establish that the High findings are false positives or resolved.
+
+The Medium EnginEx alert is unchanged. The application does not opt into legacy `<?njs ?>` execution; the safe renderer continues to reject it by default. The explicit legacy compatibility adapter remains unsafe and must not receive user-authored or AI-authored templates.
+
+**Disposition:** no alert has been dismissed or suppressed. Re-evaluate the exact current-branch CodeQL result after CI, then retain the findings pending explicit security-owner review of bearer-cookie exposure, TLS termination/proxy trust, browser threat model, token lifecycle, and the decision on legacy template compatibility. This source refactor is not an independent security assessment and does not alter the `NOT_PRODUCTION_CERTIFIED` release state.
