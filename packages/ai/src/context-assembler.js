@@ -1,6 +1,6 @@
 'use strict';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE } = require('../../domain/src/identifiers');
 const MAX_AI_CONTEXT_CONTENT_IDS = 5;
 const MAX_AI_CONTEXT_CHARS = 3_000;
 const TRUNCATION_MARKER = '\n[Context truncated to the configured limit.]';

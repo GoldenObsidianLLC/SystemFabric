@@ -88,9 +88,9 @@ function createFixtures(t) {
   const migrations = {
     status: 'PASS',
     environment: { node: 'v22.23.4' },
-    migrationCount: 17,
-    firstPass: '17/17 migrations applied',
-    secondPass: '17/17 migrations skipped as already applied',
+    migrationCount: 18,
+    firstPass: '18/18 migrations applied',
+    secondPass: '18/18 migrations skipped as already applied',
     cleanup: 'disposable database dropped',
   };
   for (const file of JOBS[2].requiredFiles) {

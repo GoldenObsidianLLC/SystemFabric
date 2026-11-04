@@ -170,7 +170,7 @@ const requiredMigrations = [
   '0010_outbox_event_contract.sql', '0011_outbox_legacy_classification_backfill.sql',
   '0012_durable_consumer_group_deliveries.sql', '0013_consumer_group_event_filters.sql',
   '0014_collaborative_document_operations.sql', '0015_commerce_refund_idempotency.sql',
-  '0016_paid_membership_paused_status.sql', '0017_ai_task_lifecycle.sql'
+  '0016_paid_membership_paused_status.sql', '0017_ai_task_lifecycle.sql', '0018_ai_task_durable_queue.sql'
 ];
 const missingMigrations = requiredMigrations.filter(file => !fs.existsSync(path.join(root, 'database/migrations', file)));
 addCheck('migration-artifacts', 'Versioned migration files', missingMigrations.length ? 'BLOCKED' : 'PASS',

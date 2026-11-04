@@ -3,11 +3,11 @@
 const { instrumentRedisClient } = require('../../observability/src/tracing');
 const { randomUUID } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
+const { UUID_RE: EVENT_ID_RE } = require('../../domain/src/identifiers');
 const { validateCollaborationOperation } = require('../../collaboration/src');
 
 const DEFAULT_CHANNEL_PREFIX = 'virgoscorpio_hub:realtime:v1';
 const CHANNEL_PREFIX_RE = /^[A-Za-z0-9:_-]{1,96}$/;
-const EVENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESENCE_PAYLOAD = Object.freeze({ kind: 'presence.refresh' });
 const DOCUMENT_ID_RE = SITE_ID_RE;
 const DEFAULT_DOCUMENT_MESSAGE_BYTES = 16_384;

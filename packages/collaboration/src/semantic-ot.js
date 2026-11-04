@@ -23,7 +23,7 @@ const TEXT_NODE_TYPES = new Set([
   'widget.button',
   'widget.quote'
 ]);
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE: UUID_PATTERN } = require('../../domain/src/identifiers');
 const NODE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 

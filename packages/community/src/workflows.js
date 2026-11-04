@@ -1,6 +1,6 @@
 'use strict';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE } = require('../../domain/src/identifiers');
 const REPORT_TYPES = new Set(['profile', 'group', 'activity', 'message', 'user']);
 const REPORT_CATEGORIES = new Set(['spam', 'harassment', 'hate', 'sexual', 'violence', 'illegal', 'other']);
 const REPORT_STATUSES = new Set(['open', 'reviewing', 'resolved', 'dismissed']);

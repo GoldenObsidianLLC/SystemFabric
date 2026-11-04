@@ -1,6 +1,6 @@
 'use strict';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE } = require('../../domain/src/identifiers');
 const TASK_TYPES = new Set(['page_draft', 'content_assist', 'seo', 'translate']);
 const TASK_STATUSES = new Set(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'blocked']);
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'blocked']);

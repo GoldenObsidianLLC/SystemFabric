@@ -1,6 +1,6 @@
 'use strict';
 
-function escapeHtml(value) { return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+const { escapeHtmlText } = require('../../security/src/output-encoding');
 const FORBIDDEN_TEX = /\\(?:href|url|includegraphics|write(?:18)?|input|include|html|htmlClass|htmlId|htmlStyle|class|style|def|gdef|newcommand|renewcommand|csname|special|immediate|openout|read|usepackage)(?![A-Za-z])/i;
 function validateFormula(tex) {
   const errors = [];
@@ -21,7 +21,7 @@ function renderMath(tex, { displayMode = false, katex = null } = {}) {
   let renderer = katex === false ? null : katex;
   if (katex === null || katex === undefined) { try { renderer = require('katex'); } catch { renderer = null; } }
   if (!renderer || typeof renderer.renderToString !== 'function') {
-    const escaped = escapeHtml(tex);
+    const escaped = escapeHtmlText(tex);
     return { html: `<code class="vsh-math-unavailable" role="math" aria-label="Mathematical formula">${escaped}</code>`, rendered: false, engine: null, warnings: ['Install the optional KaTeX dependency to enable full TeX rendering.'] };
   }
   try {
@@ -31,4 +31,4 @@ function renderMath(tex, { displayMode = false, katex = null } = {}) {
     const error = new Error('Math formula could not be rendered.'); error.code = 'ERR_VIRGOSCORPIO_HUB_MATH_RENDER'; error.statusCode = 422; error.cause = cause; throw error;
   }
 }
-module.exports = { renderMath, validateFormula, escapeMathHtml: escapeHtml };
+module.exports = { renderMath, validateFormula, escapeMathHtml: escapeHtmlText };

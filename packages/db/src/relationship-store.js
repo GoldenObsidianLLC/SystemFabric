@@ -1,17 +1,25 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { withTransaction } = require('./transaction');
+
 const ALLOWED_KINDS = new Set(['HAS_TERM', 'PARENT_OF', 'RELATED_TO', 'LOCALIZED_AS', 'NAVIGATES_TO']);
 
 function createRelationshipStore({ pool }) {
-  if (!pool) throw new TypeError('PostgreSQL pool is required.');
+  if (!pool || typeof pool.query !== 'function' || typeof pool.connect !== 'function') {
+    throw new TypeError('A PostgreSQL pool is required.');
+  }
+
   return Object.freeze({
     async upsert({ siteId, sourceId, targetId, kind, metadata = {}, actorId = null, correlationId = null }) {
-      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
-      if (sourceId === targetId) throw Object.assign(new Error('Self relationships are not allowed.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_SELF' });
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
+      if (!ALLOWED_KINDS.has(kind)) {
+        throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
+      }
+      if (sourceId === targetId) {
+        throw Object.assign(new Error('Self relationships are not allowed.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_SELF' });
+      }
+
+      return withTransaction(pool, async client => {
         // The partial unique index and UPSERT serialize concurrent creates of the same live relationship.
         const result = await client.query(
           `INSERT INTO content_relationships(id,site_id,source_id,target_id,kind,metadata,version)
@@ -22,29 +30,47 @@ function createRelationshipStore({ pool }) {
           [randomUUID(), siteId, sourceId, targetId, kind, JSON.stringify(metadata)]
         );
         const row = result.rows[0];
-        const event = { relationshipId: row.id, siteId, sourceId, targetId, kind, version: row.version, metadata: row.metadata };
-        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, row.version, JSON.stringify(event), siteId, actorId || null, correlationId || null]);
-        await client.query('COMMIT');
+        const event = {
+          relationshipId: row.id, siteId, sourceId, targetId,
+          kind, version: row.version, metadata: row.metadata
+        };
+        await client.query(
+          `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification)
+           VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb,$4,$5,$6,'site-private')
+           ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`,
+          [row.id, row.version, JSON.stringify(event), siteId, actorId || null, correlationId || null]
+        );
         return row;
-      } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
-      finally { client.release(); }
+      });
     },
+
     async delete({ siteId, sourceId, targetId, kind, actorId = null, correlationId = null }) {
-      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const result = await client.query('SELECT id,version FROM content_relationships WHERE site_id=$1 AND source_id=$2 AND target_id=$3 AND kind=$4 AND deleted_at IS NULL FOR UPDATE', [siteId, sourceId, targetId, kind]);
-        if (!result.rows[0]) { await client.query('COMMIT'); return { deleted: false }; }
+      if (!ALLOWED_KINDS.has(kind)) {
+        throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
+      }
+
+      return withTransaction(pool, async client => {
+        const result = await client.query(
+          'SELECT id,version FROM content_relationships WHERE site_id=$1 AND source_id=$2 AND target_id=$3 AND kind=$4 AND deleted_at IS NULL FOR UPDATE',
+          [siteId, sourceId, targetId, kind]
+        );
+        if (!result.rows[0]) return { deleted: false };
+
         const row = result.rows[0];
         const version = row.version + 1;
-        await client.query('UPDATE content_relationships SET deleted_at=now(),version=$2 WHERE id=$1', [row.id, version]);
+        await client.query(
+          'UPDATE content_relationships SET deleted_at=now(),version=$2 WHERE id=$1',
+          [row.id, version]
+        );
         const event = { relationshipId: row.id, siteId, sourceId, targetId, kind, version };
-        await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [row.id, version, JSON.stringify(event), siteId, actorId || null, correlationId || null]);
-        await client.query('COMMIT');
+        await client.query(
+          `INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification)
+           VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb,$4,$5,$6,'site-private')
+           ON CONFLICT (aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`,
+          [row.id, version, JSON.stringify(event), siteId, actorId || null, correlationId || null]
+        );
         return { deleted: true, id: row.id, version };
-      } catch (error) { await client.query('ROLLBACK').catch(() => {}); throw error; }
-      finally { client.release(); }
+      });
     }
   });
 }

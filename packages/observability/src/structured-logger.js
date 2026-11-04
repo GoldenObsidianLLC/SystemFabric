@@ -5,6 +5,7 @@ const {
   trace: otelTrace
 } = require('@opentelemetry/api');
 const { getTraceContext } = require('./trace-context');
+const { REQUEST_ID_RE, TRACE_ID_RE, SPAN_ID_RE } = require('./trace-identifiers');
 
 const SAFE_FIELD_NAMES = new Set([
   'requestId', 'traceId', 'spanId', 'parentSpanId',
@@ -15,9 +16,6 @@ const SAFE_FIELD_NAMES = new Set([
   'pollMs', 'attempts', 'terminal', 'processed', 'durationMs'
 ]);
 const TOKEN_RE = /^[A-Za-z0-9_.:-]{1,120}$/;
-const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
-const TRACE_ID_RE = /^[0-9a-f]{32}$/;
-const SPAN_ID_RE = /^[0-9a-f]{16}$/;
 const ROUTE_RE = /^\/[A-Za-z0-9_/:.-]{0,119}$/;
 const EVENT_NAME_RE = /^virgoscorpio_hub\.[a-z0-9_.-]{1,100}$/;
 const METHOD_RE = /^[A-Z]{1,12}$/;

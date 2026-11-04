@@ -1,5 +1,7 @@
 'use strict';
 
+const { escapeHtmlText } = require('../../security/src/output-encoding');
+
 // A deliberately curated inline SVG catalog. Arbitrary SVG uploads remain disallowed.
 const ICONS = Object.freeze({
   activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
@@ -31,7 +33,7 @@ function listIcons() { return Object.keys(ICONS).sort().map(name => ({ name, cat
 function renderIcon(name, { size = 24, title = null, strokeWidth = 1.8 } = {}) {
   if (!Object.hasOwn(ICONS, name)) { const error = new Error('Unknown icon name.'); error.code = 'ERR_VIRGOSCORPIO_HUB_ICON_NOT_FOUND'; error.statusCode = 404; throw error; }
   if (!Number.isInteger(size) || size < 8 || size > 128 || !Number.isFinite(strokeWidth) || strokeWidth < 1 || strokeWidth > 3) { const error = new Error('Icon size or stroke width is out of range.'); error.code = 'ERR_VIRGOSCORPIO_HUB_ICON_OPTIONS'; error.statusCode = 400; throw error; }
-  const escapedTitle = title === null ? '' : `<title>${String(title).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</title>`;
+  const escapedTitle = title === null ? '' : `<title>${escapeHtmlText(title)}</title>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" role="img" aria-hidden="${title === null ? 'true' : 'false'}">${escapedTitle}${ICONS[name]}</svg>`;
 }
 module.exports = { ICONS, listIcons, renderIcon };

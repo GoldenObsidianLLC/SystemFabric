@@ -5,6 +5,7 @@ const { validatePageDocument, styleToCss, isSafeUrl } = require('../../domain/sr
 const { cssVariables } = require('../../domain/src/design-system');
 const { renderIcon } = require('../../icons/src/catalog');
 const { renderMath } = require('../../math/src/renderer');
+const { escapeHtmlText } = require('../../security/src/output-encoding');
 const MAX_RENDERED_OUTPUT_BYTES = 2 * 1024 * 1024;
 
 const compiled = Object.freeze({
@@ -24,9 +25,6 @@ const compiled = Object.freeze({
 
 function safeClassName(value) {
   return typeof value === 'string' && /^[A-Za-z0-9 _-]{0,120}$/.test(value) ? value.trim() : '';
-}
-function escapeHtml(value) {
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function renderPageDocument(document, { assetUrl = id => `/media/${encodeURIComponent(id)}`, libraryAssetUrl = id => `/library/public/${encodeURIComponent(id)}`, dynamicData = {}, designTokens = {} } = {}) {
@@ -72,11 +70,11 @@ function renderPageDocument(document, { assetUrl = id => `/media/${encodeURIComp
         const video = compiled.video.render({ nodeClass: className, url: libraryAssetUrl(node.props.assetId), title: node.props.title || 'Video', poster: node.props.posterAssetId ? libraryAssetUrl(node.props.posterAssetId) : '' });
         return node.props.controls === false ? video.replace(' controls ', ' ') : video;
       }
-      case 'widget.icon': return `<span class="${escapeHtml(className)}">${renderIcon(node.props.iconName, { size: node.props.size || 24, title: node.props.title || null })}</span>`;
-      case 'widget.math': { const rendered = renderMath(node.props.formula, { displayMode: node.props.displayMode === true }); return `<div class="vsh-math ${escapeHtml(className)}${node.props.displayMode ? ' vsh-math-display' : ''}">${rendered.html}</div>`; }
+      case 'widget.icon': return `<span class="${escapeHtmlText(className)}">${renderIcon(node.props.iconName, { size: node.props.size || 24, title: node.props.title || null })}</span>`;
+      case 'widget.math': { const rendered = renderMath(node.props.formula, { displayMode: node.props.displayMode === true }); return `<div class="vsh-math ${escapeHtmlText(className)}${node.props.displayMode ? ' vsh-math-display' : ''}">${rendered.html}</div>`; }
       case 'widget.list': {
         const items = node.props.items.map(text => compiled.listItem.render({ text })).join('');
-        return node.props.ordered ? `<ol class="${escapeHtml(className)}">${items}</ol>` : `<ul class="${escapeHtml(className)}">${items}</ul>`;
+        return node.props.ordered ? `<ol class="${escapeHtmlText(className)}">${items}</ol>` : `<ul class="${escapeHtmlText(className)}">${items}</ul>`;
       }
       case 'widget.quote': {
         const quote = compiled.quote.render({ nodeClass: className, text: node.props.text });
@@ -91,7 +89,7 @@ function renderPageDocument(document, { assetUrl = id => `/media/${encodeURIComp
           const url = typeof item?.url === 'string' && isSafeUrl(item.url) ? item.url : '/';
           return compiled.queryItem.render({ url, title: String(item?.title || ''), excerpt: String(item?.excerpt || '') });
         }).join('');
-        return `<div class="${escapeHtml(gridClass)}">${items || `<p class="vsh-query-empty">${escapeHtml(node.props.emptyText || 'No items found.')}</p>`}</div>`;
+        return `<div class="${escapeHtmlText(gridClass)}">${items || `<p class="vsh-query-empty">${escapeHtmlText(node.props.emptyText || 'No items found.')}</p>`}</div>`;
       }
       default: throw new Error(`Renderer has no implementation for ${node.type}`);
     }
@@ -101,7 +99,7 @@ function renderPageDocument(document, { assetUrl = id => `/media/${encodeURIComp
   const safeCss = cssRules.join('\n');
   const tokenCss = cssVariables(designTokens);
   const katexStylesheet = (() => { try { const entry = require.resolve('katex'); return require('node:fs').existsSync(require('node:path').join(require('node:path').dirname(entry), 'katex.min.css')) ? '<link rel="stylesheet" href="/assets/katex/katex.min.css">' : ''; } catch { return ''; } })();
-  const html = `<!doctype html><html lang="${escapeHtml(document.locale || 'en')}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${katexStylesheet}<title>${enginex.compileSource('{{ title }}').render({ title: document.title })}</title><style>${tokenCss}body{font-family:var(--vsh-font-families-body,system-ui,sans-serif);line-height:1.5;margin:0}.vsh-section{padding:2rem 1rem;max-width:72rem;margin-inline:auto}.vsh-column,.vsh-container{min-width:0}.vsh-button{display:inline-block;padding:.7rem 1rem;text-decoration:none;border-radius:.35rem;background:#18212f;color:#fff}.vsh-button:focus-visible{outline:3px solid #8ab4ff;outline-offset:2px}img{max-width:100%;height:auto}.vsh-query-loop{display:grid;gap:1rem}.vsh-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.vsh-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.vsh-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.vsh-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.vsh-query-item{min-width:0;padding:1rem;border:1px solid #e2e8f0;border-radius:.5rem}.vsh-query-item h3{margin-top:0}.vsh-query-item a{overflow-wrap:anywhere}.vsh-query-empty{grid-column:1/-1}.vsh-math{overflow-x:auto;max-width:100%}.vsh-math-display{text-align:center;margin:1rem 0}video{display:block;max-width:100%;height:auto;border-radius:.35rem}@media(max-width:700px){.vsh-query-loop{grid-template-columns:1fr!important}}${safeCss}</style></head><body><main>${body}</main></body></html>`;
+  const html = `<!doctype html><html lang="${escapeHtmlText(document.locale || 'en')}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${katexStylesheet}<title>${enginex.compileSource('{{ title }}').render({ title: document.title })}</title><style>${tokenCss}body{font-family:var(--vsh-font-families-body,system-ui,sans-serif);line-height:1.5;margin:0}.vsh-section{padding:2rem 1rem;max-width:72rem;margin-inline:auto}.vsh-column,.vsh-container{min-width:0}.vsh-button{display:inline-block;padding:.7rem 1rem;text-decoration:none;border-radius:.35rem;background:#18212f;color:#fff}.vsh-button:focus-visible{outline:3px solid #8ab4ff;outline-offset:2px}img{max-width:100%;height:auto}.vsh-query-loop{display:grid;gap:1rem}.vsh-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.vsh-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.vsh-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.vsh-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.vsh-query-item{min-width:0;padding:1rem;border:1px solid #e2e8f0;border-radius:.5rem}.vsh-query-item h3{margin-top:0}.vsh-query-item a{overflow-wrap:anywhere}.vsh-query-empty{grid-column:1/-1}.vsh-math{overflow-x:auto;max-width:100%}.vsh-math-display{text-align:center;margin:1rem 0}video{display:block;max-width:100%;height:auto;border-radius:.35rem}@media(max-width:700px){.vsh-query-loop{grid-template-columns:1fr!important}}${safeCss}</style></head><body><main>${body}</main></body></html>`;
   const bytes = Buffer.byteLength(html);
   if (bytes > MAX_RENDERED_OUTPUT_BYTES) {
     const error = new Error(`Rendered output exceeds ${MAX_RENDERED_OUTPUT_BYTES} bytes.`);

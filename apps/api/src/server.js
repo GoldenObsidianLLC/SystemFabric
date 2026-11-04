@@ -48,7 +48,7 @@ const VIRGOSCORPIO_HUB_VERSION = require('../../../package.json').version;
 const MAX_BODY_DEFAULT = 1_048_576;
 const MAX_MEDIA_BODY = 16 * 1024 * 1024;
 const MAX_LIBRARY_BODY_DEFAULT = 72 * 1024 * 1024;
-const ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const { UUID_RE: ID_RE } = require('../../../packages/domain/src/identifiers');
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function sendJson(res, statusCode, payload) {
