@@ -541,6 +541,16 @@ function createPostgresStore({ pool }) {
       return result.rows[0] || null;
     },
 
+    async getByIdForOwner({ siteId, id, actorId }) {
+      const result = await pool.query(
+        `SELECT id,site_id,content_type,slug,locale,title,status,body,schema_version,version,published_snapshot,published_version,published_at,scheduled_at,created_by,updated_by,created_at,updated_at,reviewed_by,reviewed_at
+         FROM content_items
+        WHERE site_id=$1 AND id=$2 AND created_by=$3 AND deleted_at IS NULL`,
+        [siteId, id, actorId]
+      );
+      return result.rows[0] || null;
+    },
+
     async listContent({ siteId, status = null, contentType = null, limit = 50, offset = 0, actorId = null }) {
       const safeLimit = Math.min(100, Math.max(1, Number(limit) || 50));
       const safeOffset = Math.max(0, Number(offset) || 0);

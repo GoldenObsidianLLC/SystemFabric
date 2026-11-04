@@ -288,12 +288,20 @@ paths:
               properties:
                 prompt: { type: string, minLength: 1, maxLength: 12000 }
                 siteContext: { type: string, maxLength: 3000 }
+                contextContentIds:
+                  type: array
+                  maxItems: 5
+                  uniqueItems: true
+                  items: { type: string, format: uuid }
+                dataClassification: { type: string, enum: [public, internal, confidential] }
       responses:
         '200': { description: Validated, unsaved and unpublished page proposal; includes taskId when the PostgreSQL AI task migration is available }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Missing AI or content-read capability, or site AI policy blocks the selected content classification }
+        '404': { description: One or more selected pages are not visible to this actor in the selected site }
         '422': { description: Model output failed domain validation }
-        '503': { description: AI provider unavailable or not configured }
+        '503': { description: AI provider or required saved-page context store unavailable }
   /api/v1/ai/content-assist:
     post:
       summary: Suggest a content rewrite or edit

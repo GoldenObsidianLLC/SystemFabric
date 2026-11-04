@@ -2,7 +2,11 @@
 
 > **Current status: NOT_PRODUCTION_CERTIFIED.** The readiness report is an engineering evidence snapshot, not production approval.
 
-## Current candidate snapshot — 1 November 2026
+## Post-snapshot repository change — 4 November 2026
+
+PR [#59](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/59), the VirgoScorpio Hub hard identity cutover, merged to `main` at commit `d2dfcd3e8d7b4113941456be0cf96f01a0a036c1` (2026-11-04 03:52:44 UTC). This is a repository identity/code change, not a release-certification event. The detailed candidate evidence below was generated on 1 November and has not been regenerated against the post-merge commit. PR #59 records that CodeQL High alerts #4–#7 remain open pending explicit security-owner review and disposition; no suppression or dismissal was claimed. Production remains NO-GO until the applicable gates have current evidence and named approval.
+
+## Historical candidate snapshot — 1 November 2026
 
 The latest reviewed engineering evidence is recorded in the [1 November 2026 project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md). It covers candidate PR #36 at `f9d463ef9ca82d15c9220e15cf50df2ba6367a11` (based on `main` `1a903b8eab4304dd61b2489381b091d34f1ea546`). The candidate's latest hosted workflow completed all five jobs successfully, including the dedicated PostgreSQL/Memgraph job (22/22 tests, zero skips), fresh migrations (14/14 applied, 14/14 idempotently skipped), Chromium smoke (9/9), and CodeQL analysis execution.
 

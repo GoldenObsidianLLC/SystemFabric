@@ -6,7 +6,8 @@ const path = require('node:path');
 const { randomUUID, timingSafeEqual } = require('node:crypto');
 const { loadEnvFile } = require('../../../scripts/load-env');
 const { createAIService } = require('../../../packages/ai/src/service');
-const { createPostgresPool, createPostgresStore } = require('../../../packages/db/src/postgres-store');
+const { createPostgresPool, createPostgresStore, extractPageText } = require('../../../packages/db/src/postgres-store');
+const { parseAIContextContentIds, buildAIPageContext, MAX_AI_CONTEXT_CHARS } = require('../../../packages/ai/src/context-assembler');
 const { createAITaskStore } = require('../../../packages/db/src/ai-task-store');
 const { createIdentityService } = require('../../../packages/auth/src/service');
 const { createAuthorizationRequest, exchangeAndVerify, configFromEnv } = require('../../../packages/auth/src/oidc');
@@ -494,6 +495,65 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if (!allowed) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', `The ${capability} capability is required.`);
     }
     return siteId;
+  }
+  async function prepareAIPageDraftContext({ actor, siteId, body }) {
+    const contentIds = parseAIContextContentIds(body.contextContentIds);
+    if (contentIds.length === 0) {
+      return {
+        body,
+        siteContext: body.siteContext || '',
+        inputChars: String(body.prompt || '').length + String(body.siteContext || '').length
+      };
+    }
+    if (!siteId) {
+      throw fail(400, 'ERR_VIRGOSCORPIO_HUB_AI_CONTEXT_SITE_REQUIRED', 'A siteId is required when selecting saved pages as AI context.');
+    }
+    if (!store) {
+      throw fail(503, 'ERR_VIRGOSCORPIO_HUB_AI_CONTEXT_UNAVAILABLE', 'Saved-page context requires the site-scoped content store.');
+    }
+
+    let canReadAll = actor.isDeveloper === true;
+    let canReadOwn = false;
+    if (!canReadAll) {
+      if (!identity || !actor.user?.id) {
+        throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'An authenticated site member is required to use saved-page context.');
+      }
+      canReadAll = await identity.authorizeSite(actor.user.id, siteId, 'content:read');
+      if (!canReadAll) canReadOwn = await identity.authorizeSite(actor.user.id, siteId, 'content:read:own');
+      if (!canReadAll && !canReadOwn) {
+        throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Reading saved-page AI context requires content:read or content:read:own.');
+      }
+    }
+
+    if (canReadAll && typeof store.getById !== 'function') {
+      throw fail(503, 'ERR_VIRGOSCORPIO_HUB_AI_CONTEXT_UNAVAILABLE', 'The content store does not support site-scoped page reads.');
+    }
+    if (!canReadAll && typeof store.getByIdForOwner !== 'function') {
+      throw fail(503, 'ERR_VIRGOSCORPIO_HUB_AI_CONTEXT_UNAVAILABLE', 'The content store does not support owner-scoped page reads.');
+    }
+
+    const sources = [];
+    for (const id of contentIds) {
+      const source = canReadAll
+        ? await store.getById({ siteId, id })
+        : await store.getByIdForOwner({ siteId, id, actorId: actor.user.id });
+      const siteMatches = source && String(source.site_id).toLowerCase() === String(siteId).toLowerCase();
+      const ownerMatches = canReadAll || (source && String(source.created_by).toLowerCase() === String(actor.user.id).toLowerCase());
+      if (!source || !siteMatches || !ownerMatches || source.content_type !== 'page') {
+        throw fail(404, 'ERR_VIRGOSCORPIO_HUB_AI_CONTEXT_SOURCE_NOT_FOUND', 'One or more selected pages were not found or are not readable.');
+      }
+      sources.push({
+        title: source.title,
+        text: extractPageText(source.body, MAX_AI_CONTEXT_CHARS)
+      });
+    }
+
+    const siteContext = buildAIPageContext({ siteContext: body.siteContext || '', sources });
+    return {
+      body: { ...body, dataClassification: 'confidential' },
+      siteContext,
+      inputChars: String(body.prompt || '').length + siteContext.length
+    };
   }
   const AI_PROVIDERS = new Set(['mock', 'openai-responses', 'openai-compatible', 'anthropic', 'gemini']);
   const DATA_CLASSIFICATION_RANK = Object.freeze({ public: 0, internal: 1, confidential: 2 });
@@ -1779,8 +1839,19 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       }
 
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/page-draft') {
-        const body = await readJson(req, maxBody); const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
-        const { result, taskId } = await runGovernedAIForRequest({ req, res, actor, siteId, body, action: 'page_draft', inputChars: String(body.prompt || '').length + String(body.siteContext || '').length, requestId, run: signal => ai.generatePageDraft({ prompt: body.prompt, siteContext: body.siteContext || '', actor: actor.user.id || 'local-development-token', signal }) });
+        const body = await readJson(req, maxBody);
+        const siteId = await ensureSiteCapabilityForAI(actor, url, body, 'ai:use');
+        const context = await prepareAIPageDraftContext({ actor, siteId, body });
+        const { result, taskId } = await runGovernedAIForRequest({
+          req, res, actor, siteId, body: context.body, action: 'page_draft',
+          inputChars: context.inputChars, requestId,
+          run: signal => ai.generatePageDraft({
+            prompt: body.prompt,
+            siteContext: context.siteContext,
+            actor: actor.user.id || 'local-development-token',
+            signal
+          })
+        });
         return sendJson(res, 200, { ...result, requestId, taskId, humanReviewRequired: true });
       }
       if (req.method === 'POST' && url.pathname === '/api/v1/ai/content-assist') {

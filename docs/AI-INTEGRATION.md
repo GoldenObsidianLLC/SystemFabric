@@ -27,11 +27,16 @@ Use secret management in deployed environments. External-provider calls are bloc
 ```json
 {
   "prompt": "Create a modern home page for a boutique architecture studio with a hero, services, project highlights and a contact CTA.",
-  "siteContext": "Brand voice: calm and architectural. Do not invent client names or project awards."
+  "siteContext": "Brand voice: calm and architectural. Do not invent client names or project awards.",
+  "contextContentIds": ["11111111-1111-4111-8111-111111111111"]
 }
 ```
 
 Returns a `document` conforming to VirgoScorpio Hub Page Document v1 plus `provenance` (`provider`, `model`, `generatedAt`) and `status: draft-proposal`. The response is not saved and not published.
+
+`contextContentIds` is optional and explicitly selects up to five saved pages to provide as additional context; it is not a search or automatic retrieval feature. Every selected ID is resolved within the request's site. The caller must have `ai:use` and either `content:read` (site-wide page access) or `content:read:own` (only pages created by that caller). Missing, cross-site, non-page, deleted, and non-owned records are indistinguishable to callers and fail before provider invocation. Owner-only reads use a single database query constrained by site, page ID, creator and deletion state.
+
+Only the selected page title and bounded visible text/alt content are extracted. The selected material and any supplied `siteContext` are labelled untrusted and combined within a 3,000-character limit. When saved pages are selected, the server classifies the assembled context as `confidential` regardless of a client-supplied classification. The site's AI policy must permit confidential data before the request proceeds; a lower classification ceiling blocks the request. Task and audit records retain usage metadata, not page text, prompts or model output. External processing remains subject to both the global and site-level provider/data-processing approvals.
 
 ### 2. Assist with content
 
