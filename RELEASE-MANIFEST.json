@@ -1,7 +1,7 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
@@ -210,15 +210,22 @@
     ],
     "publicHttpContractChanged": false,
     "databaseMigrationsAdded": false,
-    "codeScanningDisposition": "PR #63 branch-scoped CodeQL analysis passed and reported only the existing Medium legacy-template alert #14. The four inherited High cookie alerts #30?#33 were not reported on the branch and await post-merge default-branch analysis. No alert was manually dismissed or suppressed."
+    "codeScanningDisposition": "Post-merge default-branch CodeQL analysis on dc4a82d marks alerts #30 through #33 fixed with fixed_at set and dismissed_at empty. Alert #14 remains open. This is an automated CodeQL resolution, not a manual dismissal; browser session values remain bearer credentials by design and their transport/deployment controls remain subject to independent review."
   },
   "versionHistory": [
     {
       "version": "0.5.3",
       "changeType": "patch",
-      "status": "unreleased-candidate",
+      "status": "merged-to-main-unreleased",
       "date": "2026-11-04",
       "summary": "Extract auth route and cookie protocol modules; validate cookie serialization attributes without changing browser auth contracts."
+    },
+    {
+      "version": "0.5.4",
+      "changeType": "patch",
+      "status": "unreleased-candidate",
+      "date": "2026-11-04",
+      "summary": "Extract auth session persistence and lifecycle into a composable package module without changing the identity-service public method surface."
     }
   ],
   "historicalValidation": {
@@ -255,38 +262,100 @@
       },
       "hostedCi": "PASS (Node 22/24, PostgreSQL/Memgraph, browser/accessibility, CodeQL, evidence consolidation).",
       "productionCertified": false
+    },
+    "0.5.3": {
+      "reviewedAt": "2026-11-04",
+      "branch": "fix/security-hardening-2026-11",
+      "runtime": {
+        "node": "26.12.1",
+        "platform": "win32",
+        "arch": "x64"
+      },
+      "semver": {
+        "previousVersion": "0.5.2",
+        "candidateVersion": "0.5.3",
+        "changeType": "patch",
+        "released": false
+      },
+      "artifactCheck": {
+        "status": "PASS",
+        "requiredPaths": 192,
+        "javascriptFilesSyntaxChecked": 203
+      },
+      "unitTests": {
+        "status": "PASS",
+        "tests": 431,
+        "passed": 428,
+        "failed": 0,
+        "skipped": 3
+      },
+      "focusedTests": {
+        "status": "PASS",
+        "tests": 33,
+        "passed": 33,
+        "failed": 0,
+        "skipped": 0
+      },
+      "npmAuditHigh": {
+        "status": "PASS",
+        "vulnerabilities": 0
+      },
+      "productionCertified": false,
+      "codeScanning": {
+        "branch": "fix/security-hardening-2026-11",
+        "workflow": "PASS",
+        "branchScopedOpenAlerts": [
+          {
+            "number": 14,
+            "severity": "medium",
+            "rule": "js/unsafe-code-construction",
+            "path": "vendor/enginex/engine-legacy.js",
+            "line": 569
+          }
+        ],
+        "inheritedMainAlertsAwaitingPostMergeAnalysis": [
+          30,
+          31,
+          32,
+          33
+        ],
+        "dismissedOrSuppressed": false,
+        "disposition": "Four High auth-cookie alerts were not reported for the PR branch; confirm their default-branch state after merge. The Medium legacy template-code alert remains open and requires a security-owner decision."
+      },
+      "mergedCommit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
+      "hostedCi": "PASS (Node 22/24, PostgreSQL/Memgraph, browser/accessibility, CodeQL, evidence consolidation)."
     }
   },
   "candidateValidation": {
     "reviewedAt": "2026-11-04",
-    "branch": "fix/security-hardening-2026-11",
+    "branch": "refactor/auth-service-seams-2026-11",
     "runtime": {
       "node": "26.12.1",
       "platform": "win32",
       "arch": "x64"
     },
     "semver": {
-      "previousVersion": "0.5.2",
-      "candidateVersion": "0.5.3",
+      "previousVersion": "0.5.3",
+      "candidateVersion": "0.5.4",
       "changeType": "patch",
       "released": false
     },
     "artifactCheck": {
       "status": "PASS",
-      "requiredPaths": 192,
-      "javascriptFilesSyntaxChecked": 203
+      "requiredPaths": 194,
+      "javascriptFilesSyntaxChecked": 205
     },
     "unitTests": {
       "status": "PASS",
-      "tests": 431,
-      "passed": 428,
+      "tests": 437,
+      "passed": 434,
       "failed": 0,
       "skipped": 3
     },
     "focusedTests": {
       "status": "PASS",
-      "tests": 33,
-      "passed": 33,
+      "tests": 35,
+      "passed": 35,
       "failed": 0,
       "skipped": 0
     },
@@ -294,11 +363,60 @@
       "status": "PASS",
       "vulnerabilities": 0
     },
-    "productionCertified": false,
     "codeScanning": {
-      "branch": "fix/security-hardening-2026-11",
-      "workflow": "PASS",
-      "branchScopedOpenAlerts": [
+      "latestMainCommit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
+      "latestMainAnalysisAt": "2026-11-04T21:18:28Z",
+      "openAlerts": [
+        14
+      ],
+      "fixedAlerts": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "manualDismissals": 0
+    },
+    "productionCertified": false,
+    "npmCi": {
+      "status": "PASS",
+      "packagesInstalled": 180,
+      "dependencyVersionsChanged": false
+    },
+    "livePostgresMemgraphIntegration": "NOT_RUN_LOCALLY; required hosted PR CI integration job is pending."
+  },
+  "postMergeCodeScanning": {
+    "analyzedAt": "2026-11-04T21:18:28Z",
+    "commit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
+    "branch": "refs/heads/main",
+    "alerts": {
+      "fixed": [
+        {
+          "number": 30,
+          "severity": "high",
+          "rule": "js/clear-text-storage-of-sensitive-data",
+          "dismissedAt": null
+        },
+        {
+          "number": 31,
+          "severity": "high",
+          "rule": "js/clear-text-storage-of-sensitive-data",
+          "dismissedAt": null
+        },
+        {
+          "number": 32,
+          "severity": "high",
+          "rule": "js/clear-text-storage-of-sensitive-data",
+          "dismissedAt": null
+        },
+        {
+          "number": 33,
+          "severity": "high",
+          "rule": "js/clear-text-storage-of-sensitive-data",
+          "dismissedAt": null
+        }
+      ],
+      "open": [
         {
           "number": 14,
           "severity": "medium",
@@ -306,15 +424,26 @@
           "path": "vendor/enginex/engine-legacy.js",
           "line": 569
         }
-      ],
-      "inheritedMainAlertsAwaitingPostMergeAnalysis": [
-        30,
-        31,
-        32,
-        33
-      ],
-      "dismissedOrSuppressed": false,
-      "disposition": "Four High auth-cookie alerts were not reported for the PR branch; confirm their default-branch state after merge. The Medium legacy template-code alert remains open and requires a security-owner decision."
-    }
+      ]
+    },
+    "manualDismissals": 0,
+    "note": "The four High data-flow alerts are fixed in the default-branch CodeQL analysis after auth route/cookie extraction. Session cookies still carry opaque bearer tokens; retain independent deployment/security review."
+  },
+  "sessionServiceRefactor": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
+    "branch": "refactor/auth-service-seams-2026-11",
+    "module": "packages/auth/src/session-service.js",
+    "owns": [
+      "Opaque session/CSRF token creation and digest-only persistence",
+      "Session authentication, idle/expiry checks, and throttled activity touches",
+      "Site membership aggregation for authenticated principals",
+      "CSRF digest verification",
+      "Session listing, logout, and scoped revocation invalidations"
+    ],
+    "composedBy": "packages/auth/src/service.js",
+    "publicIdentityServiceMethodsChanged": false,
+    "databaseMigrationsAdded": false,
+    "publicHttpContractChanged": false
   }
 }

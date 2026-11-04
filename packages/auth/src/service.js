@@ -7,6 +7,7 @@ const PASSWORD_MIN = 12;
 const PASSWORD_MAX = 128;
 const SESSION_TTL_HOURS = 12;
 const { generateTotpSecret, verifyTotp, totpUri, encryptSecret, decryptSecret, generateRecoveryCodes } = require('./totp');
+const { createSessionService } = require('./session-service');
 
 function digest(value) { return createHash('sha256').update(String(value)).digest('hex'); }
 function safeEqualText(a, b) {
@@ -84,21 +85,28 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
     state.count += 1;
   }
 
-  async function createSession(user, metadata = {}) {
-    const token = randomBytes(32).toString('base64url');
-    const csrf = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(clock() + sessionTtlMs);
-    await pool.query(
-      `INSERT INTO auth_sessions(user_id,token_hash,csrf_hash,expires_at,user_agent_hash,ip_hash)
-       VALUES($1,$2,$3,$4,$5,$6)`,
-      [user.id, digest(token), digest(csrf), expiresAt, metadata.userAgent ? digest(metadata.userAgent) : null, metadata.ip ? digest(metadata.ip) : null]
-    );
-    return { token, csrf, expiresAt, user: safeUser(user) };
-  }
-
   function safeUser(user) {
     return { id: user.id, email: user.email, displayName: user.display_name, status: user.status, emailVerified: Boolean(user.email_verified_at), mfaEnabled: Boolean(user.mfa_enabled) };
   }
+
+  const {
+    createSession,
+    authenticate,
+    isSessionActive,
+    validateCsrf,
+    logout,
+    listSessions,
+    revokeSession
+  } = createSessionService({
+    pool,
+    clock,
+    sessionTtlMs,
+    sessionIdleTtlMinutes,
+    digestToken: digest,
+    safeEqualText,
+    safeUser,
+    onAuthorizationChange: notifyAuthorizationChange
+  });
 
   return Object.freeze({
     async bootstrapOwner({ email: inputEmail, password, displayName, siteSlug = 'main', siteName = 'Main Site' }) {
@@ -355,61 +363,12 @@ function createIdentityService({ pool, env = process.env, clock = () => Date.now
       return { ...(await createSession(user, { ip, userAgent })), mfaRequired: false };
     },
 
-    async authenticate(token) {
-      if (typeof token !== 'string' || token.length < 32 || token.length > 200) return null;
-      const result = await pool.query(
-        `SELECT s.id AS session_id,s.user_id,s.csrf_hash,s.expires_at,u.email,u.display_name,u.status,u.email_verified_at,u.mfa_enabled
-         FROM auth_sessions s JOIN users u ON u.id=s.user_id
-         WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at > now()
-           AND s.last_seen_at > now() - ($2 * interval '1 minute') AND u.status='active' LIMIT 1`,
-        [digest(token), sessionIdleTtlMinutes]
-      );
-      const row = result.rows[0];
-      if (!row) return null;
-      void pool.query('UPDATE auth_sessions SET last_seen_at=now() WHERE id=$1 AND last_seen_at < now() - interval \'1 minute\'', [row.session_id]).catch(() => {});
-      const memberships = await pool.query(
-        `SELECT s.id AS site_id,s.slug AS site_slug,s.name AS site_name,r.slug AS role_slug,r.capabilities
-         FROM site_memberships m JOIN sites s ON s.id=m.site_id JOIN roles r ON r.id=m.role_id
-         WHERE m.user_id=$1 ORDER BY s.name`, [row.user_id]
-      );
-      const bySite = new Map();
-      for (const member of memberships.rows) {
-        let entry = bySite.get(member.site_id);
-        if (!entry) { entry = { siteId: member.site_id, siteSlug: member.site_slug, siteName: member.site_name, roles: [], capabilities: new Set() }; bySite.set(member.site_id, entry); }
-        entry.roles.push(member.role_slug);
-        for (const capability of (Array.isArray(member.capabilities) ? member.capabilities : [])) entry.capabilities.add(capability);
-      }
-      return {
-        sessionId: row.session_id, user: { id: row.user_id, email: row.email, displayName: row.display_name, status: row.status, emailVerified: Boolean(row.email_verified_at), mfaEnabled: Boolean(row.mfa_enabled) },
-        expiresAt: row.expires_at,
-        memberships: [...bySite.values()].map(m => ({ ...m, role: m.roles.length === 1 ? m.roles[0] : m.roles, roles: m.roles, capabilities: [...m.capabilities] }))
-      };
-    },
-
-    async isSessionActive({ userId, sessionId }) {
-      if (typeof userId !== 'string' || !userId || typeof sessionId !== 'string' || !sessionId) return false;
-      const result = await pool.query(
-        `SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id
-         WHERE s.id=$1 AND s.user_id=$2 AND s.revoked_at IS NULL AND s.expires_at>now()
-           AND s.last_seen_at>now()-($3 * interval '1 minute') AND u.status='active' LIMIT 1`,
-        [sessionId, userId, sessionIdleTtlMinutes]
-      );
-      return result.rowCount > 0;
-    },
-
-    async validateCsrf(token, csrf) {
-      if (typeof token !== 'string' || typeof csrf !== 'string') return false;
-      const result = await pool.query('SELECT csrf_hash FROM auth_sessions WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>now()', [digest(token)]);
-      return !!result.rows[0] && safeEqualText(result.rows[0].csrf_hash, digest(csrf));
-    },
-
-    async logout(token) {
-      if (!token) return { revoked: false };
-      const result = await pool.query('UPDATE auth_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL RETURNING id,user_id', [digest(token)]);
-      const session = result.rows[0];
-      if (session) await notifyAuthorizationChange({ principalId: session.user_id, sessionId: session.id });
-      return { revoked: Boolean(session) };
-    },
+    authenticate,
+    isSessionActive,
+    validateCsrf,
+    logout,
+    listSessions,
+    revokeSession,
 
     async listSites(userId) {
       const result = await pool.query(
