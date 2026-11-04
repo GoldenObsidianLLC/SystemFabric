@@ -13,7 +13,7 @@ function response(session, { ok = true, status = 200, raw } = {}) {
   return { ok, status, async text() { return raw ?? JSON.stringify(session); } };
 }
 
-function fakePool({ candidateRows = [candidate], orderRow = { ...candidate, status: 'pending_payment' } } = {}) {
+function fakePool({ candidateRows = [candidate], orderRow = { ...candidate, status: 'pending_payment' }, commitFails = false } = {}) {
   const state = { calls: [], connects: 0, commits: 0, rollbacks: 0, releases: 0, reservationsCommitted: 0 };
   const pool = {
     state,
@@ -28,7 +28,7 @@ function fakePool({ candidateRows = [candidate], orderRow = { ...candidate, stat
         async query(sql, values) {
           state.calls.push({ surface: 'client', sql, values });
           if (sql === 'BEGIN') return { rows: [] };
-          if (sql === 'COMMIT') { state.commits += 1; return { rows: [] }; }
+          if (sql === 'COMMIT') { state.commits += 1; if (commitFails) throw new Error('database commit failed'); return { rows: [] }; }
           if (sql === 'ROLLBACK') { state.rollbacks += 1; return { rows: [] }; }
           if (/SELECT id,site_id,status,provider_session_id/.test(sql)) return { rows: [orderRow] };
           if (/UPDATE commerce_orders SET status='failed'/.test(sql)) return { rows: [{ id: candidate.order_id }] };
@@ -77,6 +77,20 @@ test('expired Stripe session transitions pending order to failed and releases th
   assert.equal(requests[0].url, 'https://api.stripe.com/v1/checkout/sessions/cs_test_123');
   assert.equal(requests[0].options.method, 'GET');
   assert.equal(requests[0].options.headers.Authorization, `Bearer ${TEST_STRIPE_SECRET_KEY}`);
+});
+
+test('checkout reconciliation rolls back the order and inventory transition when commit fails', async () => {
+  const pool = fakePool({ commitFails: true });
+  await assert.rejects(
+    reconcileExpiredStripeCheckouts(pool, {
+      secretKey: TEST_STRIPE_SECRET_KEY,
+      fetchImpl: fetchSession({ id: candidate.provider_session_id, status: 'expired', payment_status: 'unpaid' })
+    }),
+    /database commit failed/
+  );
+  assert.equal(pool.state.commits, 1);
+  assert.equal(pool.state.rollbacks, 1);
+  assert.equal(pool.state.releaseClient, true);
 });
 
 test('complete paid Stripe session reconciles pending order and commits the reservation', async () => {

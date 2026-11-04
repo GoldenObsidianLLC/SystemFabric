@@ -6,12 +6,13 @@ const { spawnSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const { Pool } = require('pg');
 const { loadEnvFile } = require('./load-env');
+const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 
 const root = path.resolve(__dirname, '..');
 const evidenceDir = path.join(root, 'artifacts', 'evidence');
 const logLines = [];
 const evidence = {
-  schemaVersion: 1, product: 'VirgoScorpio Hub', version: '0.5.1',
+  schemaVersion: 1, product: 'VirgoScorpio Hub', version: PRODUCT_VERSION,
   gate: 'fresh-migrations', generatedAt: new Date().toISOString(),
   status: 'BLOCKED',
   environment: { node: process.version, platform: process.platform, arch: process.arch },

@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 const {
   hasNoHighAuditFindings,
   hasSuccessfulPlaywrightSummary,
@@ -365,7 +366,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
         const sbom = JSON.parse(readEvidenceFile(directory, 'artifacts/virgoscorpio-hub.sbom.cdx.json').toString('utf8'));
         const packageLock = JSON.parse(readEvidenceFile(directory, 'package-lock.json').toString('utf8'));
         const check = id => readiness.checks?.find(item => item.id === id);
-        if (readiness.product !== 'VirgoScorpio Hub' || readiness.version !== '0.5.1') errors.push('Release-readiness report product/version mismatch.');
+        if (readiness.product !== 'VirgoScorpio Hub' || readiness.version !== PRODUCT_VERSION) errors.push('Release-readiness report product/version mismatch.');
         if (readiness.sourceRevision !== expected.mergeSha) errors.push('Release-readiness report is not bound to the exact merge/source revision.');
         if (readiness.host?.node !== jobConfig.runtime) errors.push('Release-readiness report runtime does not match this matrix job.');
         for (const id of ['clean-source-tree', 'syntax-artifact-check', 'unit-tests', 'enginex-tests']) {
@@ -413,7 +414,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
         if (sbom.bomFormat !== 'CycloneDX' || !Array.isArray(sbom.components) || !Array.isArray(sbom.dependencies)) {
           errors.push('CycloneDX SBOM structure is invalid.');
         }
-        if (packageLock.name !== 'virgoscorpio-hub' || packageLock.version !== '0.5.1' || packageLock.lockfileVersion !== 3) {
+        if (packageLock.name !== 'virgoscorpio-hub' || packageLock.version !== PRODUCT_VERSION || packageLock.lockfileVersion !== 3) {
           errors.push('Dependency lockfile identity/version/format does not match this release.');
         }
         for (const file of ['npm-audit-all.log', 'npm-audit.log']) {
@@ -421,7 +422,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
           if (!hasNoHighAuditFindings(auditOutput)) errors.push('Dependency audit output is missing a valid summary or contains high/critical findings: ' + file + '.');
         }
         const purl = sbom.metadata?.component?.purl;
-        if (purl !== 'pkg:npm/virgoscorpio-hub@0.5.1') errors.push('SBOM package identity is missing or does not match VirgoScorpio Hub 0.5.1.');
+        if (purl !== `pkg:npm/virgoscorpio-hub@${PRODUCT_VERSION}`) errors.push('SBOM package identity is missing or does not match VirgoScorpio Hub.');
       } else if (jobConfig.key === 'postgres-memgraph-integration') {
         const live = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/integration-live.json').toString('utf8'));
         const migrations = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/fresh-migrations.json').toString('utf8'));
@@ -537,7 +538,7 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
   return {
     schemaVersion: 1,
     product: 'VirgoScorpio Hub',
-    version: '0.5.1',
+    version: PRODUCT_VERSION,
     generatedAt: new Date().toISOString(),
     workflowRun: {
       repository: expected.repository,

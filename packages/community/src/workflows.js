@@ -1,6 +1,7 @@
 'use strict';
 
 const { UUID_RE } = require('../../domain/src/identifiers');
+const { withTransaction } = require('../../db/src/transaction');
 const REPORT_TYPES = new Set(['profile', 'group', 'activity', 'message', 'user']);
 const REPORT_CATEGORIES = new Set(['spam', 'harassment', 'hate', 'sexual', 'violence', 'illegal', 'other']);
 const REPORT_STATUSES = new Set(['open', 'reviewing', 'resolved', 'dismissed']);
@@ -87,9 +88,7 @@ async function createDirectConversation(ctx, siteId, body) {
   );
   if (!recipient.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_USER_NOT_FOUND', 'Recipient is not an active member of this site.');
 
-  const client = await localPool.connect();
-  try {
-    await client.query('BEGIN');
+  const { conversation, created } = await withTransaction(localPool, async client => {
     const pair = [actor.user.id, recipientId].sort();
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`virgoscorpio_hub:direct:${siteId}:${pair.join(':')}`]);
     if (await hasBlockBetween(client, siteId, actor.user.id, recipientId)) {
@@ -123,17 +122,14 @@ async function createDirectConversation(ctx, siteId, body) {
       );
       created = true;
     }
-    const conversation = await client.query(
+    const result = await client.query(
       `SELECT c.id,c.site_id,c.conversation_type,c.group_id,c.created_at,c.updated_at
          FROM social_conversations c WHERE c.site_id=$1 AND c.id=$2`,
       [siteId, conversationId]
     );
-    await client.query('COMMIT');
-    return ctx.sendJson(ctx.res, created ? 201 : 200, { conversation: conversation.rows[0], created, requestId });
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally { client.release(); }
+    return { conversation: result.rows[0], created };
+  });
+  return ctx.sendJson(ctx.res, created ? 201 : 200, { conversation, created, requestId });
 }
 
 async function listMessages(ctx, siteId, conversationId) {
@@ -156,10 +152,8 @@ async function listMessages(ctx, siteId, conversationId) {
 async function createMessage(ctx, siteId, conversationId, body) {
   const content = cleanRequiredText(body.body, MAX_MESSAGE_LENGTH);
   if (!content) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_MESSAGE_INVALID', 'Message body must contain 1–10000 characters.');
-  const client = await ctx.localPool.connect();
-  try {
-    await client.query('BEGIN');
-    const conversation = await assertConversationMember(client, ctx, siteId, conversationId, ctx.actor.user.id, { lock: true });
+  const saved = await withTransaction(ctx.localPool, async client => {
+    await assertConversationMember(client, ctx, siteId, conversationId, ctx.actor.user.id, { lock: true });
     const recipients = await client.query(
       `SELECT user_id FROM social_conversation_members
         WHERE site_id=$1 AND conversation_id=$2 AND left_at IS NULL AND user_id<>$3`,
@@ -179,7 +173,7 @@ async function createMessage(ctx, siteId, conversationId, body) {
     if (Number(recent.rows[0]?.count || 0) >= MESSAGES_PER_MINUTE) {
       routeError(ctx, 429, 'ERR_VIRGOSCORPIO_HUB_MESSAGE_RATE_LIMIT', 'Message rate limit exceeded. Try again shortly.');
     }
-    const saved = await client.query(
+    const result = await client.query(
       `INSERT INTO social_messages(site_id,conversation_id,sender_id,body)
        VALUES($1,$2,$3,$4) RETURNING id,conversation_id,sender_id,body,status,created_at,updated_at`,
       [siteId, conversationId, ctx.actor.user.id, content]
@@ -189,15 +183,12 @@ async function createMessage(ctx, siteId, conversationId, body) {
       await client.query(
         `INSERT INTO social_notifications(site_id,user_id,notification_type,payload)
          VALUES($1,$2,'community.message.new',jsonb_build_object('conversationId',$3::text,'messageId',$4::text,'fromUserId',$5::text))`,
-        [siteId, recipient.user_id, conversationId, saved.rows[0].id, ctx.actor.user.id]
+        [siteId, recipient.user_id, conversationId, result.rows[0].id, ctx.actor.user.id]
       );
     }
-    await client.query('COMMIT');
-    return ctx.sendJson(ctx.res, 201, { message: saved.rows[0], requestId: ctx.requestId });
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally { client.release(); }
+    return result.rows[0];
+  });
+  return ctx.sendJson(ctx.res, 201, { message: saved, requestId: ctx.requestId });
 }
 
 async function handleBlocks(ctx, siteId, targetId, method) {
@@ -270,9 +261,7 @@ async function handleReports(ctx, siteId, reportId, method) {
     if (!REPORT_TYPES.has(body.targetType) || !isUuid(body.targetId)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_TARGET', 'Report targetType and targetId are invalid.');
     if (!REPORT_CATEGORIES.has(body.category)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_CATEGORY', 'Report category is invalid.');
     const detail = cleanRequiredText(body.detail, MAX_REPORT_DETAIL_LENGTH);
-    const client = await ctx.localPool.connect();
-    try {
-      await client.query('BEGIN');
+    const report = await withTransaction(ctx.localPool, async client => {
       // Serialize rate-limit accounting by reporter so concurrent requests cannot
       // all pass the count check and exceed the documented ceiling.
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`virgoscorpio_hub:report-rate:${siteId}:${ctx.actor.user.id}`]);
@@ -297,12 +286,9 @@ async function handleReports(ctx, siteId, reportId, method) {
          ON CONFLICT DO NOTHING`,
         [siteId, result.rows[0].id, ctx.actor.user.id]
       );
-      await client.query('COMMIT');
-      return ctx.sendJson(ctx.res, 201, { report: result.rows[0], requestId: ctx.requestId });
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally { client.release(); }
+      return result.rows[0];
+    });
+    return ctx.sendJson(ctx.res, 201, { report, requestId: ctx.requestId });
   }
   if (method === 'PATCH' && reportId) {
     await ctx.requireCapability(ctx.actor, siteId, 'community:moderate');
@@ -310,9 +296,7 @@ async function handleReports(ctx, siteId, reportId, method) {
     const body = await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000));
     if (!['reviewing', 'resolved', 'dismissed'].includes(body.status)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_STATUS', 'A report may be moved to reviewing, resolved, or dismissed.');
     const note = cleanRequiredText(body.moderationNote, MAX_REPORT_DETAIL_LENGTH);
-    const client = await ctx.localPool.connect();
-    try {
-      await client.query('BEGIN');
+    const report = await withTransaction(ctx.localPool, async client => {
       const updated = await client.query(
         'UPDATE social_reports SET status=$3,moderation_note=$4,reviewed_by=$5,updated_at=now() WHERE site_id=$1 AND id=$2 RETURNING id,site_id,reporter_id,target_type,target_id,category,detail,status,moderation_note,reviewed_by,updated_at',
         [siteId, reportId, body.status, note, ctx.actor.user.id]
@@ -324,12 +308,9 @@ async function handleReports(ctx, siteId, reportId, method) {
           [siteId, ctx.actor.user.id, reportId, note]
         );
       }
-      await client.query('COMMIT');
-      return ctx.sendJson(ctx.res, 200, { report: updated.rows[0], requestId: ctx.requestId });
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw error;
-    } finally { client.release(); }
+      return updated.rows[0];
+    });
+    return ctx.sendJson(ctx.res, 200, { report, requestId: ctx.requestId });
   }
   return false;
 }
@@ -342,9 +323,7 @@ async function handleModeration(ctx, siteId) {
     routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_MODERATION_ACTION', 'Only hide/restore actions on an activity or message are currently supported.');
   }
   const reason = cleanRequiredText(body.reason, MAX_MODERATION_REASON_LENGTH);
-  const client = await ctx.localPool.connect();
-  try {
-    await client.query('BEGIN');
+  const target = await withTransaction(ctx.localPool, async client => {
     let result;
     if (body.targetType === 'activity') {
       result = await client.query(
@@ -364,12 +343,9 @@ async function handleModeration(ctx, siteId) {
       'INSERT INTO virgoscorpio_hub_moderation_actions(site_id,actor_id,target_type,target_id,action,reason) VALUES($1,$2,$3,$4,$5,$6)',
       [siteId, ctx.actor.user.id, body.targetType, body.targetId, body.action, reason]
     );
-    await client.query('COMMIT');
-    return ctx.sendJson(ctx.res, 200, { moderation: { targetType: body.targetType, targetId: body.targetId, action: body.action, target: result.rows[0] }, requestId: ctx.requestId });
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    throw error;
-  } finally { client.release(); }
+    return result.rows[0];
+  });
+  return ctx.sendJson(ctx.res, 200, { moderation: { targetType: body.targetType, targetId: body.targetId, action: body.action, target }, requestId: ctx.requestId });
 }
 
 async function handleNotifications(ctx, siteId, notificationId, action, method) {

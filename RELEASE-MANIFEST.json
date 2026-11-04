@@ -1,7 +1,7 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
@@ -154,5 +154,75 @@
     "Playwright browser/accessibility, fuzz, load/soak and backup-restore tests",
     "dependency/SBOM review, independent security audit, operational runbooks and release approval",
     "Execute release:readiness and retain the generated report, test logs, and reviewed external evidence; release:assert-ready must pass before production claims"
-  ]
+  ],
+  "codebaseOptimizationReview": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "a8ca0afec79cf68258906de2cdc65e1a347c1053",
+    "scope": "repository-wide JavaScript source/test inventory and representative pattern review",
+    "enumeratedFiles": {
+      "apps": 10,
+      "packages": 76,
+      "scripts": 26,
+      "tests": 86,
+      "total": 198
+    },
+    "semver": {
+      "previousVersion": "0.5.1",
+      "candidateVersion": "0.5.2",
+      "changeType": "patch",
+      "released": false
+    },
+    "implemented": [
+      "Adopt shared PostgreSQL transaction lifecycle in five community workflow transactions.",
+      "Adopt shared PostgreSQL transaction lifecycle in Stripe checkout reconciliation; update summary counters after commit.",
+      "Add transaction commit/rollback/client-release regression tests.",
+      "Document architecture pressure points and staged refactoring opportunities.",
+      "Centralize product version metadata and remove hard-coded 0.5.1 runtime/release evidence defaults."
+    ],
+    "publicApiChanged": false,
+    "databaseMigrationsAdded": false,
+    "productionCertified": false,
+    "codeScanningAtReview": {
+      "openAlerts": 5,
+      "high": 4,
+      "medium": 1,
+      "latestInstanceCommit": "a8ca0afec79cf68258906de2cdc65e1a347c1053",
+      "disposition": "Open; not dismissed or waived."
+    }
+  },
+  "candidateValidation": {
+    "reviewedAt": "2026-11-04",
+    "branch": "refactor/codebase-patterns-2026-11",
+    "runtime": {
+      "node": "26.12.1",
+      "platform": "win32",
+      "arch": "x64"
+    },
+    "npmCi": "PASS (180 packages installed; no dependency versions changed for this patch).",
+    "artifactCheck": {
+      "status": "PASS",
+      "requiredPaths": 189,
+      "javascriptFilesSyntaxChecked": 200
+    },
+    "unitTests": {
+      "status": "PASS",
+      "tests": 427,
+      "passed": 424,
+      "failed": 0,
+      "skipped": 3
+    },
+    "focusedTests": {
+      "status": "PASS",
+      "tests": 22,
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    "npmAuditHigh": {
+      "status": "PASS",
+      "vulnerabilities": 0
+    },
+    "livePostgresMemgraphIntegration": "NOT_RUN_LOCALLY; requires external services and separate integration evidence.",
+    "productionCertified": false
+  }
 }

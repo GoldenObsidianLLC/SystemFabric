@@ -4,6 +4,7 @@ const { LoggerProvider, BatchLogRecordProcessor } = require('@opentelemetry/sdk-
 const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http');
 const { resourceFromAttributes } = require('@opentelemetry/resources');
 const { parseExporterHeaders } = require('./tracing');
+const { PRODUCT_VERSION } = require('../../domain/src/version');
 
 const SERVICE_NAME_RE = /^[a-z][a-z0-9._-]{0,63}$/;
 const TOKEN_RE = /^[A-Za-z0-9_.:-]{1,120}$/;
@@ -70,7 +71,7 @@ function parseLogExportConfig(env = process.env, serviceName = 'virgoscorpio-hub
     : 'unknown';
   const version = typeof env.VIRGOSCORPIO_HUB_VERSION === 'string' && VERSION_RE.test(env.VIRGOSCORPIO_HUB_VERSION)
     ? env.VIRGOSCORPIO_HUB_VERSION
-    : '0.5.1';
+    : PRODUCT_VERSION;
 
   return Object.freeze({
     enabled,

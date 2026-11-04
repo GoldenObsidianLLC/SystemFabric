@@ -11,6 +11,7 @@ const {
 const { AsyncLocalStorageContextManager } = require('@opentelemetry/context-async-hooks');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 const { resourceFromAttributes } = require('@opentelemetry/resources');
+const { PRODUCT_VERSION } = require('../../domain/src/version');
 const {
   BatchSpanProcessor,
   ParentBasedSampler,
@@ -139,7 +140,7 @@ function parseTracingConfig(env = process.env, serviceName = 'virgoscorpio-hub-a
     : 'unknown';
   const version = typeof env.VIRGOSCORPIO_HUB_VERSION === 'string' && /^[0-9A-Za-z.+-]{1,40}$/.test(env.VIRGOSCORPIO_HUB_VERSION)
     ? env.VIRGOSCORPIO_HUB_VERSION
-    : '0.5.1';
+    : PRODUCT_VERSION;
 
   return Object.freeze({
     enabled,

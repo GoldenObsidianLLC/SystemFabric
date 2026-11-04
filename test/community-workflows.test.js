@@ -83,3 +83,65 @@ test('notification read-all endpoint is recognized and scopes updates by user an
   assert.match(statement, /WHERE site_id=\$1 AND user_id=\$2 AND read_at IS NULL/);
   assert.deepEqual(values, [siteId, actorId]);
 });
+
+function transactionalDirectConversationPool({ blocked = false } = {}) {
+  const state = { statements: [], commits: 0, rollbacks: 0, releases: 0 };
+  const conversation = {
+    id: 'd47bf4ed-2029-401c-8f31-4e0ec17199ef',
+    site_id: siteId,
+    conversation_type: 'direct',
+    group_id: null
+  };
+  const client = {
+    async query(sql) {
+      state.statements.push(sql);
+      if (sql === 'BEGIN') return { rows: [] };
+      if (sql === 'COMMIT') { state.commits += 1; return { rows: [] }; }
+      if (sql === 'ROLLBACK') { state.rollbacks += 1; return { rows: [] }; }
+      if (/pg_advisory_xact_lock/.test(sql)) return { rows: [] };
+      if (/SELECT 1 FROM social_blocks/.test(sql)) return { rows: blocked ? [{ present: 1 }] : [] };
+      if (/SELECT c\.id FROM social_conversations/.test(sql)) return { rows: [] };
+      if (/INSERT INTO social_conversations/.test(sql)) return { rows: [{ id: conversation.id }] };
+      if (/SELECT c\.id,c\.site_id/.test(sql)) return { rows: [conversation] };
+      if (/INSERT INTO social_conversation_members|INSERT INTO social_notifications/.test(sql)) return { rows: [] };
+      throw new Error(`Unexpected transaction query: ${sql}`);
+    },
+    release() { state.releases += 1; }
+  };
+  return {
+    state,
+    async query(sql) {
+      assert.match(sql, /SELECT u\.id FROM users/);
+      return { rows: [{ id: recipientId }] };
+    },
+    async connect() { return client; }
+  };
+}
+
+test('direct conversation creation commits before returning and releases its transaction client', async () => {
+  const pool = transactionalDirectConversationPool();
+  const ctx = createContext({ method: 'POST', body: { recipientId }, pool });
+
+  assert.equal(await handleCommunityWorkflowRoute(ctx), true);
+  assert.equal(ctx.res.statusCode, 201);
+  assert.equal(ctx.res.payload.created, true);
+  assert.equal(ctx.res.payload.conversation.id, 'd47bf4ed-2029-401c-8f31-4e0ec17199ef');
+  assert.equal(pool.state.commits, 1);
+  assert.equal(pool.state.rollbacks, 0);
+  assert.equal(pool.state.releases, 1);
+  assert.equal(pool.state.statements[0], 'BEGIN');
+  assert.equal(pool.state.statements.at(-1), 'COMMIT');
+});
+
+test('direct conversation policy denial rolls back and releases its transaction client', async () => {
+  const pool = transactionalDirectConversationPool({ blocked: true });
+  const ctx = createContext({ method: 'POST', body: { recipientId }, pool });
+
+  await assert.rejects(
+    handleCommunityWorkflowRoute(ctx),
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_BLOCKED' && error.statusCode === 403
+  );
+  assert.equal(pool.state.commits, 0);
+  assert.equal(pool.state.rollbacks, 1);
+  assert.equal(pool.state.releases, 1);
+});
