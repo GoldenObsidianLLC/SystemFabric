@@ -1,8 +1,8 @@
-# EnginEx AI-Native 6.2
+# EnginEx AI-Native 7.0
 
 EnginEx is a dependency-free Node.js HTML template engine with a restricted expression interpreter, nested template composition, bounded rendering, machine-readable grammar, JSON Schema-based data contracts, structured diagnostics, optional AI providers, and an optional Model Context Protocol (MCP) adapter.
 
-> **Security position:** EnginEx parses a restricted expression language. The synchronous compiler uses `Function` only to compile statements it generates from validated AST nodes; raw template source is never concatenated into executable code. Treat the compiler as security-critical. This does not make arbitrary static HTML safe. Keep helpers capability-limited, and never enable unsafe legacy compatibility for untrusted templates.
+> **Security position:** EnginEx parses a restricted expression language. The synchronous compiler uses `Function` only to compile statements it generates from validated AST nodes; raw template source is never concatenated into executable code. Treat the compiler as security-critical. Legacy `<?njs ?>` JavaScript execution has been removed in 7.0.0. This does not make arbitrary static HTML safe. Keep helpers capability-limited.
 
 ## Highlights
 
@@ -67,7 +67,7 @@ const html = await engine('product-list.html', {
 });
 ```
 
-The original Express-compatible callback API is retained. The safe engine rejects `<?njs ... ?>` blocks. The separately named legacy adapter remains an explicitly unsafe compatibility feature.
+The original Express-compatible callback API is retained. EnginEx 7.0.0 rejects `<?njs ... ?>` blocks and no longer ships the legacy JavaScript renderer. The former `allowUnsafeCode` option and `engine.unsafe()` entry point return `ERR_ENGINEX_UNSAFE_API`.
 
 ## Compiled rendering and prepared data
 
@@ -149,10 +149,10 @@ Mark dynamic regions with a fragment name and wrap them in a real DOM element us
 - `engine.attachWebSocketLivePreview()` attaches to a host-supplied `ws`-compatible server and supports authorized full previews plus incremental sessions. It does not bundle a WebSocket server.
 - `engine.connectWebTransport()` is a browser client for a host-implemented JSON-lines service. `engine.wrapRtcDataChannel()` wraps an already-negotiated WebRTC data channel; signaling and ICE are the host application's responsibility.
 
-Use adapters only when workload-specific measurements justify them. The current 6.2 exploratory CLI benchmark is captured in [the updated comparison and benchmark report](docs/UPDATED-COMPARISON.md): five-run medians were 33,764 renders/sec for compiled EnginEx, 54,426 for prepared immutable data, and 202,406 for native PHP CLI with OPcache. Twig was not installed. The environment's Node.js is below the package's declared minimum and the shared host showed substantial run-to-run variance, so these measurements are not production qualification or universal performance claims. The 500-request HTTP smoke tests use Node's and PHP's built-in development servers, not PHP-FPM, and are documented separately.
+Use adapters only when workload-specific measurements justify them. The historical 6.2 exploratory CLI benchmark is captured in [the updated comparison and benchmark report](docs/UPDATED-COMPARISON.md): five-run medians were 33,764 renders/sec for compiled EnginEx, 54,426 for prepared immutable data, and 202,406 for native PHP CLI with OPcache. These results are not EnginEx 7.0 measurements. Twig was not installed. The environment's Node.js is below the package's declared minimum and the shared host showed substantial run-to-run variance, so these measurements are not production qualification or universal performance claims. The 500-request HTTP smoke tests use Node's and PHP's built-in development servers, not PHP-FPM, and are documented separately.
 
 
-## EnginEx 6.2 runtime contracts
+## EnginEx 7.0 runtime contracts
 
 ### Named performance profiles
 
@@ -366,9 +366,13 @@ For URL values, apply `safeUrl` and then output the result through normal escape
 
 Triple braces only accept engine-branded safe HTML from `engine.safeHtml()` or designated safe helpers. `safeHtml()` is a trust assertion, not a sanitizer: do not wrap untrusted HTML with it.
 
-## Legacy compatibility
+## Migrating from EnginEx 6.x
 
-Trusted historical `<?njs ... ?>` files can be rendered only with `allowUnsafeCode: true` through `engine-legacy.js`. That mode executes arbitrary JavaScript in the Node.js process and is not a sandbox. Do not enable it for templates authored by users or an AI model. Migrate behavior to named helpers and safe template expressions before deployment.
+EnginEx 7.0.0 removes the arbitrary-JavaScript `<?njs ... ?>` renderer and the `engine-legacy.js` adapter. Passing `allowUnsafeCode: true` or calling `engine.unsafe()` now fails with `ERR_ENGINEX_UNSAFE_API`; no compatibility switch can re-enable execution.
+
+Replace historical blocks with the restricted expression language and explicitly registered helpers. For example, move business logic into a host-owned helper with a narrow input/output contract, register only the helper needed by the template, and render its result using ordinary escaped interpolation. Do not expose filesystem, process, environment, unrestricted network, or generic module-loading capabilities to template helpers.
+
+The parser still recognizes legacy block boundaries so that historical files fail with a clear `ERR_ENGINEX_UNSAFE_CODE_DISABLED` diagnostic rather than rendering JavaScript as markup. There is no automatic conversion for arbitrary JavaScript blocks because their side effects and access to process capabilities cannot be safely inferred.
 
 ## Tests, evals, benchmarks
 

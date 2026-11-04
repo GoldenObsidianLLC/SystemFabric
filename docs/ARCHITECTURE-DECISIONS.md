@@ -28,9 +28,9 @@
 
 ## ADR-005: EnginEx is isolated behind a rendering adapter
 
-**Decision:** VirgoScorpio Hub uses vendored EnginEx 6.2.0 through `packages/render`. The renderer consumes validated documents and prepared data rather than issuing CMS SQL queries.
+**Decision:** VirgoScorpio Hub uses vendored EnginEx 7.0.0 through `packages/render`. The renderer consumes validated documents and prepared data rather than issuing CMS SQL queries. The 7.0.0 upgrade removes arbitrary-JavaScript `<?njs ?>` rendering and fails closed when legacy opt-in APIs are called.
 
-**Trade-off:** VirgoScorpio Hub's supported Node.js minimum follows the vendored package declaration (>=22.23.4); this build has only been locally tested on 22.16.0.
+**Trade-off:** VirgoScorpio Hub's supported Node.js minimum follows the vendored package declaration (>=22.23.4). EnginEx 7.0 removes legacy arbitrary-JavaScript template execution; historical `<?njs ?>` templates require migration to restricted expressions and allow-listed helpers.
 
 ## ADR-006: AI is provider-neutral and optional
 

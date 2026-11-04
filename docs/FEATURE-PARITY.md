@@ -1,8 +1,8 @@
-# VirgoScorpio Hub Feature Coverage & Strategic Capability Matrix — 0.5.1
+# VirgoScorpio Hub Feature Coverage & Strategic Capability Matrix — 0.6.0
 
 This matrix separates current implementation evidence from planned and research-stage capabilities. A class, migration, API route, UI surface, provider adapter, or CI workflow definition is not proof of a complete user workflow or production readiness.
 
-VirgoScorpio Hub's current 0.5.1 baseline remains a developer-preview hardening candidate. The collaborative AI-native capabilities below describe the intended direction; they must not be presented as shipped features until implementation and acceptance evidence exist.
+VirgoScorpio Hub 0.6.0 is an unreleased security/compatibility candidate on the 0.5.x developer-preview lineage. EnginEx 7.0.0 removes arbitrary-JavaScript legacy template execution; historical `<?njs ?>` templates need migration to restricted expressions and allow-listed helpers. The collaborative AI-native capabilities below describe the intended direction; they must not be presented as shipped features until implementation and acceptance evidence exist.
 
 ## Maturity definitions
 
@@ -20,7 +20,7 @@ VirgoScorpio Hub's current 0.5.1 baseline remains a developer-preview hardening 
 |---|---|---|
 | CMS content | Pages/posts/custom types, structured JSON documents, revisions, restore-as-new-draft, review, publish/schedule/unpublish/archive, optimistic version checks | **Developer-preview foundation.** Editorial collaboration, full import/export, multilingual editing UX, advanced workflows and migration tooling still expanding. |
 | Visual builder | Nested drag-and-drop canvas, core widgets, properties, responsive preview, undo/redo, import/export, preview and draft recovery | **Partial.** Not full Elementor parity: theme builder, popup/form builder, global component studio, dynamic query builder and marketplace remain incomplete. Browser E2E was not run locally. |
-| Rendering | EnginEx 6.2.0-based safe rendering, constrained widgets, validated documents and output limits | **Implemented baseline.** Supported Node runtime and realistic data/load must still be validated. |
+| Rendering | EnginEx 7.0.0 safe rendering, constrained widgets, validated documents and output limits; arbitrary-JavaScript legacy template execution removed | **Implemented baseline.** Supported Node runtime and realistic data/load must still be validated. |
 | Authentication | Password hashing, sessions/cookies, CSRF/origin controls, invitations, reset/verification workflows, TOTP foundation, OIDC/SAML integration code | **Partial.** Real provider integration, MFA recovery lifecycle, email delivery, session handling behind real proxies and comprehensive recovery tests remain gates. |
 | Tenancy | Site memberships, capability checks and site-scoped repository/API patterns | **Partial.** Production-wide tenant isolation and independent authorization review remain mandatory. |
 | PostgreSQL/Memgraph | PostgreSQL authoritative store, transactional outbox, version/idempotency controls, graph integration test | **Implemented foundation.** Live migrations, graph outage/replay/reconciliation and concurrent tests were skipped because services were unavailable in the recorded validation environment. |
@@ -125,4 +125,4 @@ The collaborative AI-native capabilities are an additional strategic direction, 
 
 ## Release statement
 
-VirgoScorpio Hub 0.5.1 is an expanded developer-preview hardening candidate. It is not feature-equivalent to WordPress, WooCommerce, BuddyPress or Elementor and has not been production-certified. The strategic AI and real-time capabilities in this document are planned or research-stage unless a row explicitly states otherwise. See `LOCAL-VALIDATION.md`, `RELEASE-GATE.md`, `RELEASE-EVIDENCE.md` and [the roadmap](ROADMAP.md).
+VirgoScorpio Hub 0.6.0 remains an expanded developer preview, is not feature-equivalent to WordPress, WooCommerce, BuddyPress or Elementor, and has not been production-certified. The strategic AI and real-time capabilities in this document are planned or research-stage unless a row explicitly states otherwise. See [release readiness](RELEASE_READINESS.md), [the changelog](../CHANGELOG.md), and [the roadmap](ROADMAP.md).

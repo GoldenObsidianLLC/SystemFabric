@@ -32,6 +32,10 @@ Arrows describe conceptual dependencies, not necessarily synchronous calls or a 
 
 Use the source tree and tests as the source of truth; responsibilities can evolve between versions.
 
+## Rendering boundary
+
+The renderer boundary uses EnginEx 7.0.0 through `packages/render`. Its safe restricted grammar and generated renderer remain available; arbitrary JavaScript `<?njs ?>` templates and the `engine-legacy.js` compatibility adapter were removed. Calls to legacy opt-in APIs fail closed; templates must use restricted expressions and narrowly allow-listed helpers.
+
 ## API authentication seam
 
 The API composition module keeps responsibility for request lifecycle, identity lookup, session authentication, and the security checks that must run before a route is invoked. Browser authentication route handling is grouped in `apps/api/src/auth-routes.js`: its public handler covers login, MFA verification, password recovery, bootstrap, invitation acceptance, and SAML/OIDC callbacks; its authenticated handler covers account/session and MFA management routes. It receives explicit dependencies (identity, SSO adapters, bounded body readers, rate limiting, response/error helpers) and returns whether it handled the route.

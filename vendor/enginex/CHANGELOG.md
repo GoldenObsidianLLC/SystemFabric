@@ -1,5 +1,11 @@
 # Changelog
 
+## 7.0.0 — 2026-11-04
+
+**Breaking security change:** removed the legacy arbitrary-JavaScript `<?njs ... ?>` renderer and deleted `engine-legacy.js`. The `allowUnsafeCode: true` option and `engine.unsafe()` API now fail closed with `ERR_ENGINEX_UNSAFE_API`. Legacy template blocks fail with `ERR_ENGINEX_UNSAFE_CODE_DISABLED`; they are never executed by the safe renderer.
+
+Migration: replace legacy blocks with the restricted expression grammar and narrowly allow-listed application helpers. No automated converter is provided because arbitrary JavaScript can perform side effects and access process capabilities that cannot be inferred safely.
+
 ## 6.2.0 — 2026-10-27
 
 - Added a canonical, versioned `RenderRequest` normalization API shared by integration entry points.

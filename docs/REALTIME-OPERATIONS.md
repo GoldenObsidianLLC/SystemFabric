@@ -228,4 +228,4 @@ This runbook does not close any production gate. At minimum, the following remai
 - Independent tenant/site authorization and WebSocket/origin/security review, plus accessibility/browser acceptance.
 - Release-owner approval against the exact candidate SHA and all applicable release evidence.
 
-Until these are completed and accepted, keep VirgoScorpio Hub 0.5.1 at **NOT_PRODUCTION_CERTIFIED / NO-GO**. Keep realtime features disabled or limited to the reviewed isolated developer-preview environment.
+Until these are completed and accepted, keep the current VirgoScorpio Hub 0.6.0 candidate at **NOT_PRODUCTION_CERTIFIED / NO-GO**. Keep real-time features disabled or limited to the reviewed isolated developer-preview environment.

@@ -14,7 +14,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.5.1 is an actively developed software baseline. It is **not production-certified**. Passing tests and static checks do not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md).
+> **Project status:** VirgoScorpio Hub 0.6.0 is an unreleased security/compatibility candidate on the 0.5.x developer-preview lineage. It upgrades the renderer to EnginEx 7.0.0 and removes arbitrary-JavaScript legacy template execution. The platform remains **NOT_PRODUCTION_CERTIFIED**; passing local/hosted CI does not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and the [0.6.0 changelog](CHANGELOG.md).
 
 ## Table of contents
 

@@ -1,8 +1,10 @@
-# EnginEx 6.2 vs. Native PHP and Twig
+# Historical EnginEx 6.2 comparison vs. Native PHP and Twig
+
+> Historical benchmark snapshot only. It predates EnginEx 7.0.0 and must not be presented as 7.0.0 performance evidence.
 
 EnginEx is a Node.js template engine, not a general-purpose replacement for PHP. Native PHP templates execute the PHP language; EnginEx safe mode uses a restricted expression language and compiles validated templates into reusable JavaScript render functions. Twig is the closest PHP comparison because it is a dedicated template language.
 
-- [Current performance comparison](UPDATED-COMPARISON.md)
+- [Historical 6.2 performance comparison](UPDATED-COMPARISON.md)
 - [Machine-readable CLI medians](../bench/enginex-php-twig-comparison.json)
 - [Raw per-run CLI measurements](../bench/paired-runs/)
 - [HTTP smoke, concurrency 1](../bench/http-comparison-v6.2-c1.json)

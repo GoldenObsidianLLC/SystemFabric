@@ -146,11 +146,30 @@ test('legacy NJS blocks fail closed by default and never execute', async t => {
   assert.equal(globalThis.__enginexShouldNotRun, undefined);
 });
 
-test('explicit unsafe compatibility mode renders trusted NJS templates', async t => {
+test('removed legacy execution API rejects allowUnsafeCode and engine.unsafe without executing template code', async t => {
   const { root, write } = await fixture(t);
-  await write('index.html', '<h1><?njs echo(window.name); ?></h1>');
-  const html = await engine('index.html', opts(root, { name: 'Ada' }, { allowUnsafeCode: true }));
-  assert.equal(html, '<h1>Ada</h1>');
+  await write('index.html', '<?njs globalThis.__enginexShouldNotRun = true; echo("bad"); ?>');
+  delete globalThis.__enginexShouldNotRun;
+
+  await assert.rejects(
+    engine('index.html', opts(root, {}, { allowUnsafeCode: true })),
+    { code: 'ERR_ENGINEX_UNSAFE_API' }
+  );
+  await assert.rejects(
+    engine.unsafe('index.html', opts(root)),
+    { code: 'ERR_ENGINEX_UNSAFE_API' }
+  );
+
+  const unsafeCallbackError = await new Promise(resolve => {
+    engine.unsafe('index.html', opts(root), error => resolve(error));
+  });
+  assert.equal(unsafeCallbackError.code, 'ERR_ENGINEX_UNSAFE_API');
+
+  const callbackError = await new Promise(resolve => {
+    engine('index.html', opts(root, {}, { allowUnsafeCode: true }), error => resolve(error));
+  });
+  assert.equal(callbackError.code, 'ERR_ENGINEX_UNSAFE_API');
+  assert.equal(globalThis.__enginexShouldNotRun, undefined);
 });
 
 test('strict paths reject traversal and external symlinks', async t => {

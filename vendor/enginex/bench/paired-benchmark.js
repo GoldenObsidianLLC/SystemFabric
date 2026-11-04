@@ -75,7 +75,7 @@ const outputHashes = [...new Set(measured.map(row => row.singleOutputSha256).fil
 const outputBytes = [...new Set(measured.map(row => row.outputBytes).filter(Number.isFinite))];
 const equivalent = measured.length >= 2 && measured.every(row => row.outputEquivalentAcrossRuns) && outputHashes.length === 1 && outputBytes.length === 1;
 const report = {
-  title: 'EnginEx 6.2 paired CLI rendering benchmark',
+  title: `EnginEx ${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version} paired CLI rendering benchmark`,
   generatedAt: new Date().toISOString(),
   evidenceClass: 'LOCAL_MEASUREMENT_EXPLORATORY',
   status: 'NOT_PRODUCTION_CERTIFIED',

@@ -1,6 +1,6 @@
 # VirgoScorpio Hub Security and Threat Model
 
-**Scope:** VirgoScorpio Hub 0.5.3 hardening candidate / developer preview. This document describes the implemented controls and the remaining security work. It is not a certification or independent audit.
+**Scope:** VirgoScorpio Hub 0.6.0 security/compatibility candidate / developer preview. EnginEx 7.0.0 removes the legacy arbitrary-JavaScript template renderer. This document describes implemented controls and remaining security work; it is not a certification or independent audit.
 
 ## Assets to protect
 

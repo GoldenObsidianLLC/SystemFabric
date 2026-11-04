@@ -67,3 +67,15 @@ The Medium EnginEx alert is unchanged. The application does not opt into legacy 
 The four High alert closures mean CodeQL no longer reports those data-flow findings after the authentication route/cookie extraction. They do not make the browser session token cease to be a bearer credential: session and MFA tokens are still intentionally transported in secure, HttpOnly cookies and only their digests are stored in PostgreSQL. Continue to review TLS termination, trusted proxy configuration, browser/session lifecycle and revocation, same-origin/CSRF controls, and deployment cookie flags. This is not an independent security assessment.
 
 **Disposition:** retain #14 open pending a maintainer/security-owner decision on the unsafe legacy-template compatibility surface. The application does not opt into `<?njs ?>`, and the safe renderer rejects it by default. The legacy path remains unsafe and must not receive user-authored or AI-authored templates. The project remains `NOT_PRODUCTION_CERTIFIED`.
+
+## Revalidation on 2026-11-04 — EnginEx 7.0.0 candidate
+
+After PR #64 the default branch baseline was `aa361ab`. The remaining open Medium alert #14 identified arbitrary JavaScript execution in `vendor/enginex/engine-legacy.js`, reachable only through the explicitly unsafe legacy adapter.
+
+The 0.6.0 candidate upgrades EnginEx from 6.2.0 to 7.0.0, deletes `engine-legacy.js`, removes `allowUnsafeRequire`, and makes `allowUnsafeCode: true` and `engine.unsafe()` fail closed with `ERR_ENGINEX_UNSAFE_API`. Legacy `<?njs ?>` blocks continue to be recognized as legacy syntax only so the safe renderer can reject them with `ERR_ENGINEX_UNSAFE_CODE_DISABLED`; no arbitrary JavaScript template execution remains.
+
+Local EnginEx 7.0.0 validation passed on Node 26.12.1 / Windows x64: 94 tests, 91 passed, 0 failed, 3 platform-specific skips; package integrity verification passed for 31 required files. The vendor test command is now serial (`--test-concurrency=1`) to prevent memory exhaustion when the worker-pool/accelerator tests compete with the full parallel suite on constrained Windows workstations.
+
+**CodeQL disposition:** alert #14 is still open on the `aa361ab` main baseline. The 0.6.0 candidate is intended to remove the sink rather than suppress the alert. Wait for the required PR CodeQL run and post-merge default-branch analysis before recording it as fixed. No alert is manually dismissed, suppressed, or waived.
+
+**Compatibility:** This is a breaking EnginEx 7.0.0 major upgrade. VirgoScorpio Hub increments from 0.5.4 to 0.6.0 (minor before 1.0.0, consistent with SemVer's pre-1.0 guidance). Historical templates using JavaScript blocks must migrate to restricted expressions and allow-listed host helpers; no automatic converter is available. Production certification remains blocked.

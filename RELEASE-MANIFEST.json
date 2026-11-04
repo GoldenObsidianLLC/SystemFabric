@@ -1,7 +1,7 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
@@ -12,16 +12,17 @@
     "packageLock": {
       "included": true,
       "trackedInGit": true,
-      "cleanNpmCiValidated": true,
+      "cleanNpmCiValidated": false,
       "reviewedByMaintainer": false,
-      "reason": "A fresh isolated Windows x64 Node.js 26.12.1 npm ci passed on 2026-10-30 after synchronizing redis@6.3.1 and its five @redis/* package entries. Human maintainer dependency review and supported CI matrix evidence remain open."
+      "reason": "The current 0.6.0 / EnginEx 7.0.0 candidate requires fresh clean npm ci evidence. A local repeat on 2026-11-04 exhausted Node.js heap under workstation memory pressure; hosted CI must verify clean installation and lockfile identity before merge or release."
     }
   },
   "renderer": {
     "name": "enginex-ai-native",
-    "version": "6.2.0",
+    "version": "7.0.0",
     "source": "vendor/enginex",
-    "license": "MIT"
+    "license": "MIT",
+    "legacyJavaScriptTemplates": "Removed in EnginEx 7.0.0; legacy opt-in APIs fail closed."
   },
   "data": {
     "authoritative": "PostgreSQL",
@@ -223,9 +224,16 @@
     {
       "version": "0.5.4",
       "changeType": "patch",
-      "status": "unreleased-candidate",
+      "status": "merged-to-main-unreleased",
       "date": "2026-11-04",
       "summary": "Extract auth session persistence and lifecycle into a composable package module without changing the identity-service public method surface."
+    },
+    {
+      "version": "0.6.0",
+      "changeType": "minor",
+      "status": "unreleased-candidate",
+      "date": "2026-11-04",
+      "summary": "Upgrade EnginEx to 7.0.0, remove the arbitrary-JavaScript legacy template renderer, and fail closed on legacy opt-in APIs."
     }
   ],
   "historicalValidation": {
@@ -328,21 +336,55 @@
   },
   "candidateValidation": {
     "reviewedAt": "2026-11-04",
-    "branch": "refactor/auth-service-seams-2026-11",
-    "runtime": {
-      "node": "26.12.1",
-      "platform": "win32",
-      "arch": "x64"
-    },
+    "branch": "fix/remove-unsafe-legacy-renderer-2026-11",
     "semver": {
-      "previousVersion": "0.5.3",
-      "candidateVersion": "0.5.4",
-      "changeType": "patch",
+      "previousVersion": "0.5.4",
+      "candidateVersion": "0.6.0",
+      "changeType": "minor",
       "released": false
+    },
+    "breakingChanges": [
+      "EnginEx dependency upgraded from 6.2.0 to 7.0.0.",
+      "Legacy <?njs ?> execution and engine-legacy.js were removed.",
+      "allowUnsafeCode: true and engine.unsafe() fail with ERR_ENGINEX_UNSAFE_API."
+    ],
+    "localValidation": "PASS",
+    "hostedCi": "PENDING_PULL_REQUEST",
+    "remainingCodeScanning": [
+      14
+    ],
+    "productionCertified": false,
+    "localEnginex": {
+      "version": "7.0.0",
+      "status": "PASS",
+      "syntaxFilesChecked": 22,
+      "tests": 94,
+      "passed": 91,
+      "failed": 0,
+      "skipped": 3,
+      "packageIntegrityCheck": {
+        "status": "PASS",
+        "files": 31
+      },
+      "testConcurrency": 1
+    },
+    "codeScanning": {
+      "baselineCommit": "aa361ab",
+      "baselineOpenAlerts": [
+        14
+      ],
+      "expectedCandidateBehavior": "Removing engine-legacy.js removes the only CodeQL js/unsafe-code-construction sink identified by alert #14. Confirm through the PR CodeQL analysis; do not pre-mark fixed."
+    },
+    "npmCi": {
+      "status": "LOCAL_REPEAT_FAILED_OUT_OF_MEMORY",
+      "historicalAttempt": "180 packages installed and reported PASS in the pre-existing candidate record.",
+      "latestAttempt": "npm ci --no-audit --no-fund exited 1 after Node.js heap exhaustion on this Windows workstation; the pre-existing node_modules tree also showed extraneous/invalid packages when inspected with npm ls.",
+      "externalDependencyVersionsChanged": false,
+      "releaseGate": "A fresh clean npm ci in hosted CI is required before merge; do not treat the prior local install record as current-candidate proof."
     },
     "artifactCheck": {
       "status": "PASS",
-      "requiredPaths": 194,
+      "requiredPaths": 195,
       "javascriptFilesSyntaxChecked": 205
     },
     "unitTests": {
@@ -350,40 +392,29 @@
       "tests": 437,
       "passed": 434,
       "failed": 0,
-      "skipped": 3
-    },
-    "focusedTests": {
-      "status": "PASS",
-      "tests": 35,
-      "passed": 35,
-      "failed": 0,
-      "skipped": 0
+      "skipped": 3,
+      "skipNotes": [
+        "Open-file rename semantics differ on Windows.",
+        "O_NOFOLLOW is not exposed on this Windows platform."
+      ]
     },
     "npmAuditHigh": {
       "status": "PASS",
       "vulnerabilities": 0
     },
-    "codeScanning": {
-      "latestMainCommit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
-      "latestMainAnalysisAt": "2026-11-04T21:18:28Z",
-      "openAlerts": [
-        14
-      ],
-      "fixedAlerts": [
-        30,
-        31,
-        32,
-        33
-      ],
-      "manualDismissals": 0
+    "migrationGuide": "docs/ENGINEX-7-MIGRATION.md",
+    "testConcurrency": 1,
+    "latestNpmCiAttempt": {
+      "date": "2026-11-04",
+      "status": "BLOCKED_BY_LOCAL_RESOURCE_LIMIT",
+      "detail": "A subsequent npm ci attempt after the successful local test run terminated with Node.js heap out of memory on the Windows workstation. The attempt left npm ls reporting invalid/extraneous installed-package entries. No package or lockfile content was changed by the attempt. The previous clean-install evidence is retained as historical; hosted PR CI must validate a fresh clean install for this candidate."
     },
-    "productionCertified": false,
-    "npmCi": {
+    "latestNpmAudit": {
       "status": "PASS",
-      "packagesInstalled": 180,
-      "dependencyVersionsChanged": false
-    },
-    "livePostgresMemgraphIntegration": "NOT_RUN_LOCALLY; required hosted PR CI integration job is pending."
+      "command": "npm audit --audit-level=high",
+      "vulnerabilities": 0,
+      "date": "2026-11-04"
+    }
   },
   "postMergeCodeScanning": {
     "analyzedAt": "2026-11-04T21:18:28Z",
@@ -445,5 +476,19 @@
     "publicIdentityServiceMethodsChanged": false,
     "databaseMigrationsAdded": false,
     "publicHttpContractChanged": false
+  },
+  "semverChange": {
+    "hub": {
+      "from": "0.5.4",
+      "to": "0.6.0",
+      "type": "minor",
+      "reason": "Pre-1.0 compatibility change removing the unsafe legacy renderer surface."
+    },
+    "enginex": {
+      "from": "6.2.0",
+      "to": "7.0.0",
+      "type": "major",
+      "reason": "Removal of allowUnsafeCode/engine.unsafe execution capability."
+    }
   }
 }

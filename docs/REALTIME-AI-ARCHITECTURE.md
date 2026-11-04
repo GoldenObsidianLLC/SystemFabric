@@ -1,7 +1,7 @@
 # VirgoScorpio Hub Real-Time and AI-Native Architecture
 
 **Status:** Proposed architecture for research and staged implementation
-**Baseline:** VirgoScorpio Hub 0.5.1 developer-preview hardening candidate
+**Historical baseline:** VirgoScorpio Hub 0.5.1 developer-preview snapshot. The current unreleased candidate is 0.6.0; this document describes the architecture lineage and is not release-readiness evidence.
 **Scope:** Real-time events, presence, collaboration, AI orchestration/governance, contextual intelligence and collaborative workflow planning
 
 This document describes a target architecture, not an inventory of currently shipped services. Components and data flows are proposed until implemented and validated. The design must preserve the current platform boundaries: PostgreSQL is authoritative for transactional state, Memgraph is a derived graph projection, and external AI/provider integrations are optional dependencies that require explicit policy and environment validation. It is also guided by the VirgoScorpio Hub Manifesto: AI should augment human capability and preserve agency, creative dignity and meaningful participation. Those values are engineering goals, not claims of guaranteed economic outcomes.

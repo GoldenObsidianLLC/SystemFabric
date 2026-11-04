@@ -1,11 +1,11 @@
-# VirgoScorpio Hub Implementation Roadmap — 0.5.1
+# VirgoScorpio Hub Implementation Roadmap — 0.6.0
 
-> **Validation baseline note — 1 November 2026:** the latest reviewed candidate evidence covers 14 migrations on a fresh disposable PostgreSQL database (14/14 applied, then 14/14 skipped) and a supported v0008-to-current migration-upgrade fixture. The latest live PostgreSQL/Memgraph integration job passed 22/22 with zero skips. Candidate PR #36 is not merged, and the downstream provider, security, operations and release-approval milestones remain open. See the [project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md).
+> **Historical validation snapshot — 1 November 2026:** the evidence below records the state at that date and is not evidence for the 0.6.0 candidate or its current commit. The latest 0.6.0 source snapshot upgrades the vendored renderer to EnginEx 7.0.0 and removes legacy JavaScript template execution. Current release approval, supported-runtime, security and deployment evidence remains governed by [Release readiness](RELEASE_READINESS.md). The archived [0.5.1 project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md) is a historical record.
 
 ## Completed foundations in this source snapshot
 
 - Node.js modular core, PostgreSQL source of truth, Memgraph graph projection, versioned transactional outbox.
-- EnginEx 6.2.0 rendering adapter and versioned page-document model.
+- EnginEx 7.0.0 safe rendering adapter (legacy JavaScript template execution removed) and versioned page-document model.
 - AI provider adapters, content/page drafting, schema validation and constrained MCP tools.
 - Identity/session and publication workflow foundations; browser editor baseline.
 - File/Document/Media libraries, curated icons, video widgets, math formula validation/rendering, optional optimization.

@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "release": "6.2.0",
+  "release": "7.0.0",
   "claims": [
     {
       "id": "ENG-CLAIM-001",
       "claim": "The compiled renderer output is equivalent to the interpreter for tested fixtures.",
       "status": "tested",
-      "evidence": ["npm test", "bench/enginex-php-twig-comparison.json"],
-      "scope": "local test suite and fixture only"
+      "evidence": ["test/engine.test.js", "test/v6.2.test.js"],
+      "scope": "7.0.0 local tests compare safe compiled and interpreter output; the paired PHP/Twig benchmark remains a historical 6.2.0 artifact, not 7.0.0 throughput evidence"
     },
     {
       "id": "ENG-CLAIM-002",
@@ -36,6 +36,13 @@
       "status": "not-audited",
       "evidence": [],
       "scope": "requires separate independent review"
+    },
+    {
+      "id": "ENG-CLAIM-006",
+      "claim": "Legacy JavaScript template execution is unavailable through the 7.0.0 renderer API.",
+      "status": "tested",
+      "evidence": ["test/engine.test.js"],
+      "scope": "Unit tests prove legacy flags and engine.unsafe reject without running template code; this is not an independent security audit."
     }
   ]
 }

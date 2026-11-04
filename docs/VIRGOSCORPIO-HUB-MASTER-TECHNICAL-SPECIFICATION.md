@@ -1,15 +1,15 @@
 # VirgoScorpio Hub Master Technical Specification
 
-**Document version:** 0.5.1  
+**Document version:** 0.6.0<br>
 **Status:** Foundation baseline / architecture RFC accepted for implementation  
 **Product classification:** AI-integrated, contract-driven headless CMS and HTML rendering runtime  
 **Primary runtime:** Node.js 22.23.4+  
 **Authoritative content store:** PostgreSQL  
 **Relationship query projection:** Memgraph  
-**Initial renderer:** EnginEx 6.2.0, vendored and pinned under `vendor/enginex/`  
-**Last updated:** 2026-10-27
+**Renderer:** EnginEx 7.0.0, vendored and pinned under `vendor/enginex/`; legacy JavaScript template execution is removed<br>
+**Last updated:** 2026-11-04
 
-> This specification defines the intended architecture and the current starter implementation. Sections marked “implemented baseline” exist in the repository. “Planned / release gate” items are not claimed to be complete. VirgoScorpio Hub 0.5.1 is not production-certified.
+> This specification defines the intended architecture and the current starter implementation. Sections marked “implemented baseline” exist in the repository. “Planned / release gate” items are not claimed to be complete. VirgoScorpio Hub 0.6.0 remains a developer-preview candidate and is not production-certified. Its EnginEx 7.0.0 dependency rejects and removes legacy arbitrary-JavaScript `<?njs ?>` template execution.
 
 ## 1. Executive summary
 
@@ -200,7 +200,7 @@ Trusted first-party plugins may run in-process under the application's normal se
 
 ## 7. Rendering runtime based on EnginEx
 
-EnginEx is the initial rendering subsystem, vendored as version 6.2.0. It is kept behind `packages/render/src/index.js` so VirgoScorpio Hub can evolve or replace the renderer without coupling content models to one engine's internal types.
+EnginEx is the rendering subsystem, vendored as version 7.0.0 with legacy JavaScript template execution removed. It is kept behind `packages/render/src/index.js` so VirgoScorpio Hub can evolve or replace the renderer without coupling content models to one engine's internal types.
 
 ### 7.1 Rendering request lifecycle
 
@@ -414,8 +414,8 @@ A local library-object reconciler is exposed as `npm run reconcile:library`; it 
 
 The CI workflow now defines a supported-Node matrix, PostgreSQL/Memgraph integration services, browser/accessibility smoke tests, dependency audit/SBOM steps and CodeQL. These definitions have not produced verified CI results during local packaging. Current local validation is 76 passing VirgoScorpio Hub tests and 88 passing vendored EnginEx tests, with 3 database integration tests skipped. The environment's Node.js 22.16.0 is below the declared 22.23.4 minimum; there is no reviewed lockfile, clean `npm ci`, live database/provider run, Playwright E2E, container runtime validation, production load test or independent security review. See `LOCAL-VALIDATION.md`, `FEATURE-PARITY.md` and `RELEASE-GATE.md`.
 
-## Implementation status update — 0.5.1
+## Implementation status update — 0.5.1 (historical)
 
 The 0.5.1 hardening candidate adds user-facing, site-scoped direct conversations/messages, notifications/read markers, blocks, reports and moderation APIs. Checkout creation now persists its provider request snapshot for idempotent recovery, reconciles expired stock holds against Stripe Checkout Session state (never releasing stock solely because a local timer elapsed), and commits/releases reservations transactionally on observed payment/expiration transitions. The release-readiness command records machine-readable checks and keeps external deployment evidence fail-closed. These changes are covered by unit tests but still require live PostgreSQL/Stripe, browser, security and supported-runtime validation.
 
-VirgoScorpio Hub 0.5.1 remains an expanded developer preview, not a production-certified or full WordPress/WooCommerce/BuddyPress/Elementor equivalent release.
+At the 0.5.1 milestone VirgoScorpio Hub remained an expanded developer preview, not a production-certified or full WordPress/WooCommerce/BuddyPress/Elementor equivalent release. The current candidate is 0.6.0; see the specification metadata at the top of this document and the release-readiness page for current status.

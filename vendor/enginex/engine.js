@@ -19,8 +19,8 @@
  *   {{#block "content"}}...{{/block}}
  *   {{ value | upper }}                 filter pipeline
  *
- * Legacy <?njs ... ?> templates are supported only through the explicit,
- * intentionally unsafe `{ allowUnsafeCode: true }` compatibility switch.
+ * Legacy <?njs ... ?> templates are rejected. The historical arbitrary-
+ * JavaScript compatibility renderer was removed in EnginEx 7.0.0.
  */
 
 const fs = require('node:fs');
@@ -32,7 +32,7 @@ const { FragmentDependencyGraph, DirtyBitSet, pathMatchesDependency } = require(
 const { getProfileLimits, describeProfiles } = require('./lib/performance-profiles');
 const { normalizeRenderRequest, RENDER_REQUEST_SCHEMA } = require('./lib/render-request');
 
-const VERSION = '6.2.0';
+const VERSION = '7.0.0';
 const OPEN = '{{';
 const RAW_OPEN = '{{{';
 const DEFAULT_EXTENSION = '.html';
@@ -62,7 +62,7 @@ const ENGINE_OPTION_KEYS = new Set([
   'maxTemplateBytes', 'maxNodes', 'maxBlockDepth', 'maxExpressionNodes', 'maxExpressionDepth',
   'maxDataDepth', 'maxDataStringLength', 'maxDataNodes', 'maxDataProperties', 'maxLoopIterations',
   'maxIncludeDepth', 'maxOutputLength', 'maxRenderTimeMs', 'allowUnsafeCode',
-  'allowUnsafeRequire', 'development', 'onError', 'templateName', 'dataSchema', 'templateManifest',
+  'development', 'onError', 'templateName', 'dataSchema', 'templateManifest',
   'pureHelpers', 'incremental', 'changedPaths', 'wasmSimdAccelerator', 'workerPool', 'webGpu',
   'profile', 'telemetry', 'onMetric', 'traceId', 'requestId', 'strictOutputContexts'
 ]);
@@ -2229,13 +2229,8 @@ async function* renderNodes(nodes, templatePath, state, blockOverrides = null) {
       }
       case 'extends': break;
       case 'legacy':
-        if (!state.options.allowUnsafeCode) {
-          throw new TemplateError('Legacy <?njs ... ?> blocks execute arbitrary JavaScript. Set allowUnsafeCode: true only for trusted templates.', {
-            code: 'ERR_ENGINEX_UNSAFE_CODE_DISABLED', templatePath
-          });
-        }
-        throw new TemplateError('Unsafe legacy blocks are handled by the explicitly selected compatibility engine.', {
-          code: 'ERR_ENGINEX_UNSAFE_COMPAT_DISPATCH', templatePath
+        throw new TemplateError('Legacy <?njs ... ?> blocks were removed in EnginEx 7.0.0. Replace them with restricted expressions and explicitly registered helpers.', {
+          code: 'ERR_ENGINEX_UNSAFE_CODE_DISABLED', templatePath
         });
       default: throw new TemplateError(`Unknown compiled node type ${node.type}.`, { code: 'ERR_ENGINEX_UNKNOWN_NODE', templatePath });
     }
@@ -2287,8 +2282,8 @@ async function* renderStreamInternal(templateName, options = {}) {
   let failureCode = null;
   try {
     if (options.allowUnsafeCode) {
-      // The compatibility path is deliberately separate from the secure interpreter.
-      throw new TemplateError('Use engine.unsafe(...) to render legacy <?njs ?> templates.', { code: 'ERR_ENGINEX_UNSAFE_API' });
+      // Fail closed even when the renderer is invoked directly with legacy options.
+      throw new TemplateError('Legacy JavaScript template execution was removed in EnginEx 7.0.0. Use restricted expressions and explicitly registered helpers.', { code: 'ERR_ENGINEX_UNSAFE_API' });
     }
     const limits = mergeLimits(options);
     const rootPath = await resolveRootPath(templateName, options);
@@ -2344,16 +2339,14 @@ function engine(templateName, options, callback) {
   if (typeof options === 'function') { callback = options; options = {}; }
   options = options && typeof options === 'object' ? options : {};
   if (options.allowUnsafeCode) {
-    const legacyOptions = {
-      ...options,
-      root: options.root ?? options.views ?? process.cwd(),
-      strictPaths: options.strictPaths !== false,
-      allowRequire: options.allowUnsafeRequire === true
-    };
-    delete legacyOptions.allowUnsafeCode;
-    delete legacyOptions.allowUnsafeRequire;
-    const legacy = require('./engine-legacy');
-    return legacy(templateName, legacyOptions, callback);
+    const error = new TemplateError('Legacy JavaScript template execution was removed in EnginEx 7.0.0. Use restricted expressions and explicitly registered helpers.', {
+      code: 'ERR_ENGINEX_UNSAFE_API'
+    });
+    if (typeof callback === 'function') {
+      Promise.resolve().then(() => callback(error));
+      return undefined;
+    }
+    return Promise.reject(error);
   }
   const promise = render(templateName, options);
   if (typeof callback === 'function') {
@@ -2991,7 +2984,7 @@ engine.version = VERSION;
 engine.__engine = engine;
 engine.__express = engine;
 engine.unsafe = function unsafe(templateName, options, callback) {
-  if (typeof options === 'function') { callback = options; options = {}; }
+  if (typeof options === 'function') { callback = options; }
   return engine(templateName, { ...(options || {}), allowUnsafeCode: true }, callback);
 };
 
