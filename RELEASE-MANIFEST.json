@@ -210,7 +210,7 @@
     ],
     "publicHttpContractChanged": false,
     "databaseMigrationsAdded": false,
-    "codeScanningDisposition": "No alerts dismissed or waived. Re-evaluate on the candidate commit; cookie alerts require security-owner review and the vendored unsafe legacy template alert remains an explicit unsafe-compatibility decision."
+    "codeScanningDisposition": "PR #63 branch-scoped CodeQL analysis passed and reported only the existing Medium legacy-template alert #14. The four inherited High cookie alerts #30?#33 were not reported on the branch and await post-merge default-branch analysis. No alert was manually dismissed or suppressed."
   },
   "versionHistory": [
     {
@@ -294,7 +294,27 @@
       "status": "PASS",
       "vulnerabilities": 0
     },
-    "hostedCi": "PENDING_PULL_REQUEST",
-    "productionCertified": false
+    "productionCertified": false,
+    "codeScanning": {
+      "branch": "fix/security-hardening-2026-11",
+      "workflow": "PASS",
+      "branchScopedOpenAlerts": [
+        {
+          "number": 14,
+          "severity": "medium",
+          "rule": "js/unsafe-code-construction",
+          "path": "vendor/enginex/engine-legacy.js",
+          "line": 569
+        }
+      ],
+      "inheritedMainAlertsAwaitingPostMergeAnalysis": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "dismissedOrSuppressed": false,
+      "disposition": "Four High auth-cookie alerts were not reported for the PR branch; confirm their default-branch state after merge. The Medium legacy template-code alert remains open and requires a security-owner decision."
+    }
   }
 }
