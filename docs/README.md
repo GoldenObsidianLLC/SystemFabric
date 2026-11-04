@@ -5,7 +5,7 @@
 - [VirgoScorpio Hub 0.5.1 project status report — 1 November 2026](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md) — full engineering, security, release-readiness, governance and funding snapshot. Historical candidate evidence; not production approval.
 - [Repository coherence and continuity review — 1 November 2026](REPOSITORY-COHERENCE-AND-CONTINUITY-REVIEW-2026-11-01.md) — repository inventory, documentation drift, CI/readiness gaps, branch reconciliation, safe corrections and backlog.
 
-The project remains **NOT_PRODUCTION_CERTIFIED**. PR #36 is a candidate branch, not a merged release. See the report for exact revisions and evidence boundaries.
+The project remains **NOT_PRODUCTION_CERTIFIED**. PR #59, the hard VirgoScorpio Hub identity cutover, was merged to `main` at `d2dfcd3` (merge time: 4 November 2026, 03:52 UTC). This did not certify a release. The 1 November status reports below predate that merge and remain historical snapshots, not current-commit readiness evidence. PR #59 explicitly leaves CodeQL High alerts #4–#7 pending security-owner review and disposition. See [Release readiness](RELEASE_READINESS.md) for the unchanged production NO-GO gates.
 
 This directory contains task-oriented documentation. The root [README](../README.md) is the project overview and quickest entry point; the pages below contain detail so that the README can stay scannable.
 
