@@ -25,6 +25,7 @@ Apply these checks to every AI-enabled product track:
 
 ### Reliability and release process
 
+- [x] Remove the legacy EnginEx arbitrary-JavaScript renderer and fail closed on the retired compatibility flags. Review [EnginEx 7.0 Migration](ENGINEX-7-MIGRATION.md); this breaking renderer upgrade is an unreleased 0.6.0 candidate, not release approval.
 - [ ] Make CI green across the supported Node.js matrix, live PostgreSQL/Memgraph job, browser smoke tests, and CodeQL upload.
 - [ ] Add fresh-database migration and supported upgrade-path evidence.
 - [ ] Exercise concurrent writes, outbox retry/recovery, and failure recovery under representative load.

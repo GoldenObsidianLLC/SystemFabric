@@ -1,6 +1,6 @@
 # VirgoScorpio Hub — VS Code Development and Blocker-Resolution Setup
 
-**Scope:** local development and test infrastructure for VirgoScorpio Hub 0.5.1. This is not a production deployment guide. Never place production credentials in this workspace.
+**Scope:** local development and test infrastructure for VirgoScorpio Hub 0.6.0 and the current 0.5.x developer-preview lineage. This is not a production deployment guide. Never place production credentials in this workspace.
 
 ## Preferred path: VS Code Dev Containers
 

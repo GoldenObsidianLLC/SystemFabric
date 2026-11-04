@@ -2,9 +2,13 @@
 
 > **Current status: NOT_PRODUCTION_CERTIFIED.** The readiness report is an engineering evidence snapshot, not production approval.
 
-## Post-snapshot repository change — 4 November 2026
+## Post-snapshot repository changes — 4 November 2026
 
-PR [#59](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/59), the VirgoScorpio Hub hard identity cutover, merged to `main` at commit `d2dfcd3e8d7b4113941456be0cf96f01a0a036c1` (2026-11-04 03:52:44 UTC). This is a repository identity/code change, not a release-certification event. The detailed candidate evidence below was generated on 1 November and has not been regenerated against the post-merge commit. PR #59 records that CodeQL High alerts #4–#7 remain open pending explicit security-owner review and disposition; no suppression or dismissal was claimed. Production remains NO-GO until the applicable gates have current evidence and named approval.
+PR [#59](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/59) completed the identity cutover. PR #61 added the encrypted durable AI queue foundation; PR #62 centralized transaction/version infrastructure; PR #63 extracted browser auth routes/cookie handling; and PR #64 separated session persistence/lifecycle from identity orchestration. These PRs are merged to `main` at the latest pre-candidate commit `aa361ab` (4 November 2026). They are code changes, not release-certification events. The detailed candidate evidence below was generated on 1 November and is historical, not current-commit evidence.
+
+The post-PR #63 CodeQL analysis on `dc4a82d` marked High auth-cookie alerts #30–#33 fixed without manual dismissal. Medium alert #14 (`js/unsafe-code-construction`) remains open on the `aa361ab` baseline, at the now-removed vendor legacy renderer. PR #65 is the 0.6.0 / EnginEx 7.0.0 compatibility/security candidate that removes that legacy execution adapter; its CodeQL and other hosted checks must pass before the alert can be recorded as fixed. No finding is manually dismissed or suppressed.
+
+**Current release state remains NOT_PRODUCTION_CERTIFIED / NO-GO.** The 0.6.0 candidate's local tests and static checks do not replace current supported-runtime, hosted integration, security, provider, accessibility, operational, independent-review and named release-owner evidence.
 
 ## Historical candidate snapshot — 1 November 2026
 
@@ -105,6 +109,6 @@ For each remaining gate, record:
 
 VirgoScorpio Hub remains **NOT_PRODUCTION_CERTIFIED**. Do not mark it production-ready until every required gate has current evidence for the intended release revision, exceptions are documented and approved, restore/rollback paths are proven, and the release owner signs off. A green CI run, public repository, or a passed unit suite is not production certification.
 
-### Recommended 0.5.1 release scope
+### Recommended developer-preview scope
 
-See [RELEASE-SCOPE.md](RELEASE-SCOPE.md) for the recommended developer-preview scope and provider matrix. It is explicitly marked pending named release-owner approval; it does not certify production or waive the open evidence gates.
+The [0.5.1 release-scope proposal](RELEASE-SCOPE.md) remains a historical proposal pending named release-owner approval. Reconcile its exclusions and limitations against the 0.6.0 candidate before preparing a release decision. It does not certify production or waive any evidence gate.

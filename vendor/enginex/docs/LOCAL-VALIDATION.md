@@ -1,4 +1,6 @@
-# EnginEx 6.2.0 local validation report
+# EnginEx 6.2.0 local validation report (historical)
+
+> This report is a historical snapshot for EnginEx 6.2.0. EnginEx 7.0.0 has separate current validation in `RELEASE-MANIFEST.json`; the Node.js runtime and results below are not evidence for 7.0.0.
 
 Status: **validated locally for the recorded test environment; not production-certified**.
 

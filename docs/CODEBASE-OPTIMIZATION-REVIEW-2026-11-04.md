@@ -106,3 +106,18 @@ Version is advanced from **0.5.1 to 0.5.2**, a patch increment under Semantic Ve
 - The work does not certify production readiness, provider connectivity, disaster recovery, capacity, accessibility, or external integration behavior.
 
 **Design rule:** deepen a module only where it reduces the facts callers must know. Prefer a small interface with a strong implementation, and keep domain policy, authorization, and cross-system consistency visible where contracts differ.
+
+## Follow-up — 4 November 2026: renderer security and compatibility boundary
+
+PR #65 candidate (Hub 0.6.0 / EnginEx 7.0.0) addresses the remaining Medium CodeQL sink by removing the explicit legacy arbitrary-JavaScript template renderer instead of suppressing or waiving the finding. The earlier 0.5.2 architecture review and validation counts above are historical snapshots; the 0.6.0 candidate validation is summarized here.
+
+- Deleted `vendor/enginex/engine-legacy.js`; no application call sites were found in `apps/`, `packages/`, `scripts/`, or `test/`.
+- Removed `allowUnsafeRequire`; calls with `allowUnsafeCode: true` or `engine.unsafe()` now fail closed with `ERR_ENGINEX_UNSAFE_API`.
+- Legacy `<?njs ?>` source is rejected with `ERR_ENGINEX_UNSAFE_CODE_DISABLED`; the safe restricted-expression interpreter and generated renderer remain.
+- Added an explicit EnginEx 6.x to 7.0.0 migration guide. Existing JavaScript blocks must be converted to restricted expressions, host-owned view-model preparation, or narrowly registered helpers. No automatic conversion is attempted.
+- Made both root and vendored EnginEx test runners serial (`--test-concurrency=1`) after the default parallel root suite exhausted memory on the Windows workstation. The bounded root runner passes 437 tests (434 passed, 0 failed, 3 platform-specific skips); EnginEx validation passes 94 tests (91 passed, 0 failed, 3 platform-specific skips) and verifies 31 package files.
+- Local Hub validation passes 194 required artifacts, 205 JavaScript syntax checks, 437 tests (434 passed, 0 failed, 3 Windows/platform skips), with zero high-severity npm audit vulnerabilities.
+
+**Compatibility/versioning:** EnginEx 6.2.0 → 7.0.0 is a major version change because arbitrary-JavaScript template execution was removed. VirgoScorpio Hub 0.5.4 → 0.6.0 is a minor pre-1.0 increment under SemVer's pre-1.0 compatibility convention. This candidate is not yet released or production-certified.
+
+**Security disposition:** alert #14 was open on baseline `aa361ab`. Do not record it as fixed until the PR's branch-scoped CodeQL job and post-merge default-branch analysis confirm that the sink is no longer reported. No finding is manually dismissed or suppressed.

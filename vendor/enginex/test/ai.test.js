@@ -24,7 +24,7 @@ test('AI capability manifest and grammar are available without providers', () =>
   const ai = engine.createAI();
   const manifest = ai.describe();
   assert.equal(manifest.name, 'EnginEx');
-  assert.equal(manifest.version, '6.2.0');
+  assert.equal(manifest.version, '7.0.0');
   assert.equal(manifest.language.arbitraryJavaScriptInSafeMode, false);
   assert.ok(ai.getGrammar().productions.expression);
   assert.ok(ai.getManifestSchema().properties.security);

@@ -37,5 +37,5 @@ engine.ResponseCache = ResponseCache;
 engine.DirtyBitSet = DirtyBitSet;
 engine.FragmentDependencyGraph = FragmentDependencyGraph;
 engine.pathMatchesDependency = pathMatchesDependency;
-engine.version = '6.2.0';
+engine.version = '7.0.0';
 module.exports = engine;

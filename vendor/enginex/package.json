@@ -1,6 +1,6 @@
 {
   "name": "enginex-ai-native",
-  "version": "6.2.0",
+  "version": "7.0.0",
   "description": "Dependency-free secure Node.js templating with optimized compiled renderers, change-aware incremental updates, profiles, telemetry, AI tooling, and optional acceleration backends.",
   "main": "index.js",
   "bin": {
@@ -31,8 +31,8 @@
     "./transports/webrtc": "./transports/webrtc-data-channel.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "check": "node --check index.js && node --check lib/performance-profiles.js && node --check lib/backend-capabilities.js && node --check lib/render-request.js && node --check engine.js && node --check bench/http-compare.js && node --check bench/http-client.js && node --check bench/paired-benchmark.js && node --check bench/http/node-server.js && node --check bin/enginex.js && node --check ai/index.js && node --check providers/openai-responses.js && node --check adapters/mcp-server.mjs && node --check mcp/serve-stdio.mjs && node --check lib/dirty-bitset.js && node --check lib/response-cache.js && node --check lib/shared-worker-pool.js && node --check accelerators/wasm-simd.js && node --check accelerators/webgpu-scanner.js && node --check transports/websocket-live-preview.js && node --check transports/webrtc-data-channel.js && node --check transports/webtransport-client.mjs && node --test test/*.test.js && node scripts/verify-package.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "check": "node --check index.js && node --check lib/performance-profiles.js && node --check lib/backend-capabilities.js && node --check lib/render-request.js && node --check engine.js && node --check bench/http-compare.js && node --check bench/http-client.js && node --check bench/paired-benchmark.js && node --check bench/http/node-server.js && node --check bin/enginex.js && node --check ai/index.js && node --check providers/openai-responses.js && node --check adapters/mcp-server.mjs && node --check mcp/serve-stdio.mjs && node --check lib/dirty-bitset.js && node --check lib/response-cache.js && node --check lib/shared-worker-pool.js && node --check accelerators/wasm-simd.js && node --check accelerators/webgpu-scanner.js && node --check transports/websocket-live-preview.js && node --check transports/webrtc-data-channel.js && node --check transports/webtransport-client.mjs && node --test --test-concurrency=1 test/*.test.js && node scripts/verify-package.js",
     "bench:node": "node bench/render.js",
     "bench:prepared": "node bench/render-prepared.js",
     "bench:compare": "node bench/compare.js",

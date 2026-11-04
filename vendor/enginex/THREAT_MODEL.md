@@ -6,7 +6,7 @@ Template source, rendered HTML, template data, trusted application helpers, API 
 
 ## Trust boundaries
 
-1. Template source -> restricted parser -> AST compiler-generated JavaScript / interpreter.
+1. Template source -> restricted parser -> validated AST -> restricted interpreter or compiler-generated renderer. Legacy `<?njs ?>` JavaScript blocks are rejected and never executed.
 2. Build-produced AST manifest -> version, path, node, size and dependency validation -> compiler-generated renderer. Treat the builder and code generator as trusted computing base.
 3. Application data -> data snapshot/schema validation or opaque prepared snapshot -> renderer.
 4. Model output -> strict local parsing/validation -> preview -> human review -> optional publication.
@@ -17,7 +17,7 @@ Template source, rendered HTML, template data, trusted application helpers, API 
 
 | Threat | Controls | Residual risk |
 |---|---|---|
-| Arbitrary code execution from expressions | Restricted grammar; compiler translates only supported AST nodes, string literals are escaped, raw source is not copied into code; direct registered helper calls only | Compiler/codegen bug, malformed manifest accepted by validation, or malicious helper; codegen needs independent review and fuzzing |
+| Arbitrary code execution from expressions | Restricted grammar; compiler translates only supported AST nodes, string literals are escaped, raw source is not copied into code; direct registered helper calls only; legacy JavaScript execution adapter removed in 7.0.0 | Compiler/codegen bug, malformed manifest accepted by validation, or malicious helper; codegen needs independent review and fuzzing |
 | Prototype pollution/property escape | Blocked meta-properties and own-data property reads | Runtime/parser regression |
 | XSS from interpolated values | HTML escaping by default, branded raw output, `safeUrl`, `jsonScript` | HTML contexts other than supported text/quoted attributes; dangerous static HTML |
 | Traversal and symlink escape | Canonical path checks, root confinement, target checks for publication | TOCTOU on mutable deployment directories; incorrect host configuration |

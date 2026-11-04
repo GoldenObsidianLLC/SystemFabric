@@ -4,7 +4,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const required = [
-  'index.js', 'engine.js', 'engine-legacy.js', 'ai/index.js',
+  'index.js', 'engine.js', 'ai/index.js',
   'lib/dirty-bitset.js', 'lib/performance-profiles.js', 'lib/backend-capabilities.js', 'lib/render-request.js', 'schemas/render-request.schema.json',
   'lib/response-cache.js', 'lib/schema.js', 'schemas/template-grammar.json',
   'schemas/template-manifest.schema.json', 'bin/enginex.js', 'test/engine.test.js',
@@ -15,8 +15,10 @@ const required = [
   'optimization/claims-register.json', 'optimization/rollback-manifest.json', 'SECURITY.md', 'THREAT_MODEL.md'
 ];
 const missing = required.filter(item => !fs.existsSync(path.join(root, item)));
-if (missing.length) {
-  console.error(`Package verification failed; missing files: ${missing.join(', ')}`);
+const legacyRendererPresent = fs.existsSync(path.join(root, 'engine-legacy.js'));
+if (missing.length || legacyRendererPresent) {
+  if (missing.length) console.error(`Package verification failed; missing files: ${missing.join(', ')}`);
+  if (legacyRendererPresent) console.error('Package verification failed; the removed unsafe legacy renderer must not be present.');
   process.exitCode = 1;
 } else if (pkg.version !== require('../engine').version || pkg.version !== require('../index').version) {
   console.error(`Package version mismatch: package=${pkg.version}, engine=${require('../engine').version}, index=${require('../index').version}`);

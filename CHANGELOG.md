@@ -2,7 +2,20 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
-## 0.5.4 (unreleased patch candidate)
+## 0.6.0 (unreleased security and compatibility candidate)
+
+### Security and renderer compatibility
+
+- Upgrade the vendored EnginEx renderer from 6.2.0 to 7.0.0 and remove `vendor/enginex/engine-legacy.js`, the legacy `<?njs ?>` arbitrary-JavaScript execution adapter.
+- Make `allowUnsafeCode: true` and `engine.unsafe()` fail closed with `ERR_ENGINEX_UNSAFE_API`; legacy template blocks fail with `ERR_ENGINEX_UNSAFE_CODE_DISABLED`. The safe expression interpreter and generated renderer remain available.
+- Add `docs/ENGINEX-7-MIGRATION.md`, a tested EnginEx 6.x to 7.0 migration guide: replace historical JavaScript blocks with restricted expressions and narrowly allow-listed helpers. No automatic converter is provided.
+- Update release manifests, package metadata, security model, architecture records, third-party notices, artifact checks and versioned test fixtures.
+- Serialize the root unit suite with `--test-concurrency=1`, matching the vendored EnginEx test runner, after the default parallel Node.js test runner exhausted memory on the Windows development workstation. This keeps test resource use bounded and the complete suite repeatable.
+- Bump VirgoScorpio Hub from 0.5.4 to 0.6.0 as a SemVer minor pre-1.0 compatibility change; bump vendored EnginEx from 6.2.0 to 7.0.0 as a SemVer major. This is an unreleased candidate; no tag or publication is implied.
+- Local validation: root `npm run check` passes on Node.js 26.12.1 (195 required paths, 205 JavaScript files syntax-checked, 437 tests: 434 passed, 0 failed, 3 Windows/platform-specific skips); vendor EnginEx 7.0.0 check passes (94 tests: 91 passed, 0 failed, 3 skips; 31 package files verified); `npm audit --audit-level=high` reports 0 vulnerabilities. A repeat `npm ci` attempt on the workstation hit a Node.js out-of-memory failure under local memory pressure; clean-install verification remains an explicit hosted CI gate.
+- Preserve `NOT_PRODUCTION_CERTIFIED`; independent security and deployment validation remain required.
+
+## 0.5.4 (merged to main, unreleased patch)
 
 ### Authentication architecture and maintainability
 
@@ -11,7 +24,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Update the architecture map, required-artifact verification, changelog, and release manifest. Full local validation passes: 194 required paths, 205 JavaScript files syntax-checked, 437 tests (434 passed, 0 failed, 3 platform-specific skips), focused session/auth tests 35/35, and zero npm audit vulnerabilities. Hosted integration CI is the remaining candidate gate. No public API or database migration change is intended.
 - Bump the package and lockfile from 0.5.3 to 0.5.4 as a SemVer patch; this is an unreleased candidate, not a published release.
 
-## 0.5.3 (unreleased patch candidate)
+## 0.5.3 (merged to main, unreleased patch)
 
 ### Security and API architecture
 
@@ -21,7 +34,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Record the post-merge CodeQL result on `dc4a82d`: High auth-cookie findings #30–#33 changed to `fixed` in the default-branch analysis without dismissal; the Medium unsafe legacy-template finding #14 remains open and requires an explicit compatibility/security-owner decision.
 - Bump the package and lockfile from 0.5.2 to 0.5.3 as a SemVer patch. No public HTTP contract or database migration change is intended; this remains an unreleased developer-preview candidate.
 
-## 0.5.2 (unreleased patch candidate)
+## 0.5.2 (merged to main, unreleased patch)
 
 ### Architecture and maintainability
 

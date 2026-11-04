@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "release": "6.2.0",
-  "baselineRelease": "6.1.0",
+  "release": "7.0.0",
+  "baselineRelease": "6.2.0",
   "rollbackStrategy": {
     "renderer": "Keep the previous package artifact and renderer configuration; disable the candidate feature or deploy the previous version.",
     "incrementalRendering": "Disable incremental updates per session and perform a full render when dependencies or patch state are uncertain.",

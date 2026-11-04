@@ -1,4 +1,6 @@
-# EnginEx 6.2.0 vs. Native PHP and Twig
+# Historical EnginEx 6.2.0 measurements vs. Native PHP and Twig
+
+> Historical snapshot. These exploratory results predate EnginEx 7.0.0 and are not performance evidence for the 7.0.0 release.
 
 ## Executive summary
 

@@ -158,7 +158,7 @@ test('opt-in telemetry emits bounded render metrics and callbacks cannot break r
 test('manifest embeds source hashes and reproducibility metadata', async () => {
   await withViews({ 'page.html': '<h1>{{ name }}</h1>' }, async root => {
     const manifest = await engine.buildManifest(root, { entry: 'page.html' });
-    assert.equal(manifest.engineVersion, '6.2.0');
+    assert.equal(manifest.engineVersion, '7.0.0');
     assert.equal(manifest.grammarVersion, 'enginex-template-1');
     assert.equal(manifest.build.reproducible, true);
     assert.match(manifest.templates[0].sourceHash, /^[a-f0-9]{64}$/);
