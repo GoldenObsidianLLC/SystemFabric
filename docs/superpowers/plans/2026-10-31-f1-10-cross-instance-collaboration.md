@@ -21,7 +21,7 @@
 - Redis publish failure after a PostgreSQL commit must not fail the edit acknowledgement or undo the local hub publication.
 - Preserve strict site/document authorization, server-generated origin echo suppression, monotonic sequence delivery, WebSocket 16 KiB frames, 60 messages/minute and 1 MiB outbound backpressure.
 - Heartbeat reconciliation is single-flight per document subscription; it must not create a second timer per document or overlapping database sync requests.
-- Real Redis integration uses only `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true` plus `SYSTEMFABRIC_TEST_REDIS_URL` pointing at an approved local Redis endpoint; do not use application Redis credentials by default or access any primary database.
+- Real Redis integration uses only `VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true` plus `VIRGOSCORPIO_HUB_TEST_REDIS_URL` pointing at an approved local Redis endpoint; do not use application Redis credentials by default or access any primary database.
 - No new package dependency and no database migration.
 
 ## Review Focus
@@ -197,7 +197,7 @@ git commit -m "feat(collaboration): reconcile document sequences on heartbeat"
 
 - [x] **Step 1: Add real-Redis integration tests**
 
-Add a test gated by `SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true` and `SYSTEMFABRIC_TEST_REDIS_URL`. Validate that the URL uses an explicitly approved local endpoint before connecting. Use a unique channel prefix per test run; do not print URL credentials.
+Add a test gated by `VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true` and `VIRGOSCORPIO_HUB_TEST_REDIS_URL`. Validate that the URL uses an explicitly approved local endpoint before connecting. Use a unique channel prefix per test run; do not print URL credentials.
 
 Test two independent bridge clients/hubs for:
 - Cross-instance same-document operation fan-out.
@@ -213,11 +213,11 @@ Expected: the original RED expectation was superseded because Task 1 had already
 
 - [x] **Step 3: Implement the real-Redis integration harness**
 
-Use `createRedisRealtimeBridge` with two independent client pairs and two local hubs. The real Redis test validates only Pub/Sub routing and independent clients; use the in-memory store for operation sequence/recovery. Give each test a random `systemfabric:test:f1-10:<uuid>` channel prefix and close hubs/bridges in `t.after` cleanup. Do not change Redis databases, flush keys or inspect any application database.
+Use `createRedisRealtimeBridge` with two independent client pairs and two local hubs. The real Redis test validates only Pub/Sub routing and independent clients; use the in-memory store for operation sequence/recovery. Give each test a random `virgoscorpio_hub:test:f1-10:<uuid>` channel prefix and close hubs/bridges in `t.after` cleanup. Do not change Redis databases, flush keys or inspect any application database.
 
 - [x] **Step 4: Run the explicit local Redis integration test**
 
-Run: `set SYSTEMFABRIC_RUN_REDIS_INTEGRATION=true && set SYSTEMFABRIC_TEST_REDIS_URL=redis://127.0.0.1:6379 && node --test test/integration/redis-collaboration.integration.test.js`
+Run: `set VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION=true && set VIRGOSCORPIO_HUB_TEST_REDIS_URL=redis://127.0.0.1:6379 && node --test test/integration/redis-collaboration.integration.test.js`
 Expected: test PASS with no skips; fixture validates the endpoint is loopback and the test opens no application database. Use the configured local Redis-compatible endpoint only; never print credentials.
 
 - [x] **Step 5: Write multi-instance browser tests first**

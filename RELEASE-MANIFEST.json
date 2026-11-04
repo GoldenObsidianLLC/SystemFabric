@@ -1,6 +1,6 @@
 {
-  "name": "SystemFabric",
-  "packageName": "systemfabric",
+  "name": "VirgoScorpio Hub",
+  "packageName": "virgoscorpio-hub",
   "version": "0.5.1",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
@@ -100,19 +100,19 @@
     ]
   },
   "validation": {
-    "systemfabricUnitTests": "212 passed, 0 failed, 0 skipped on Node.js 26.12.1 (2026-10-31), including release-readiness Redis URL forwarding and evidence-validator regression tests.",
+    "virgoScorpioHubUnitTests": "212 passed, 0 failed, 0 skipped on Node.js 26.12.1 (2026-10-31), including release-readiness Redis URL forwarding and evidence-validator regression tests.",
     "syntaxAndArtifactCheck": "passed: 146 required paths, 143 JavaScript files syntax-checked on Node.js 26.12.1 (2026-10-31).",
     "apiSmokeTests": "health, editor/platform assets, icon catalogue, escaped math fallback, AI proposal/preview routes, auth requirements and no-database behavior covered by unit/API tests",
     "enginexVendoredTests": "88 passed, 0 failed, 0 skipped on Node.js 26.12.1 (2026-10-31).",
     "supportedNodeRuntimeTested": true,
     "cleanNpmCi": true,
-    "postgresIntegrationTests": "22 live PostgreSQL/Memgraph/Redis integration tests passed with zero skips against the dedicated local TEST_DATABASE_URL systemfabric_test database on 2026-10-31; DATABASE_URL was not used for test operations.",
+    "postgresIntegrationTests": "22 live PostgreSQL/Memgraph/Redis integration tests passed with zero skips against the dedicated local TEST_DATABASE_URL virgoscorpio_hub_test database on 2026-10-31; DATABASE_URL was not used for test operations.",
     "memgraphIntegrationTests": "The 22-test local integration bundle passed with zero skips on 2026-10-31 using dedicated PostgreSQL, Memgraph and loopback Memurai services.",
     "integrationSuite": "22 passed, 0 failed, 0 skipped; includes v0008-to-latest migration upgrade, PostgreSQL transaction rollback/concurrency/outbox, Memgraph projections, Redis shared presence/document Pub/Sub, multi-instance SSE fan-out and tenant isolation (2026-10-31).",
     "memgraphOutageRecovery": "passed on 2026-10-31: persisted projection event remained pending with its lease released while an isolated Memgraph 3.13.1 container was stopped, replayed successfully after restart, produced the expected projection and was not delivered twice.",
     "graphProjectionRebuild": "passed on 2026-10-31: canonical content/taxonomy/relationships rebuilt in a disposable Memgraph 3.13.1 container, tombstones retained, stale nodes removed, safety bound preserved existing state and second rebuild deterministic.",
-    "libraryReconciliationDryRun": "passed on 2026-10-31 against dedicated TEST_DATABASE_URL systemfabric_test; read-only dry-run, no apply/deletion.",
-    "playwrightE2E": "9 Playwright Chromium tests passed on 2026-10-31 using one worker and the approved loopback SYSTEMFABRIC_TEST_REDIS_URL; includes editor, accessibility smoke, two-session collaboration and multi-node recovery/editor matrix. Manual screen-reader and broader WCAG review remain outstanding.",
+    "libraryReconciliationDryRun": "passed on 2026-10-31 against dedicated TEST_DATABASE_URL virgoscorpio_hub_test; read-only dry-run, no apply/deletion.",
+    "playwrightE2E": "9 Playwright Chromium tests passed on 2026-10-31 using one worker and the approved loopback VIRGOSCORPIO_HUB_TEST_REDIS_URL; includes editor, accessibility smoke, two-session collaboration and multi-node recovery/editor matrix. Manual screen-reader and broader WCAG review remain outstanding.",
     "npmAudit": "npm audit --audit-level=high and npm audit --omit=dev --audit-level=high both passed with 0 vulnerabilities reported on 2026-10-31.",
     "cycloneDxSbom": "npm run sbom generated CycloneDX 1.5 SBOM with 163 components and 164 dependency records on 2026-10-31; maintainer review and provenance/attestation remain open.",
     "dependencyAuditAndSBOM": false,
@@ -127,11 +127,11 @@
     "independentSecurityAudit": false,
     "freshMigrationInstall": "PASS — all 14 migrations applied to a disposable fresh PostgreSQL test database, then all 14 skipped on a second pass; disposable database dropped; dedicated TEST_DATABASE_URL only (2026-10-31).",
     "migrationChecksumEolNormalization": "passed: migration checksums normalize CRLF and CR line endings to LF, preserving applied-migration identity across platforms",
-    "postRebaseLiveIntegration": "22 passed, 0 failed, 0 skipped against TEST_DATABASE_URL systemfabric_test, local Memgraph and local Memurai on current main commit (2026-10-31).",
+    "postRebaseLiveIntegration": "22 passed, 0 failed, 0 skipped against TEST_DATABASE_URL virgoscorpio_hub_test, local Memgraph and local Memurai on current main commit (2026-10-31).",
     "postRebaseFreshMigrations": "14/14 applied and 14/14 skipped on the second pass in a disposable local TEST_DATABASE_URL database; disposable DB dropped (2026-10-31).",
     "postRebasePlaywright": "9 Playwright Chromium tests passed on current main using one worker (2026-10-31); manual screen-reader/WCAG review remains open.",
     "gitleaks": "Gitleaks working-tree and all locally fetched Git refs scans both exited 0 with empty JSON findings on 2026-10-31; verify published remote refs before every release.",
-    "releaseReadinessRedisEnvironment": "Regression-tested: release:readiness now forwards only approved local Redis/Memurai endpoints to SYSTEMFABRIC_TEST_REDIS_URL and enables the Redis integration suites; remote, malformed, and absent endpoints leave live Redis tests disabled."
+    "releaseReadinessRedisEnvironment": "Regression-tested: release:readiness now forwards only approved local Redis/Memurai endpoints to VIRGOSCORPIO_HUB_TEST_REDIS_URL and enables the Redis integration suites; remote, malformed, and absent endpoints leave live Redis tests disabled."
   },
   "aiPrivacy": {
     "externalProviderOptInRequired": true,

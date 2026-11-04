@@ -1,8 +1,8 @@
-# SystemFabric Feature Coverage & Strategic Capability Matrix — 0.5.1
+# VirgoScorpio Hub Feature Coverage & Strategic Capability Matrix — 0.5.1
 
 This matrix separates current implementation evidence from planned and research-stage capabilities. A class, migration, API route, UI surface, provider adapter, or CI workflow definition is not proof of a complete user workflow or production readiness.
 
-SystemFabric's current 0.5.1 baseline remains a developer-preview hardening candidate. The collaborative AI-native capabilities below describe the intended direction; they must not be presented as shipped features until implementation and acceptance evidence exist.
+VirgoScorpio Hub's current 0.5.1 baseline remains a developer-preview hardening candidate. The collaborative AI-native capabilities below describe the intended direction; they must not be presented as shipped features until implementation and acceptance evidence exist.
 
 ## Maturity definitions
 
@@ -43,7 +43,7 @@ SystemFabric's current 0.5.1 baseline remains a developer-preview hardening cand
 | AI integration | Mock, OpenAI Responses, OpenAI-compatible, Anthropic and Gemini adapters; page/content proposals, SEO/translation, validation, site policies and MCP | **Implemented foundation.** Live provider calls, model availability, broader governance, contextual retrieval and enterprise integrations need environment-specific tests. AI output never authorizes itself to publish. |
 | Third-party plugins | Manifest/capability approval, Ed25519 provenance, pinned-image runner interface and restricted container invocation foundations | **Partial.** Full archive-to-signed-image supply chain, runtime isolation tests and adversarial review remain. |
 | CI and verification | Workflow definitions for Node 22.23.4/24.22.1, PostgreSQL/Memgraph integration, Playwright and CodeQL; npm audit/SBOM steps; a release-readiness reporter that records test evidence and blocks on missing gates | **Configured/source-tested, not production-certified.** A committed lockfile, supported-runtime run, live services, real integrations, browser E2E, audit/SBOM and independent security evidence are still required. |
-| Production validation | 105 SystemFabric unit tests passed on the previously recorded available runtime; syntax/artifact and live-integration checks are captured by `npm run release:readiness` | **Not production-certified.** Re-run checks against the exact target commit. The recorded environment had a Node version below the declared minimum and lacked several live integrations. Skipped integration tests are not passes. |
+| Production validation | 105 VirgoScorpio Hub unit tests passed on the previously recorded available runtime; syntax/artifact and live-integration checks are captured by `npm run release:readiness` | **Not production-certified.** Re-run checks against the exact target commit. The recorded environment had a Node version below the declared minimum and lacked several live integrations. Skipped integration tests are not passes. |
 
 ### Real-time foundation implementation update
 
@@ -51,7 +51,7 @@ A developer-preview foundation exists for a process-local authorization-aware ev
 
 ## Human-AI symbiosis and agency principles
 
-The [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) sets the project's purpose: technology should amplify human capability, preserve creative dignity and productive relevance, and support meaningful human participation as AI capabilities advance. The manifesto also identifies technological determinism, concentration of power and loss of human agency as guiding concerns. These are project values and design intentions, not measurable claims that the software can guarantee employment, income, or macroeconomic outcomes.
+The [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md) sets the project's purpose: technology should amplify human capability, preserve creative dignity and productive relevance, and support meaningful human participation as AI capabilities advance. The manifesto also identifies technological determinism, concentration of power and loss of human agency as guiding concerns. These are project values and design intentions, not measurable claims that the software can guarantee employment, income, or macroeconomic outcomes.
 
 The engineering interpretation is:
 
@@ -119,10 +119,10 @@ Every planned capability must satisfy the following before it can be marked impl
 
 ## Parity boundaries
 
-WordPress, Elementor, WooCommerce and BuddyPress remain useful comparison points for selected product areas. SystemFabric should define explicit acceptance subsets for each comparison. Do not claim full parity based on a similarly named module, API route, data table, or visual control.
+WordPress, Elementor, WooCommerce and BuddyPress remain useful comparison points for selected product areas. VirgoScorpio Hub should define explicit acceptance subsets for each comparison. Do not claim full parity based on a similarly named module, API route, data table, or visual control.
 
 The collaborative AI-native capabilities are an additional strategic direction, not a substitute for completing the existing core platform, security and release gates.
 
 ## Release statement
 
-SystemFabric 0.5.1 is an expanded developer-preview hardening candidate. It is not feature-equivalent to WordPress, WooCommerce, BuddyPress or Elementor and has not been production-certified. The strategic AI and real-time capabilities in this document are planned or research-stage unless a row explicitly states otherwise. See `LOCAL-VALIDATION.md`, `RELEASE-GATE.md`, `RELEASE-EVIDENCE.md` and [the roadmap](ROADMAP.md).
+VirgoScorpio Hub 0.5.1 is an expanded developer-preview hardening candidate. It is not feature-equivalent to WordPress, WooCommerce, BuddyPress or Elementor and has not been production-certified. The strategic AI and real-time capabilities in this document are planned or research-stage unless a row explicitly states otherwise. See `LOCAL-VALIDATION.md`, `RELEASE-GATE.md`, `RELEASE-EVIDENCE.md` and [the roadmap](ROADMAP.md).

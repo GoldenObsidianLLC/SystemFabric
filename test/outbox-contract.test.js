@@ -70,20 +70,20 @@ test('system-originated events and internal worker messages remain unscoped', ()
 test('domain events fail closed when site scope or classification is missing', () => {
   assert.throws(
     () => eventEnvelopeFromOutboxRow(makeOutboxRow({ site_id: null, classification: 'internal' })),
-    error => error.code === 'ERR_SYSTEMFABRIC_EVENT_CLASSIFICATION_MISMATCH' ||
-      error.code === 'ERR_SYSTEMFABRIC_EVENT_SITE_REQUIRED'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_EVENT_CLASSIFICATION_MISMATCH' ||
+      error.code === 'ERR_VIRGOSCORPIO_HUB_EVENT_SITE_REQUIRED'
   );
 
   assert.throws(
     () => eventEnvelopeFromOutboxRow(makeOutboxRow({ classification: 'internal' })),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_CLASSIFICATION_MISMATCH' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_CLASSIFICATION_MISMATCH' }
   );
 });
 
 test('unsupported schema versions fail rather than being interpreted as v1', () => {
   assert.throws(
     () => eventEnvelopeFromOutboxRow(makeOutboxRow({ schema_version: 2 })),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_SCHEMA_UNSUPPORTED' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_SCHEMA_UNSUPPORTED' }
   );
 });
 
@@ -92,19 +92,19 @@ test('envelope validation rejects unsafe identifiers, invalid actors and invalid
 
   assert.throws(
     () => validateEventEnvelope({ ...base, eventId: 'not-a-uuid' }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_ID_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_ID_INVALID' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, actor: { type: 'user', id: null } }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_ACTOR_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_ACTOR_INVALID' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, resource: { type: 'content', id: RESOURCE_ID, version: 0 } }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_RESOURCE_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_RESOURCE_INVALID' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, correlationId: 'bad\r\nheader' }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_IDENTIFIER_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_IDENTIFIER_INVALID' }
   );
 });
 
@@ -112,11 +112,11 @@ test('event payloads are bounded and must be JSON objects', () => {
   const base = eventEnvelopeFromOutboxRow(makeOutboxRow());
   assert.throws(
     () => validateEventEnvelope({ ...base, payload: [] }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_PAYLOAD_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_PAYLOAD_INVALID' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, payload: { text: 'x'.repeat(70 * 1024) } }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_PAYLOAD_TOO_LARGE' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_PAYLOAD_TOO_LARGE' }
   );
 });
 
@@ -124,15 +124,15 @@ test('public and site-private classifications require a valid site UUID', () => 
   const base = eventEnvelopeFromOutboxRow(makeOutboxRow());
   assert.throws(
     () => validateEventEnvelope({ ...base, eventType: 'announcement.created', classification: 'public', siteId: null }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_SITE_REQUIRED' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_SITE_REQUIRED' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, siteId: null }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_SITE_REQUIRED' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_SITE_REQUIRED' }
   );
   assert.throws(
     () => validateEventEnvelope({ ...base, siteId: 'wrong-site-id' }),
-    { code: 'ERR_SYSTEMFABRIC_EVENT_SITE_INVALID' }
+    { code: 'ERR_VIRGOSCORPIO_HUB_EVENT_SITE_INVALID' }
   );
 });
 

@@ -15,20 +15,20 @@ function validateFormula(tex) {
 }
 function renderMath(tex, { displayMode = false, katex = null } = {}) {
   const validation = validateFormula(tex);
-  if (!validation.valid) { const error = new Error('Math formula failed validation.'); error.code = 'ERR_SYSTEMFABRIC_MATH_INVALID'; error.statusCode = 422; error.details = validation.errors; throw error; }
+  if (!validation.valid) { const error = new Error('Math formula failed validation.'); error.code = 'ERR_VIRGOSCORPIO_HUB_MATH_INVALID'; error.statusCode = 422; error.details = validation.errors; throw error; }
   // `katex: false` explicitly exercises the safe escaped fallback even when
   // the optional KaTeX package is installed in the current environment.
   let renderer = katex === false ? null : katex;
   if (katex === null || katex === undefined) { try { renderer = require('katex'); } catch { renderer = null; } }
   if (!renderer || typeof renderer.renderToString !== 'function') {
     const escaped = escapeHtml(tex);
-    return { html: `<code class="sf-math-unavailable" role="math" aria-label="Mathematical formula">${escaped}</code>`, rendered: false, engine: null, warnings: ['Install the optional KaTeX dependency to enable full TeX rendering.'] };
+    return { html: `<code class="vsh-math-unavailable" role="math" aria-label="Mathematical formula">${escaped}</code>`, rendered: false, engine: null, warnings: ['Install the optional KaTeX dependency to enable full TeX rendering.'] };
   }
   try {
     const html = renderer.renderToString(tex, { displayMode: displayMode === true, output: 'htmlAndMathml', throwOnError: true, strict: 'error', trust: false, maxSize: 10, maxExpand: 1000 });
     return { html, rendered: true, engine: 'katex', warnings: [] };
   } catch (cause) {
-    const error = new Error('Math formula could not be rendered.'); error.code = 'ERR_SYSTEMFABRIC_MATH_RENDER'; error.statusCode = 422; error.cause = cause; throw error;
+    const error = new Error('Math formula could not be rendered.'); error.code = 'ERR_VIRGOSCORPIO_HUB_MATH_RENDER'; error.statusCode = 422; error.cause = cause; throw error;
   }
 }
 module.exports = { renderMath, validateFormula, escapeMathHtml: escapeHtml };

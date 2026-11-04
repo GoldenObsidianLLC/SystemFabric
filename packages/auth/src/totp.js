@@ -42,16 +42,16 @@ function verifyTotp(secret, input, { now = Date.now(), window = 1, lastUsedStep 
   }
   return null;
 }
-function totpUri(secret, email, issuer = 'SystemFabric') {
+function totpUri(secret, email, issuer = 'VirgoScorpio Hub') {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(email)}`;
   const query = new URLSearchParams({ secret, issuer, algorithm: 'SHA1', digits: '6', period: '30' });
   return `otpauth://totp/${label}?${query.toString()}`;
 }
 function keyFromEnv(env) {
-  const value = env.SYSTEMFABRIC_MFA_ENCRYPTION_KEY;
-  if (!value) { const error = new Error('SYSTEMFABRIC_MFA_ENCRYPTION_KEY is required for MFA.'); error.code = 'ERR_SYSTEMFABRIC_MFA_KEY_MISSING'; throw error; }
+  const value = env.VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY;
+  if (!value) { const error = new Error('VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY is required for MFA.'); error.code = 'ERR_VIRGOSCORPIO_HUB_MFA_KEY_MISSING'; throw error; }
   const key = Buffer.from(value, 'base64url');
-  if (key.length !== 32) { const error = new Error('SYSTEMFABRIC_MFA_ENCRYPTION_KEY must decode to exactly 32 bytes.'); error.code = 'ERR_SYSTEMFABRIC_MFA_KEY_INVALID'; throw error; }
+  if (key.length !== 32) { const error = new Error('VIRGOSCORPIO_HUB_MFA_ENCRYPTION_KEY must decode to exactly 32 bytes.'); error.code = 'ERR_VIRGOSCORPIO_HUB_MFA_KEY_INVALID'; throw error; }
   return key;
 }
 function encryptSecret(secret, env = process.env) {

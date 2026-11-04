@@ -2,7 +2,7 @@
 function validationError(code, errors) { return { valid: false, code, errors }; }
 function validateProduct(input, { requireStatus = false } = {}) {
   const errors=[];
-  if (!input || typeof input!=='object' || Array.isArray(input)) return validationError('ERR_SYSTEMFABRIC_PRODUCT_INVALID',['product must be an object']);
+  if (!input || typeof input!=='object' || Array.isArray(input)) return validationError('ERR_VIRGOSCORPIO_HUB_PRODUCT_INVALID',['product must be an object']);
   if (typeof input.slug!=='string'||!/^[a-z0-9][a-z0-9-]{0,180}$/.test(input.slug)) errors.push('slug must be a lowercase URL-safe identifier');
   if (typeof input.name!=='string'||!input.name.trim()||input.name.length>240) errors.push('name must contain 1–240 characters');
   if (!['simple','variable','downloadable','virtual','subscription'].includes(input.productType||'simple')) errors.push('productType is invalid');
@@ -15,10 +15,10 @@ function validateProduct(input, { requireStatus = false } = {}) {
   if (input.images!==undefined&&(!Array.isArray(input.images)||input.images.length>50||input.images.some(id=>typeof id!=='string'||id.length>100))) errors.push('images must be an array of at most 50 asset identifiers');
   if (input.attributes!==undefined&&(!input.attributes||typeof input.attributes!=='object'||Array.isArray(input.attributes)||Buffer.byteLength(JSON.stringify(input.attributes))>32000)) errors.push('attributes must be a small JSON object');
   if (requireStatus && !['draft','published','archived'].includes(input.status)) errors.push('status must be draft, published, or archived');
-  return { valid:errors.length===0,code:'ERR_SYSTEMFABRIC_PRODUCT_INVALID',errors };
+  return { valid:errors.length===0,code:'ERR_VIRGOSCORPIO_HUB_PRODUCT_INVALID',errors };
 }
 function normalizeCart(items) {
-  if (!Array.isArray(items)||items.length<1||items.length>100) return validationError('ERR_SYSTEMFABRIC_CART_INVALID',['items must contain 1–100 product lines']);
+  if (!Array.isArray(items)||items.length<1||items.length>100) return validationError('ERR_VIRGOSCORPIO_HUB_CART_INVALID',['items must contain 1–100 product lines']);
   const quantities=new Map(); const errors=[];
   for(const [index,item] of items.entries()) {
     if(!item||typeof item!=='object'||typeof item.productId!=='string'||!/^[0-9a-f-]{36}$/i.test(item.productId)||!Number.isInteger(item.quantity)||item.quantity<1||item.quantity>1000) { errors.push(`items[${index}] is invalid`); continue; }

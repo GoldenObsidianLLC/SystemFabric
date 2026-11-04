@@ -42,9 +42,9 @@ test('collaboration REST endpoints require an editable draft and return committe
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: 'collab-api-token',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: content.site_id,
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_API_TOKEN: 'collab-api-token',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: content.site_id,
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
       AI_PROVIDER: 'mock',
       MAX_REQUEST_BYTES: '16384',
       RATE_LIMIT_MAX_REQUESTS: '100'
@@ -86,7 +86,7 @@ test('collaboration REST endpoints require an editable draft and return committe
     assert.equal(state.operations[0].sequence, 1);
     assert.equal(calls[1].afterSequence, 0);
   } finally {
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   }
 });
@@ -111,8 +111,8 @@ test('collaboration REST routes enforce site, draft, cursor, and operation-size 
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: 'collab-boundary-token',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: siteId,
+      VIRGOSCORPIO_HUB_API_TOKEN: 'collab-boundary-token',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: siteId,
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -124,7 +124,7 @@ test('collaboration REST routes enforce site, draft, cursor, and operation-size 
   const auth = { authorization: 'Bearer collab-boundary-token' };
   try {
     const crossSite = await fetch(base + '/api/v1/pages/' + contentId + '/collaboration/sync?afterSequence=0', {
-      headers: { ...auth, 'x-systemfabric-site-id': '99999999-9999-4999-8999-999999999999' }
+      headers: { ...auth, 'x-virgoscorpio-hub-site-id': '99999999-9999-4999-8999-999999999999' }
     });
     assert.equal(crossSite.status, 404);
 
@@ -134,7 +134,7 @@ test('collaboration REST routes enforce site, draft, cursor, and operation-size 
     status = 'published';
     const notDraft = await fetch(base + '/api/v1/pages/' + contentId + '/collaboration/sync?afterSequence=0', { headers: auth });
     assert.equal(notDraft.status, 409);
-    assert.equal((await notDraft.json()).code, 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT');
+    assert.equal((await notDraft.json()).code, 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_DRAFT');
 
     status = 'draft';
     const tooLarge = await fetch(base + '/api/v1/pages/' + contentId + '/collaboration/operations', {
@@ -144,7 +144,7 @@ test('collaboration REST routes enforce site, draft, cursor, and operation-size 
     });
     assert.equal(tooLarge.status, 413);
   } finally {
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   }
 });
@@ -218,10 +218,10 @@ test('collaboration REST writes enforce content:edit or own-content ownership fr
       body: JSON.stringify({ operation: { ...operation, opId: '44444444-4444-4444-8444-444444444444' } })
     });
     assert.equal(otherWrite.status, 403);
-    assert.equal((await otherWrite.json()).code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+    assert.equal((await otherWrite.json()).code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
     assert.equal(writes.length, 1, 'unauthorized edits must never reach the store');
   } finally {
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   }
 });
@@ -235,8 +235,8 @@ test('Redis-backed realtime rejects a bridge that lacks document publication', (
   assert.throws(() => createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
       AI_PROVIDER: 'mock'
     },
     presenceService: presence,

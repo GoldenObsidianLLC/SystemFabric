@@ -196,7 +196,7 @@ function normalizeGeneratedDocument(document) {
   const validation = validatePageDocument(clone);
   if (!validation.valid) {
     const error = new Error(`Generated page document failed validation: ${validation.errors.join('; ')}`);
-    error.code = 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT';
+    error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT';
     error.details = validation.errors;
     throw error;
   }

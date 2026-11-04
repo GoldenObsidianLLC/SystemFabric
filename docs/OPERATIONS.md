@@ -1,4 +1,4 @@
-# SystemFabric Operations Guide
+# VirgoScorpio Hub Operations Guide
 
 ## Local startup
 
@@ -7,7 +7,7 @@
 3. Start PostgreSQL: `docker compose up -d postgres`. Optional local Memgraph: `docker compose --profile graph up -d memgraph`.
 4. Run `npm ci` to install the exact reviewed dependency graph in the tracked `package-lock.json`. Use `npm install` only when intentionally changing dependencies, then review the lockfile diff and run the full check suite.
 5. Run `npm run migrate`.
-6. Set `SYSTEMFABRIC_ADMIN_EMAIL`, `SYSTEMFABRIC_ADMIN_PASSWORD`, and the site name/slug; run `npm run bootstrap:owner` once.
+6. Set `VIRGOSCORPIO_HUB_ADMIN_EMAIL`, `VIRGOSCORPIO_HUB_ADMIN_PASSWORD`, and the site name/slug; run `npm run bootstrap:owner` once.
 7. Start API with `npm start`, then open `http://127.0.0.1:8787/admin`.
 8. Run `npm run start:worker` and `npm run start:scheduler` separately when using the outbox or scheduled publishing.
 
@@ -19,10 +19,10 @@ Use different database identities for migration and runtime. Grant the runtime o
 
 ## Background processes
 
-- **Outbox worker** (`npm run start:worker`): consumes the persisted `graph.projection.v1` consumer group from PostgreSQL and applies allow-listed content, workflow-status, taxonomy and relationship events to Memgraph. Requires migrations 0010–0013. Delivery attempts and dead letters live in `outbox_deliveries`; the source `outbox_events` rows remain the replay source. Configure `SYSTEMFABRIC_GRAPH_CONSUMER_GROUP`, batch/dispatch sizes, lease duration, max attempts and poll interval through the `SYSTEMFABRIC_GRAPH_*` variables when needed. Monitor group backlog, retries and dead letters; event groups have independent subscriptions and must not be treated as authorization controls.
-- **Shared presence (preview)**: use a Redis-protocol-compatible service such as Memurai or Redis. Set `SYSTEMFABRIC_REALTIME_ENABLED=true`, `SYSTEMFABRIC_PRESENCE_STORE=redis` and `SYSTEMFABRIC_PRESENCE_REDIS_URL`; tune `SYSTEMFABRIC_PRESENCE_LEASE_MS`, `SYSTEMFABRIC_PRESENCE_MAX_SESSIONS_PER_SITE` and `SYSTEMFABRIC_PRESENCE_EXPIRY_RETENTION_MS` within their documented bounds. Redis connection is required at API startup and failures return 503; there is no silent memory fallback. Keep Redis private, authenticated and TLS-protected outside localhost. This shares presence snapshots and relays only site-scoped `presence.refresh` invalidations through Redis Pub/Sub; each receiving API hub rechecks local SSE subscriber authorization. Lease-expiry invalidations are lazy and are published when a site read/heartbeat discovers stale leases. The standalone API entry point is not production-certified for real-time use.
+- **Outbox worker** (`npm run start:worker`): consumes the persisted `graph.projection.v1` consumer group from PostgreSQL and applies allow-listed content, workflow-status, taxonomy and relationship events to Memgraph. Requires migrations 0010–0013. Delivery attempts and dead letters live in `outbox_deliveries`; the source `outbox_events` rows remain the replay source. Configure `VIRGOSCORPIO_HUB_GRAPH_CONSUMER_GROUP`, batch/dispatch sizes, lease duration, max attempts and poll interval through the `VIRGOSCORPIO_HUB_GRAPH_*` variables when needed. Monitor group backlog, retries and dead letters; event groups have independent subscriptions and must not be treated as authorization controls.
+- **Shared presence (preview)**: use a Redis-protocol-compatible service such as Memurai or Redis. Set `VIRGOSCORPIO_HUB_REALTIME_ENABLED=true`, `VIRGOSCORPIO_HUB_PRESENCE_STORE=redis` and `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL`; tune `VIRGOSCORPIO_HUB_PRESENCE_LEASE_MS`, `VIRGOSCORPIO_HUB_PRESENCE_MAX_SESSIONS_PER_SITE` and `VIRGOSCORPIO_HUB_PRESENCE_EXPIRY_RETENTION_MS` within their documented bounds. Redis connection is required at API startup and failures return 503; there is no silent memory fallback. Keep Redis private, authenticated and TLS-protected outside localhost. This shares presence snapshots and relays only site-scoped `presence.refresh` invalidations through Redis Pub/Sub; each receiving API hub rechecks local SSE subscriber authorization. Lease-expiry invalidations are lazy and are published when a site read/heartbeat discovers stale leases. The standalone API entry point is not production-certified for real-time use.
 - **Scheduler** (`npm run start:scheduler`): publishes due approved content. Multiple workers use row locking and `SKIP LOCKED`; still verify concurrency under your deployment configuration.
-- **Plugin runner** (`npm run start:plugin-runner`): run only on a separate private host or isolated execution environment. Configure `PLUGIN_RUNNER_TOKEN` with at least 32 random characters and `SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES` with explicit immutable image references. Only expose it to the API over private TLS or private network. Do not expose the runner port (default 9090) publicly.
+- **Plugin runner** (`npm run start:plugin-runner`): run only on a separate private host or isolated execution environment. Configure `PLUGIN_RUNNER_TOKEN` with at least 32 random characters and `VIRGOSCORPIO_HUB_PLUGIN_ALLOWED_IMAGES` with explicit immutable image references. Only expose it to the API over private TLS or private network. Do not expose the runner port (default 9090) publicly.
 
 ## Local observability collector (development only)
 
@@ -33,7 +33,7 @@ The optional OTLP collector is disabled by default. To start the loopback-only, 
 3. Start the API and any workers/scheduler normally. They read the matching token from `.env` and export traces to `127.0.0.1:4318`.
 4. Run `npm run otel:dev:smoke` to verify unauthenticated requests are rejected and an authenticated OTLP span is accepted. Inspect the local, redacted span summary with `docker compose --profile observability logs -f otel-collector`.
 
-Rotate the token with `npm run otel:dev:setup -- --rotate`, then restart the collector and every running SystemFabric process so both sides reload the new secret. Stop the fixture with `docker compose --profile observability stop otel-collector`.
+Rotate the token with `npm run otel:dev:setup -- --rotate`, then restart the collector and every running VirgoScorpio Hub process so both sides reload the new secret. Stop the fixture with `docker compose --profile observability stop otel-collector`.
 
 The profile publishes OTLP/HTTP on loopback only, requires a bearer token, runs the pinned Collector Contrib image with reduced container privileges and bounded CPU/memory, and sends traces to an ephemeral debug exporter. It has no durable storage or query UI. Do not use this profile as a production deployment; production needs a separately selected TLS-protected collector and persistent trace backend.
 
@@ -63,9 +63,9 @@ For realtime presence, SSE/WebSocket, Redis relay, and collaborative-document sy
 
 - Set `LIBRARY_STORAGE_PROVIDER=local` for development; multi-instance deployments must configure a durable shared object store. Set strict object access policies and avoid CDN caching for private assets.
 - Install and test optional `katex`, `sharp`, and FFmpeg only in controlled builds. Keep optimization bounded and move expensive conversions to workers. Derivatives are separate from originals.
-- Use Stripe test-mode credentials, register the webhook, test duplicate/out-of-order/failed events and inventory recovery, and only then consider live mode. Never store cardholder data in SystemFabric.
+- Use Stripe test-mode credentials, register the webhook, test duplicate/out-of-order/failed events and inventory recovery, and only then consider live mode. Never store cardholder data in VirgoScorpio Hub.
 - Cloud connection metadata records references; provider connectivity, role grants, encryption, retention and delete behavior need an actual deployment probe. Do not interpret `configured` as `healthy`.
-- The built-in firewall is application-level only. Put SystemFabric behind a correctly configured TLS reverse proxy and managed edge/WAF/DDoS controls where exposure requires it.
+- The built-in firewall is application-level only. Put VirgoScorpio Hub behind a correctly configured TLS reverse proxy and managed edge/WAF/DDoS controls where exposure requires it.
 - Use `npm run reconcile:library` to run the local object reconciler in dry-run mode; inspect the candidate list before any `--apply` run. It does not clean remote object stores. Filesystem or cloud-object writes do not share an atomic transaction with PostgreSQL.
 - Configure `LIBRARY_MALWARE_SCANNER=clamdscan` with an independently managed ClamAV service for production uploads. Uploads are denied in production if scanning is not configured. Existing assets are not automatically cleared by the new scan schema; apply a controlled rescan/quarantine procedure.
 - Cloud connection test routes perform read-only provider probes. A successful probe confirms the configured identity can perform that operation at that time; it does not prove object upload/delete policies, encryption, retention, lifecycle, or CDN behavior.

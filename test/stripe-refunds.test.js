@@ -18,7 +18,7 @@ function refundArgs(extra = {}) {
     paymentIntentId: PAYMENT_INTENT_ID,
     amountMinor: 2500,
     reason: 'requested_by_customer',
-    idempotencyKey: 'sf_refund_333333333333',
+    idempotencyKey: 'vsh_refund_333333333333',
     metadata: { site_id: SITE_ID, order_id: ORDER_ID, refund_id: REFUND_ID },
     fetchImpl: async (_url, options) => ({
       ok: true,
@@ -153,7 +153,7 @@ function makeRefundContext({
   const ctx = {
     req: { method: 'POST', headers },
     res: {},
-    url: new URL(`http://systemfabric.local/api/v1/sites/${SITE_ID}/commerce/orders/${ORDER_ID}/refunds`),
+    url: new URL(`http://virgoscorpio-hub.local/api/v1/sites/${SITE_ID}/commerce/orders/${ORDER_ID}/refunds`),
     actor: { user: { id: ACTOR_ID, email: 'operator@example.test' } },
     localPool: pool,
     async siteIdFor({ routeSiteId }) {
@@ -163,7 +163,7 @@ function makeRefundContext({
     async requireCapability(_actor, siteId, capability) {
       assert.equal(siteId, SITE_ID);
       assert.equal(capability, 'commerce:manage');
-      if (!allowManage) throw Object.assign(new Error('forbidden'), { statusCode: 403, code: 'ERR_SYSTEMFABRIC_FORBIDDEN' });
+      if (!allowManage) throw Object.assign(new Error('forbidden'), { statusCode: 403, code: 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN' });
     },
     async readJson() { return body; },
     sendJson(_res, statusCode, payload) {
@@ -205,7 +205,7 @@ test('Stripe refund helper posts the exact PaymentIntent amount, metadata and st
   const options = refundArgs.lastOptions;
   assert.equal(options.method, 'POST');
   assert.equal(options.headers.authorization, 'Bearer sk_test_fixture_not_a_real_key');
-  assert.equal(options.headers['idempotency-key'], 'sf_refund_333333333333');
+  assert.equal(options.headers['idempotency-key'], 'vsh_refund_333333333333');
   const form = new URLSearchParams(options.body);
   assert.equal(form.get('payment_intent'), PAYMENT_INTENT_ID);
   assert.equal(form.get('amount'), '2500');
@@ -228,7 +228,7 @@ test('Stripe refund helper rejects invalid amounts, reasons, payment IDs and ide
     let called = false;
     await assert.rejects(
       createStripeRefund(refundArgs({ ...patch, fetchImpl: async () => { called = true; throw new Error('unexpected network call'); } })),
-      error => error.code === 'ERR_SYSTEMFABRIC_BILLING_CONFIG'
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_CONFIG'
     );
     assert.equal(called, false);
   }
@@ -244,7 +244,7 @@ test('Stripe refund helper preserves an unknown outcome after network, response-
   for (const fetchImpl of failures) {
     await assert.rejects(
       createStripeRefund(refundArgs({ fetchImpl })),
-      error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
     );
   }
 });
@@ -254,7 +254,7 @@ test('Stripe refund helper treats a definitive provider 4xx as rejected, not amb
     createStripeRefund(refundArgs({
       fetchImpl: async () => ({ ok: false, status: 400, async text() { return '{"error":"invalid"}'; } })
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_BILLING_PROVIDER'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER'
   );
 });
 
@@ -263,7 +263,7 @@ test('Stripe refund helper preserves unknown state when a successful response do
     createStripeRefund(refundArgs({
       fetchImpl: async () => ({ ok: true, status: 200, async text() { return JSON.stringify(providerResponse({ amount: 1 })); } })
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN'
   );
 });
 
@@ -274,7 +274,7 @@ test('admin refund route reserves amounts, calls Stripe once and keeps partial r
     status: 200,
     async text() {
       const form = new URLSearchParams(options.body);
-      assert.equal(options.headers['idempotency-key'], `sf_refund_${REFUND_ID}`);
+      assert.equal(options.headers['idempotency-key'], `vsh_refund_${REFUND_ID}`);
       assert.equal(form.get('payment_intent'), PAYMENT_INTENT_ID);
       assert.equal(form.get('amount'), '2500');
       return JSON.stringify(providerResponse());
@@ -306,7 +306,7 @@ test('same refund request retries an ambiguous provider outcome with the identic
   }, async () => {
     await assert.rejects(
       handlePlatformRoute(ctx),
-      error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
     );
   });
   assert.equal(state.refunds.length, 1);
@@ -319,7 +319,7 @@ test('same refund request retries an ambiguous provider outcome with the identic
     await handlePlatformRoute(ctx);
   });
   assert.equal(keys.length, 2);
-  assert.deepEqual(keys, [`sf_refund_${REFUND_ID}`, `sf_refund_${REFUND_ID}`]);
+  assert.deepEqual(keys, [`vsh_refund_${REFUND_ID}`, `vsh_refund_${REFUND_ID}`]);
   assert.equal(state.refunds[0].status, 'succeeded');
   assert.equal(state.refunds.length, 1);
   assert.equal(ctx.res.payload.idempotentReplay, true);
@@ -343,7 +343,7 @@ test('refund idempotency key cannot be reused with different amount or reason', 
   await withFetch(async () => { called = true; throw new Error('must not call provider'); }, async () => {
     await assert.rejects(
       handlePlatformRoute(ctx),
-      error => error.code === 'ERR_SYSTEMFABRIC_REFUND_IDEMPOTENCY_CONFLICT' && error.statusCode === 409
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_REFUND_IDEMPOTENCY_CONFLICT' && error.statusCode === 409
     );
   });
   assert.equal(called, false);
@@ -363,7 +363,7 @@ test('pending and successful refunds both consume the refundable order balance',
   await withFetch(async () => { called = true; throw new Error('balance must be rejected before provider call'); }, async () => {
     await assert.rejects(
       handlePlatformRoute(ctx),
-      error => error.code === 'ERR_SYSTEMFABRIC_REFUND_EXCEEDS_BALANCE' && error.statusCode === 409
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_REFUND_EXCEEDS_BALANCE' && error.statusCode === 409
     );
   });
   assert.equal(called, false);
@@ -372,10 +372,10 @@ test('pending and successful refunds both consume the refundable order balance',
 
 test('refunds require a confirmed Stripe payment and the commerce management capability', async () => {
   const noPayment = makeRefundContext({ order: { id: ORDER_ID, site_id: SITE_ID, status: 'pending_payment', currency: 'USD', total_minor: '10000', provider: 'stripe', provider_payment_id: null } });
-  await assert.rejects(handlePlatformRoute(noPayment.ctx), error => error.code === 'ERR_SYSTEMFABRIC_REFUND_PAYMENT_UNAVAILABLE');
+  await assert.rejects(handlePlatformRoute(noPayment.ctx), error => error.code === 'ERR_VIRGOSCORPIO_HUB_REFUND_PAYMENT_UNAVAILABLE');
 
   const denied = makeRefundContext({ allowManage: false });
-  await assert.rejects(handlePlatformRoute(denied.ctx), error => error.code === 'ERR_SYSTEMFABRIC_FORBIDDEN');
+  await assert.rejects(handlePlatformRoute(denied.ctx), error => error.code === 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
 });
 
 test('refund route accepts the standard Idempotency-Key header without duplicating it in the body', async () => {
@@ -401,7 +401,7 @@ test('refund route rejects conflicting body and header idempotency keys before d
   });
   await assert.rejects(
     handlePlatformRoute(ctx),
-    error => error.code === 'ERR_SYSTEMFABRIC_REFUND_IDEMPOTENCY' && error.statusCode === 400
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REFUND_IDEMPOTENCY' && error.statusCode === 400
   );
   assert.equal(state.calls.length, 0);
 });
@@ -412,7 +412,7 @@ test('Stripe refund helper treats valid JSON with a non-object shape as an unkno
       createStripeRefund(refundArgs({
         fetchImpl: async () => ({ ok: true, status: 200, async text() { return body; } })
       })),
-      error => error.code === 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN' && error.statusCode === 502
     );
   }
 });

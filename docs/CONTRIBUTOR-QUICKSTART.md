@@ -32,8 +32,8 @@ You do **not** need PostgreSQL, Memgraph, Docker, Chromium, or third-party provi
 Run these commands from the directory where you keep development projects:
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/SystemFabric.git
-Set-Location SystemFabric
+git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+Set-Location VirgoScorpio-Hub
 npm ci
 ```
 
@@ -74,7 +74,7 @@ From the repository root:
 npm run check
 ```
 
-This runs the repository artifact/path and JavaScript syntax verification, followed by the SystemFabric unit/security tests. Most unit tests use deterministic mocks and do not contact PostgreSQL, Memgraph, Stripe, cloud storage, identity providers, mail providers, or external AI services.
+This runs the repository artifact/path and JavaScript syntax verification, followed by the VirgoScorpio Hub unit/security tests. Most unit tests use deterministic mocks and do not contact PostgreSQL, Memgraph, Stripe, cloud storage, identity providers, mail providers, or external AI services.
 
 You can also run the vendored rendering/runtime tests separately:
 
@@ -91,7 +91,7 @@ A successful unit run is useful contribution evidence, but it is not a productio
 | `npm run check` | Node.js and installed npm dependencies | Basic artifact, syntax, and unit/security suite; no database service required. |
 | `npm --prefix vendor/enginex test` | Node.js | Runs the vendored EnginEx suite. |
 | `npm run test:e2e -- --workers=1` | Playwright and the configured Chrome browser | The current `playwright.config.js` selects Chromium with `channel: "chrome"`. The repository helper `npm run test:e2e:install` installs Playwright's Chromium binary; if the selected Chrome channel is unavailable, install the Chrome channel with `npx playwright install chrome` or install Google Chrome Stable. |
-| `npm run test:integration:live` | Dedicated PostgreSQL test database and Memgraph | Requires `TEST_DATABASE_URL` and `MEMGRAPH_TEST_URL` or `MEMGRAPH_URL`. The database name must end in `test`. Redis-backed integration cases also run when the approved loopback `SYSTEMFABRIC_PRESENCE_REDIS_URL` is configured. |
+| `npm run test:integration:live` | Dedicated PostgreSQL test database and Memgraph | Requires `TEST_DATABASE_URL` and `MEMGRAPH_TEST_URL` or `MEMGRAPH_URL`. The database name must end in `test`. Redis-backed integration cases also run when the approved loopback `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` is configured. |
 | `npm run test:migrations:fresh` | Explicit `TEST_DATABASE_URL` and PostgreSQL access | Creates and drops a generated disposable database derived from the test URL. Use only a dedicated local/test server and database. |
 | `npm audit` / `npm audit --omit=dev` | Internet access to npm advisories | Dependency advisory checks; not a complete security assessment. |
 | `gitleaks dir --redact --verbose .` | Gitleaks installed | Scans the current working tree. A separate Git-history scan is needed for reachable commits. |
@@ -116,9 +116,9 @@ npm run test:integration:live
 
 The live integration runner intentionally refuses to fall back from a missing `TEST_DATABASE_URL` to `DATABASE_URL`. It also requires the test database name to end in `test` and validates that the configured Memgraph endpoint is reachable. It applies migrations and writes test records. **Never point it at production or a shared database.**
 
-For Redis-specific integration coverage, configure a separately managed local Redis or Redis-compatible service (for example, Memurai on Windows) and set `SYSTEMFABRIC_PRESENCE_REDIS_URL` to its loopback URL. The live runner restricts this integration URL to local/loopback hosts. The default Compose file does not start Redis.
+For Redis-specific integration coverage, configure a separately managed local Redis or Redis-compatible service (for example, Memurai on Windows) and set `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` to its loopback URL. The live runner restricts this integration URL to local/loopback hosts. The default Compose file does not start Redis.
 
-**Important:** `.env.example` includes a loopback `SYSTEMFABRIC_PRESENCE_REDIS_URL` value, so `npm run dev:setup` copies a Redis endpoint into a new `.env`. The Compose file does not provide that Redis service. If you do not have Redis/Memurai listening on that loopback address, clear the value in your local `.env` before running the live integration suite to keep Redis-only cases disabled. Leave it set only when the local Redis-compatible service is running.
+**Important:** `.env.example` includes a loopback `VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL` value, so `npm run dev:setup` copies a Redis endpoint into a new `.env`. The Compose file does not provide that Redis service. If you do not have Redis/Memurai listening on that loopback address, clear the value in your local `.env` before running the live integration suite to keep Redis-only cases disabled. Leave it set only when the local Redis-compatible service is running.
 
 ### Provider-backed tests
 

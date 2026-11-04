@@ -28,7 +28,7 @@
     $('dirty-status').style.color = dirty ? '#e4bd7c' : '#72dba7';
   }
   function slugify(text) { return String(text || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180); }
-  function csrfFromCookie() { const match = document.cookie.match(/(?:^|;\s*)sf_csrf=([^;]+)/); return match ? match[1] : ''; }
+  function csrfFromCookie() { const match = document.cookie.match(/(?:^|;\s*)vsh_csrf=([^;]+)/); return match ? match[1] : ''; }
   async function api(path, options = {}) {
     const headers = new Headers(options.headers || {});
     const method = (options.method || 'GET').toUpperCase();
@@ -53,11 +53,11 @@
     try {
       const result = await api('/api/v1/auth/me'); state.user = result.user; state.sites = result.sites || [];
       $('user-label').textContent = state.user.displayName || state.user.email;
-      const savedSite = sessionStorage.getItem('sf-site-id');
+      const savedSite = sessionStorage.getItem('vsh-site-id');
       state.siteId = state.sites.some(s => s.siteId === savedSite) ? savedSite : (state.sites[0]?.siteId || state.sites[0]?.id || '');
       if (!state.siteId) { showApp(); $('site-select').innerHTML = ''; notify('Your account has no site memberships. Ask a site owner for access.', true); return; }
       renderSiteSelect(); showApp(); await loadPages(); await offerDraftRecovery();
-    } catch { showLogin('Sign in with your SystemFabric account.'); if (new URL(location.href).searchParams.get('mfa') === 'required') { $('mfa-challenge-panel').classList.remove('hidden'); $('login-status').textContent = 'Your organization sign-in succeeded. Enter your authenticator code to finish.'; $('mfa-code').focus(); } }
+    } catch { showLogin('Sign in with your VirgoScorpio Hub account.'); if (new URL(location.href).searchParams.get('mfa') === 'required') { $('mfa-challenge-panel').classList.remove('hidden'); $('login-status').textContent = 'Your organization sign-in succeeded. Enter your authenticator code to finish.'; $('mfa-code').focus(); } }
   }
   function renderSiteSelect() {
     const select = $('site-select'); select.replaceChildren();
@@ -66,7 +66,7 @@
     }
     select.value = state.siteId;
   }
-  function siteHeaders(extra = {}) { return { 'x-systemfabric-site-id': state.siteId, ...extra }; }
+  function siteHeaders(extra = {}) { return { 'x-virgoscorpio-hub-site-id': state.siteId, ...extra }; }
   function currentSiteCapabilities() {
     const site = state.sites.find(s => (s.siteId || s.id) === state.siteId);
     return new Set(site?.capabilities || []);
@@ -92,9 +92,9 @@
   function newNode(type) {
     const id = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
     let props = {};
-    if (type === 'section') props = { className: 'sf-section', styles: { padding: '32px 20px', backgroundColor: '#f5f7fa' } };
-    else if (type === 'column') props = { className: 'sf-column', styles: { padding: '16px' } };
-    else if (type === 'container') props = { className: 'sf-container', styles: { padding: '16px' } };
+    if (type === 'section') props = { className: 'vsh-section', styles: { padding: '32px 20px', backgroundColor: '#f5f7fa' } };
+    else if (type === 'column') props = { className: 'vsh-column', styles: { padding: '16px' } };
+    else if (type === 'container') props = { className: 'vsh-container', styles: { padding: '16px' } };
     else if (type === 'widget.heading') props = { text: 'Your heading', level: 2, styles: { fontSize: '32px', color: '#182438', margin: '0 0 12px' } };
     else if (type === 'widget.text') props = { text: 'Write a clear, helpful paragraph that explains the value you provide.', styles: { fontSize: '16px', lineHeight: '1.6', color: '#344155', margin: '0 0 14px' } };
     else if (type === 'widget.button') props = { text: 'Learn more', url: '/', styles: { backgroundColor: '#253b5a', color: '#ffffff', padding: '11px 16px', borderRadius: '5px' } };
@@ -123,7 +123,7 @@
   }
 
   async function offerDraftRecovery() {
-    const prefix = `systemfabric:draft:${state.user?.id || 'user'}:${state.siteId}:`;
+    const prefix = `virgoscorpio_hub:draft:${state.user?.id || 'user'}:${state.siteId}:`;
     const candidates = [];
     for (let index = 0; index < sessionStorage.length; index++) {
       const key = sessionStorage.key(index); if (!key?.startsWith(prefix)) continue;
@@ -137,7 +137,7 @@
     $('document-title').value = state.document.title; $('page-slug').value = latest.value.slug || slugify(state.document.title); renderAll(); markDirty(); notify('Recovered local draft. Save to persist it; version conflicts are checked by the server.');
   }
 
-  function recoveryKey() { return `systemfabric:draft:${state.user?.id || 'user'}:${state.siteId}:${state.contentId || 'new'}`; }
+  function recoveryKey() { return `virgoscorpio_hub:draft:${state.user?.id || 'user'}:${state.siteId}:${state.contentId || 'new'}`; }
   function saveRecovery() {
     if (!state.document) return;
     try { sessionStorage.setItem(recoveryKey(), JSON.stringify({ document: state.document, slug: $('page-slug').value, savedAt: Date.now(), version: state.version })); } catch { /* Recovery is best-effort only. */ }
@@ -229,7 +229,7 @@
     else if (node.type === 'widget.divider') element = document.createElement('hr');
     else if (node.type === 'widget.spacer' || node.type === 'widget.query-loop') element = document.createElement('div');
     else return document.createTextNode('Unsupported component');
-    element.classList.add('sf-node');
+    element.classList.add('vsh-node');
     const classToken = node.type === 'section' ? 'builder-section' : node.type === 'column' ? 'builder-column' : node.type === 'container' ? 'builder-container' : node.type === 'widget.heading' ? 'builder-heading' : node.type === 'widget.text' ? 'builder-text' : node.type === 'widget.button' ? 'builder-button' : node.type === 'widget.image' ? 'builder-image' : node.type === 'widget.video' ? 'builder-video' : node.type === 'widget.icon' ? 'builder-icon' : node.type === 'widget.math' ? 'builder-math' : node.type === 'widget.list' ? 'builder-list' : node.type === 'widget.quote' ? 'builder-quote' : node.type === 'widget.divider' ? 'builder-divider' : node.type === 'widget.query-loop' ? 'builder-query-loop' : 'builder-spacer';
     element.classList.add(classToken);
     if (typeof node.props.className === 'string' && /^[A-Za-z0-9 _-]{0,120}$/.test(node.props.className)) for (const name of node.props.className.split(/\s+/).filter(Boolean)) element.classList.add(name);
@@ -252,12 +252,12 @@
       else for (const child of node.children) element.append(renderNode(child));
     }
     element.addEventListener('click', event => { event.stopPropagation(); state.selectedNodeId = node.id; renderAll(); });
-    element.addEventListener('dragstart', event => { event.stopPropagation(); state.dragNodeId = node.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-systemfabric-node', node.id); });
+    element.addEventListener('dragstart', event => { event.stopPropagation(); state.dragNodeId = node.id; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('application/x-virgoscorpio-hub-node', node.id); });
     element.addEventListener('dragover', event => { if (containerTypes.has(node.type)) { event.preventDefault(); event.dataTransfer.dropEffect = state.dragComponent ? 'copy' : 'move'; element.classList.add('drag-over'); } });
     element.addEventListener('dragleave', () => element.classList.remove('drag-over'));
     element.addEventListener('drop', event => {
       if (!containerTypes.has(node.type)) return; event.preventDefault(); event.stopPropagation(); element.classList.remove('drag-over');
-      const component = event.dataTransfer.getData('application/x-systemfabric-component'); const nodeId = event.dataTransfer.getData('application/x-systemfabric-node');
+      const component = event.dataTransfer.getData('application/x-virgoscorpio-hub-component'); const nodeId = event.dataTransfer.getData('application/x-virgoscorpio-hub-node');
       if (component) addComponent(component, node.id); else if (nodeId) moveNode(nodeId, node.id);
     });
     return element;
@@ -272,7 +272,7 @@
   function onRootDragOver(event) { if (event.target === $('canvas-root') || event.target.closest('#empty-canvas')) { event.preventDefault(); event.dataTransfer.dropEffect = state.dragComponent ? 'copy' : 'move'; } }
   function onRootDrop(event) {
     if (!(event.target === $('canvas-root') || event.target.closest('#empty-canvas'))) return;
-    event.preventDefault(); const component = event.dataTransfer.getData('application/x-systemfabric-component'); const nodeId = event.dataTransfer.getData('application/x-systemfabric-node');
+    event.preventDefault(); const component = event.dataTransfer.getData('application/x-virgoscorpio-hub-component'); const nodeId = event.dataTransfer.getData('application/x-virgoscorpio-hub-node');
     if (component) addComponent(component); else if (nodeId) moveNode(nodeId, null);
   }
   function countNodes() { let count = 0; if (state.document) walkNodes(state.document.children, () => count++); return count; }
@@ -344,7 +344,7 @@
     if (!state.document) state.document = makeInitialDocument();
     state.document.title = $('document-title').value.trim() || 'Untitled page';
     let slug = slugify($('page-slug').value || state.document.title); if (!slug) slug = 'untitled';
-    const payload = { siteId: state.siteId, id: state.contentId || undefined, expectedVersion: state.contentId ? state.version : undefined, document: state.document, slug, locale: 'en', reviewed: true, note: 'Saved from SystemFabric Studio' };
+    const payload = { siteId: state.siteId, id: state.contentId || undefined, expectedVersion: state.contentId ? state.version : undefined, document: state.document, slug, locale: 'en', reviewed: true, note: 'Saved from VirgoScorpio Hub Studio' };
     $('save-button').disabled = true; setStatus('Saving draft…');
     const previousRecoveryKey = recoveryKey();
     try {
@@ -398,7 +398,7 @@
   function downloadJson() {
     if (!state.document) return;
     const blob = new Blob([JSON.stringify(state.document, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `${slugify(state.document.title) || 'page'}.systemfabric.json`; link.click(); URL.revokeObjectURL(url);
+    const link = document.createElement('a'); link.href = url; link.download = `${slugify(state.document.title) || 'page'}.virgoscorpio-hub.json`; link.click(); URL.revokeObjectURL(url);
   }
   function createNewPage() {
     if (state.dirty && !window.confirm('Discard the current unsaved changes and create a new page?')) return;
@@ -409,7 +409,7 @@
   function handlePalette() {
     for (const button of document.querySelectorAll('[data-component]')) {
       button.addEventListener('click', () => addComponent(button.dataset.component));
-      button.addEventListener('dragstart', event => { state.dragComponent = button.dataset.component; state.dragNodeId = null; event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('application/x-systemfabric-component', button.dataset.component); });
+      button.addEventListener('dragstart', event => { state.dragComponent = button.dataset.component; state.dragNodeId = null; event.dataTransfer.effectAllowed = 'copy'; event.dataTransfer.setData('application/x-virgoscorpio-hub-component', button.dataset.component); });
       button.addEventListener('dragend', () => { state.dragComponent = null; document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); });
     }
   }
@@ -431,7 +431,7 @@
   $('mfa-code').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); $('mfa-verify').click(); } });
   $('mfa-cancel').addEventListener('click', () => { $('mfa-challenge-panel').classList.add('hidden'); $('mfa-code').value = ''; $('login-status').textContent = 'Sign-in challenge canceled.'; });
   $('forgot-password').addEventListener('click', async () => {
-    const email = window.prompt('Enter the email address for your SystemFabric account:'); if (!email) return;
+    const email = window.prompt('Enter the email address for your VirgoScorpio Hub account:'); if (!email) return;
     try { const result = await api('/api/v1/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ email }) }); $('login-status').textContent = result.message || 'If an active account matches that address, reset instructions will be sent.'; }
     catch (error) { $('login-status').textContent = error.message; }
   });
@@ -463,7 +463,7 @@
     try { await api('/api/v1/auth/mfa/disable', { method: 'POST', body: JSON.stringify({ password: $('mfa-disable-password').value, code: $('mfa-disable-code').value.trim() }) }); $('security-dialog').close(); sessionStorage.clear(); showLogin('MFA was disabled and all sessions were revoked. Sign in again.'); }
     catch (error) { $('security-status').textContent = error.message; }
   });
-  $('site-select').addEventListener('change', async () => { if (state.dirty && !window.confirm('Switch site and discard local unsaved changes?')) { $('site-select').value = state.siteId; return; } state.siteId = $('site-select').value; sessionStorage.setItem('sf-site-id', state.siteId); state.contentId = null; state.document = null; state.dirty = false; await loadPages(); createNewPage(); });
+  $('site-select').addEventListener('change', async () => { if (state.dirty && !window.confirm('Switch site and discard local unsaved changes?')) { $('site-select').value = state.siteId; return; } state.siteId = $('site-select').value; sessionStorage.setItem('vsh-site-id', state.siteId); state.contentId = null; state.document = null; state.dirty = false; await loadPages(); createNewPage(); });
   $('new-page').addEventListener('click', createNewPage); $('page-search').addEventListener('input', renderPageList);
   $('document-title').addEventListener('change', () => { if (!state.document) return; snapshot(); state.document.title = $('document-title').value; if (!state.slugTouched) $('page-slug').value = slugify(state.document.title); markDirty(); renderAll(); });
   $('page-slug').addEventListener('input', () => { state.slugTouched = true; markDirty(); });

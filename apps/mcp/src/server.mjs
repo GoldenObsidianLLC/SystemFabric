@@ -18,20 +18,20 @@ const widgets = createWidgetRegistry();
 
 function jsonText(value) { return JSON.stringify(value, null, 2); }
 function createServer() {
-  const server = new McpServer({ name: 'systemfabric', version: '0.3.0' });
+  const server = new McpServer({ name: 'virgoscorpio_hub', version: '0.3.0' });
 
-  server.registerTool('systemfabric_status', {
-    description: 'Return non-sensitive SystemFabric runtime and AI provider status.',
+  server.registerTool('virgoscorpio_hub_status', {
+    description: 'Return non-sensitive VirgoScorpio Hub runtime and AI provider status.',
     inputSchema: z.object({})
-  }, async () => ({ content: [{ type: 'text', text: jsonText({ service: 'SystemFabric', version: '0.3.0', renderer: rendererInfo, ai: ai.providerInfo(), persistenceTools: 'not exposed through MCP; use authenticated CMS APIs for persistence' }) }] }));
+  }, async () => ({ content: [{ type: 'text', text: jsonText({ service: 'VirgoScorpio Hub', version: '0.3.0', renderer: rendererInfo, ai: ai.providerInfo(), persistenceTools: 'not exposed through MCP; use authenticated CMS APIs for persistence' }) }] }));
 
-  server.registerTool('systemfabric_list_widgets', {
+  server.registerTool('virgoscorpio_hub_list_widgets', {
     description: 'List approved core widget types and their editor metadata.',
     inputSchema: z.object({})
   }, async () => ({ content: [{ type: 'text', text: jsonText({ apiVersion: 1, widgets: widgets.list() }) }] }));
 
-  server.registerTool('systemfabric_validate_page_document', {
-    description: 'Validate a SystemFabric page document JSON string against the v1 domain contract. Does not save or publish.',
+  server.registerTool('virgoscorpio_hub_validate_page_document', {
+    description: 'Validate a VirgoScorpio Hub page document JSON string against the v1 domain contract. Does not save or publish.',
     inputSchema: z.object({ documentJson: z.string().min(2).max(250_000) })
   }, async ({ documentJson }) => {
     try {
@@ -43,20 +43,20 @@ function createServer() {
     }
   });
 
-  server.registerTool('systemfabric_generate_page_draft', {
-    description: 'Generate a validated SystemFabric page-document proposal. The result is an unsaved draft proposal and is never published automatically.',
+  server.registerTool('virgoscorpio_hub_generate_page_draft', {
+    description: 'Generate a validated VirgoScorpio Hub page-document proposal. The result is an unsaved draft proposal and is never published automatically.',
     inputSchema: z.object({ prompt: z.string().min(1).max(12_000), siteContext: z.string().max(3_000).optional() })
   }, async ({ prompt, siteContext = '' }) => {
     try {
       const result = await ai.generatePageDraft({ prompt, siteContext, actor: 'mcp-client' });
       return { content: [{ type: 'text', text: jsonText(result) }] };
     } catch (error) {
-      return { content: [{ type: 'text', text: `Generation failed: ${error.code || 'ERR_SYSTEMFABRIC_AI'}` }], isError: true };
+      return { content: [{ type: 'text', text: `Generation failed: ${error.code || 'ERR_VIRGOSCORPIO_HUB_AI'}` }], isError: true };
     }
   });
 
-  server.registerTool('systemfabric_render_preview', {
-    description: 'Render a validated SystemFabric page document to safe HTML for local preview. Does not persist the page.',
+  server.registerTool('virgoscorpio_hub_render_preview', {
+    description: 'Render a validated VirgoScorpio Hub page document to safe HTML for local preview. Does not persist the page.',
     inputSchema: z.object({ documentJson: z.string().min(2).max(250_000) })
   }, async ({ documentJson }) => {
     try {
@@ -65,7 +65,7 @@ function createServer() {
       if (!validation.valid) return { content: [{ type: 'text', text: jsonText(validation) }], isError: true };
       return { content: [{ type: 'text', text: renderPageDocument(document) }] };
     } catch (error) {
-      return { content: [{ type: 'text', text: `Preview failed: ${error.code || 'ERR_SYSTEMFABRIC_PREVIEW'}` }], isError: true };
+      return { content: [{ type: 'text', text: `Preview failed: ${error.code || 'ERR_VIRGOSCORPIO_HUB_PREVIEW'}` }], isError: true };
     }
   });
 
@@ -73,4 +73,4 @@ function createServer() {
 }
 
 void serveStdio(createServer);
-console.error('SystemFabric MCP stdio server started. No publish/delete tools are exposed.');
+console.error('VirgoScorpio Hub MCP stdio server started. No publish/delete tools are exposed.');

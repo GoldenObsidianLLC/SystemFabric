@@ -23,13 +23,13 @@
   } else if (route === '/verify-email') {
     $('account-title').textContent = 'Verify your email'; $('account-intro').textContent = 'Confirming your email address helps protect your account.';
     if (!token) status('This link is missing its token.', true);
-    else api('/api/v1/auth/email-verification/confirm', { token }).then(() => status('Email verified. You can return to SystemFabric Studio.')).catch(error => status(error.message, true));
+    else api('/api/v1/auth/email-verification/confirm', { token }).then(() => status('Email verified. You can return to VirgoScorpio Hub Studio.')).catch(error => status(error.message, true));
   } else if (route === '/accept-invitation') {
-    $('account-title').textContent = 'Accept your invitation'; $('account-intro').textContent = 'Create your account to join the SystemFabric site.';
+    $('account-title').textContent = 'Accept your invitation'; $('account-intro').textContent = 'Create your account to join the VirgoScorpio Hub site.';
     $('invitation-form').classList.remove('hidden');
     $('invitation-form').addEventListener('submit', async event => {
       event.preventDefault();
-      try { await api('/api/v1/auth/invitations/accept', { token, displayName: $('display-name').value, password: $('invite-password').value }); status('Invitation accepted. Return to SystemFabric Studio and sign in.'); $('invitation-form').classList.add('hidden'); }
+      try { await api('/api/v1/auth/invitations/accept', { token, displayName: $('display-name').value, password: $('invite-password').value }); status('Invitation accepted. Return to VirgoScorpio Hub Studio and sign in.'); $('invitation-form').classList.add('hidden'); }
       catch (error) { status(error.message, true); }
     });
     if (!token) status('This invitation link is missing its token.', true);

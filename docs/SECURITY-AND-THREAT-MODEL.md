@@ -1,6 +1,6 @@
-# SystemFabric Security and Threat Model
+# VirgoScorpio Hub Security and Threat Model
 
-**Scope:** SystemFabric 0.5.1 hardening candidate / developer preview. This document describes the implemented controls and the remaining security work. It is not a certification or independent audit.
+**Scope:** VirgoScorpio Hub 0.5.1 hardening candidate / developer preview. This document describes the implemented controls and the remaining security work. It is not a certification or independent audit.
 
 ## Assets to protect
 
@@ -54,7 +54,7 @@
 - Mock AI is the default; external provider content submission requires `AI_ALLOW_EXTERNAL_CONTENT=true`.
 - Credentials remain server-side; provider adapters avoid placing keys in URLs and do not include secrets in health output.
 - Prompt logging is off by default. Applicable adapters request non-stored interactions where supported, but this is not a guarantee of zero provider-side retention.
-- Model output cannot publish content or assign roles. All generated page documents must pass SystemFabric validation.
+- Model output cannot publish content or assign roles. All generated page documents must pass VirgoScorpio Hub validation.
 
 ## Threats and required mitigations
 

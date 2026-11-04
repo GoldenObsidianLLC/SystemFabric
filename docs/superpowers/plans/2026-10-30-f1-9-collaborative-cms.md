@@ -62,7 +62,7 @@
 - store.getCollaborationSync({ siteId, contentId, afterSequence })
 
 - [x] Add isolated integration tests for sequence 1 creation, revision/outbox updates, stale-base transform, idempotent retry, altered opId reuse, history pruning/reload, draft-only enforcement and site isolation.
-- [x] Run the integration test with SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION=true against the dedicated test database; use TEST_DATABASE_URL only, explicitly mapped to DATABASE_URL for the migration runner and existing content tests.
+- [x] Run the integration test with VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION=true against the dedicated test database; use TEST_DATABASE_URL only, explicitly mapped to DATABASE_URL for the migration runner and existing content tests.
 - [x] Add migration 0014 for per-document sequence/replay floor, accepted-operation history, idempotency tombstones and the collaboration workflow action.
 - [x] Implement the transactional store method: lock content first, verify draft/site, dedupe, transform against retained history, validate, update body/version/lock_version, insert revision/workflow/outbox/op record, advance sequence and prune beyond the 1,000-operation window.
 - [x] Implement sync with a single-statement snapshot returning accepted operations after a valid sequence or a canonical reload snapshot when history has expired.

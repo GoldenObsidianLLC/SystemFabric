@@ -6,7 +6,7 @@ const http = require('node:http');
 const { createHmac } = require('node:crypto');
 const { createApiServer } = require('../apps/api/src/server');
 
-const WEBHOOK_SECRET = 'whsec_systemfabric_refund_test';
+const WEBHOOK_SECRET = 'whsec_virgoscorpio_hub_refund_test';
 const SITE_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_SITE_ID = '99999999-9999-4999-8999-999999999999';
 const ORDER_ID = '22222222-2222-4222-8222-222222222222';
@@ -140,7 +140,7 @@ function makeRefundWebhookHarness(t, {
     server.listen(0, '127.0.0.1', () => {
       t.after(async () => {
         await new Promise(done => server.close(done));
-        await server.systemfabric.close();
+        await server.virgoScorpioHub.close();
       });
       resolve({ state, base: 'http://127.0.0.1:' + server.address().port });
     });

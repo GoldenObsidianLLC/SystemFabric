@@ -15,13 +15,13 @@ const WORKFLOW_FILE = '.github/workflows/ci.yml';
 const JOBS = [
   {
     key: 'node-22.23.4',
-    artifactName: 'systemfabric-ci-evidence-node-22.23.4',
+    artifactName: 'virgoscorpio_hub-ci-evidence-node-22.23.4',
     jobName: 'Unit, security, and dependency checks (Node 22.23.4)',
     runtime: 'v22.23.4',
     requiredFiles: [
       'artifacts/release-readiness.json',
       'artifacts/release-readiness.md',
-      'artifacts/systemfabric.sbom.cdx.json',
+      'artifacts/virgoscorpio-hub.sbom.cdx.json',
       'artifacts/evidence/npm-audit-all.log',
       'artifacts/evidence/npm-audit.log',
       'artifacts/evidence/sbom-generation.log',
@@ -34,13 +34,13 @@ const JOBS = [
   },
   {
     key: 'node-24.22.1',
-    artifactName: 'systemfabric-ci-evidence-node-24.22.1',
+    artifactName: 'virgoscorpio_hub-ci-evidence-node-24.22.1',
     jobName: 'Unit, security, and dependency checks (Node 24.22.1)',
     runtime: 'v24.22.1',
     requiredFiles: [
       'artifacts/release-readiness.json',
       'artifacts/release-readiness.md',
-      'artifacts/systemfabric.sbom.cdx.json',
+      'artifacts/virgoscorpio-hub.sbom.cdx.json',
       'artifacts/evidence/npm-audit-all.log',
       'artifacts/evidence/npm-audit.log',
       'artifacts/evidence/sbom-generation.log',
@@ -53,7 +53,7 @@ const JOBS = [
   },
   {
     key: 'postgres-memgraph-integration',
-    artifactName: 'systemfabric-ci-evidence-postgres-memgraph-integration',
+    artifactName: 'virgoscorpio_hub-ci-evidence-postgres-memgraph-integration',
     jobName: 'PostgreSQL and Memgraph integration',
     runtime: 'v22.23.4',
     requiredFiles: [
@@ -68,14 +68,14 @@ const JOBS = [
   },
   {
     key: 'browser-and-accessibility',
-    artifactName: 'systemfabric-ci-evidence-browser-and-accessibility',
+    artifactName: 'virgoscorpio_hub-ci-evidence-browser-and-accessibility',
     jobName: 'Browser editor and accessibility smoke tests',
     runtime: 'v22.23.4',
     requiredFiles: ['artifacts/evidence/browser-smoke.log'],
   },
   {
     key: 'security-static-analysis',
-    artifactName: 'systemfabric-ci-evidence-security-static-analysis',
+    artifactName: 'virgoscorpio_hub-ci-evidence-security-static-analysis',
     jobName: 'CodeQL security analysis',
     runtime: 'not-applicable',
     requiredFiles: [],
@@ -362,10 +362,10 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
     try {
       if (jobConfig.key.startsWith('node-')) {
         const readiness = JSON.parse(readEvidenceFile(directory, 'artifacts/release-readiness.json').toString('utf8'));
-        const sbom = JSON.parse(readEvidenceFile(directory, 'artifacts/systemfabric.sbom.cdx.json').toString('utf8'));
+        const sbom = JSON.parse(readEvidenceFile(directory, 'artifacts/virgoscorpio-hub.sbom.cdx.json').toString('utf8'));
         const packageLock = JSON.parse(readEvidenceFile(directory, 'package-lock.json').toString('utf8'));
         const check = id => readiness.checks?.find(item => item.id === id);
-        if (readiness.product !== 'SystemFabric' || readiness.version !== '0.5.1') errors.push('Release-readiness report product/version mismatch.');
+        if (readiness.product !== 'VirgoScorpio Hub' || readiness.version !== '0.5.1') errors.push('Release-readiness report product/version mismatch.');
         if (readiness.sourceRevision !== expected.mergeSha) errors.push('Release-readiness report is not bound to the exact merge/source revision.');
         if (readiness.host?.node !== jobConfig.runtime) errors.push('Release-readiness report runtime does not match this matrix job.');
         for (const id of ['clean-source-tree', 'syntax-artifact-check', 'unit-tests', 'enginex-tests']) {
@@ -380,7 +380,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
           errors.push('Release-readiness report source revision is missing or invalid.');
         }
         const artifactCheckLog = readEvidenceFile(directory, 'artifacts/evidence/artifact-check.log').toString('utf8');
-        if (!artifactCheckLog.includes('SystemFabric artifact check passed')) errors.push('Artifact/syntax log does not contain the verification success marker.');
+        if (!artifactCheckLog.includes('VirgoScorpio Hub artifact check passed')) errors.push('Artifact/syntax log does not contain the verification success marker.');
         for (const file of ['unit-tests.tap.log', 'enginex-tests.tap.log']) {
           const summary = parseTapSummary(readEvidenceFile(directory, 'artifacts/evidence/' + file).toString('utf8'));
           if (!Number.isInteger(summary.tests) || summary.tests < 1 || summary.pass !== summary.tests ||
@@ -413,7 +413,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
         if (sbom.bomFormat !== 'CycloneDX' || !Array.isArray(sbom.components) || !Array.isArray(sbom.dependencies)) {
           errors.push('CycloneDX SBOM structure is invalid.');
         }
-        if (packageLock.name !== 'systemfabric' || packageLock.version !== '0.5.1' || packageLock.lockfileVersion !== 3) {
+        if (packageLock.name !== 'virgoscorpio-hub' || packageLock.version !== '0.5.1' || packageLock.lockfileVersion !== 3) {
           errors.push('Dependency lockfile identity/version/format does not match this release.');
         }
         for (const file of ['npm-audit-all.log', 'npm-audit.log']) {
@@ -421,7 +421,7 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
           if (!hasNoHighAuditFindings(auditOutput)) errors.push('Dependency audit output is missing a valid summary or contains high/critical findings: ' + file + '.');
         }
         const purl = sbom.metadata?.component?.purl;
-        if (purl !== 'pkg:npm/systemfabric@0.5.1') errors.push('SBOM package identity is missing or does not match SystemFabric 0.5.1.');
+        if (purl !== 'pkg:npm/virgoscorpio-hub@0.5.1') errors.push('SBOM package identity is missing or does not match VirgoScorpio Hub 0.5.1.');
       } else if (jobConfig.key === 'postgres-memgraph-integration') {
         const live = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/integration-live.json').toString('utf8'));
         const migrations = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/fresh-migrations.json').toString('utf8'));
@@ -536,7 +536,7 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
   })));
   return {
     schemaVersion: 1,
-    product: 'SystemFabric',
+    product: 'VirgoScorpio Hub',
     version: '0.5.1',
     generatedAt: new Date().toISOString(),
     workflowRun: {
@@ -578,7 +578,7 @@ function renderMarkdown(report) {
     cell([job.serviceLessIntegration?.details, job.errors.join(' '), job.errors.length ? '' : 'Evidence verified.'].filter(Boolean).join(' ')) + ' |'
   ).join('\n');
   return [
-    '# SystemFabric CI Evidence Summary',
+    '# VirgoScorpio Hub CI Evidence Summary',
     '',
     '- Generated: ' + cell(report.generatedAt),
     '- Workflow: ' + cell(report.workflowRun.workflow),
@@ -649,7 +649,7 @@ function expectedMetadataFromEnvironment(env, root) {
     eventName: env.GITHUB_EVENT_NAME,
     runId: String(env.GITHUB_RUN_ID || ''),
     runAttempt: Number(env.GITHUB_RUN_ATTEMPT),
-    headSha: String(env.SYSTEMFABRIC_CI_HEAD_SHA || env.GITHUB_SHA || '').toLowerCase(),
+    headSha: String(env.VIRGOSCORPIO_HUB_CI_HEAD_SHA || env.GITHUB_SHA || '').toLowerCase(),
     // Fail closed unless the checkout is exactly the commit GitHub selected for
     // this event (the synthetic merge ref for pull_request events).
     mergeSha: checkoutSha && eventSha && checkoutSha === eventSha ? checkoutSha : '',
@@ -660,12 +660,12 @@ async function main() {
   const command = process.argv[2];
   const root = path.resolve(__dirname, '..');
   if (command === 'stage') {
-    const key = process.env.SYSTEMFABRIC_CI_JOB_KEY;
+    const key = process.env.VIRGOSCORPIO_HUB_CI_JOB_KEY;
     const config = JOBS.find(job => job.key === key);
-    if (!config) throw new Error('Unknown or missing SYSTEMFABRIC_CI_JOB_KEY.');
-    if (process.env.SYSTEMFABRIC_CI_JOB_NAME !== config.jobName) throw new Error('SYSTEMFABRIC_CI_JOB_NAME does not match the job key.');
-    const runtime = process.env.SYSTEMFABRIC_CI_RUNTIME || 'not-applicable';
-    if (runtime !== config.runtime) throw new Error('SYSTEMFABRIC_CI_RUNTIME does not match the job key.');
+    if (!config) throw new Error('Unknown or missing VIRGOSCORPIO_HUB_CI_JOB_KEY.');
+    if (process.env.VIRGOSCORPIO_HUB_CI_JOB_NAME !== config.jobName) throw new Error('VIRGOSCORPIO_HUB_CI_JOB_NAME does not match the job key.');
+    const runtime = process.env.VIRGOSCORPIO_HUB_CI_RUNTIME || 'not-applicable';
+    if (runtime !== config.runtime) throw new Error('VIRGOSCORPIO_HUB_CI_RUNTIME does not match the job key.');
     const metadata = {
       ...expectedMetadataFromEnvironment(process.env, root),
       jobKey: config.key,

@@ -39,20 +39,20 @@ function createRequestMetrics({ bucketsMs = DEFAULT_BUCKETS_MS } = {}) {
   }
   function renderPrometheus() {
     const lines = [
-      '# HELP systemfabric_http_requests_total Total HTTP responses by bounded route group and status class.',
-      '# TYPE systemfabric_http_requests_total counter'
+      '# HELP virgoscorpio_hub_http_requests_total Total HTTP responses by bounded route group and status class.',
+      '# TYPE virgoscorpio_hub_http_requests_total counter'
     ];
     for (const [compound, count] of counters) {
       const [method, route, statusClass] = compound.split('|');
-      lines.push(`systemfabric_http_requests_total{method="${escapeLabel(method)}",route="${escapeLabel(route)}",status_class="${escapeLabel(statusClass)}"} ${count}`);
+      lines.push(`virgoscorpio_hub_http_requests_total{method="${escapeLabel(method)}",route="${escapeLabel(route)}",status_class="${escapeLabel(statusClass)}"} ${count}`);
     }
-    lines.push('# HELP systemfabric_http_request_duration_milliseconds HTTP request duration in milliseconds.', '# TYPE systemfabric_http_request_duration_milliseconds histogram');
+    lines.push('# HELP virgoscorpio_hub_http_request_duration_milliseconds HTTP request duration in milliseconds.', '# TYPE virgoscorpio_hub_http_request_duration_milliseconds histogram');
     for (const [compound, histogram] of histograms) {
       const [method, route, statusClass] = compound.split('|'); const labels = `method="${escapeLabel(method)}",route="${escapeLabel(route)}",status_class="${escapeLabel(statusClass)}"`;
-      buckets.forEach((bound, index) => lines.push(`systemfabric_http_request_duration_milliseconds_bucket{${labels},le="${bound}"} ${histogram.bucketCounts[index]}`));
-      lines.push(`systemfabric_http_request_duration_milliseconds_bucket{${labels},le="+Inf"} ${histogram.count}`);
-      lines.push(`systemfabric_http_request_duration_milliseconds_sum{${labels}} ${histogram.sum.toFixed(3)}`);
-      lines.push(`systemfabric_http_request_duration_milliseconds_count{${labels}} ${histogram.count}`);
+      buckets.forEach((bound, index) => lines.push(`virgoscorpio_hub_http_request_duration_milliseconds_bucket{${labels},le="${bound}"} ${histogram.bucketCounts[index]}`));
+      lines.push(`virgoscorpio_hub_http_request_duration_milliseconds_bucket{${labels},le="+Inf"} ${histogram.count}`);
+      lines.push(`virgoscorpio_hub_http_request_duration_milliseconds_sum{${labels}} ${histogram.sum.toFixed(3)}`);
+      lines.push(`virgoscorpio_hub_http_request_duration_milliseconds_count{${labels}} ${histogram.count}`);
     }
     return `${lines.join('\n')}\n`;
   }
@@ -180,15 +180,15 @@ function createRealtimeMetrics() {
   function renderPrometheus() {
     const lines = [];
     for (const [name, value] of counters) {
-      const metric = 'systemfabric_realtime_' + name;
+      const metric = 'virgoscorpio_hub_realtime_' + name;
       lines.push('# TYPE ' + metric + ' counter', metric + ' ' + value);
     }
     for (const [name, value] of gauges) {
-      const metric = 'systemfabric_realtime_' + name;
+      const metric = 'virgoscorpio_hub_realtime_' + name;
       lines.push('# TYPE ' + metric + ' gauge', metric + ' ' + value);
     }
     for (const [name, histogram] of histograms) {
-      const metric = 'systemfabric_realtime_' + name;
+      const metric = 'virgoscorpio_hub_realtime_' + name;
       const bounds = REALTIME_HISTOGRAMS[name];
       lines.push('# TYPE ' + metric + ' histogram');
       bounds.forEach((bound, index) => lines.push(metric + '_bucket{le="' + bound + '"} ' + histogram.bucketCounts[index]));

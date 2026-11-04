@@ -61,7 +61,7 @@ async function main() {
     catch { add(`${displayName} dependency`, false, `${moduleName} is not installed; run npm run dev:bootstrap.`); }
   }
 
-  const inDevcontainer = process.env.SF_DEVCONTAINER === 'true' || Boolean(process.env.REMOTE_CONTAINERS);
+  const inDevcontainer = process.env.VIRGOSCORPIO_HUB_DEVCONTAINER === 'true' || Boolean(process.env.REMOTE_CONTAINERS);
   if (inDevcontainer) add('Docker Compose control', true, 'Running inside the VS Code Dev Container; Compose services are managed by the host.');
   else {
     const dockerOk = commandOk('docker', ['--version']) && commandOk('docker', ['compose', 'version']);
@@ -80,7 +80,7 @@ async function main() {
     add(label, reachable, reachable ? `${endpoint.host}:${endpoint.port} accepts TCP connections.` : `Cannot connect to ${endpoint.host}:${endpoint.port}; start Compose services or check the URL.`, false);
   }
 
-  console.log('\nSystemFabric VS Code development preflight');
+  console.log('\nVirgoScorpio Hub VS Code development preflight');
   console.log('==========================================');
   for (const result of results) console.log(`${result.ok ? 'PASS' : (result.fatal ? 'BLOCK' : 'WARN')}  ${result.name}: ${result.details}`);
   const blockers = results.filter(result => !result.ok && result.fatal);

@@ -1,8 +1,8 @@
-# SystemFabric 0.5.1 — Independent Assessor Engagement Brief
+# VirgoScorpio Hub 0.5.1 — Independent Assessor Engagement Brief
 
 **Status:** procurement preparation only. No vendor has been contacted, retained, or approved. No independent review has been performed.
 
-**Coordination:** [GitHub issue #14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14)
+**Coordination:** [GitHub issue #14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14)
 
 **Technical hand-off:** [TENANT-ISOLATION-ASSESSMENT-BRIEF.md](TENANT-ISOLATION-ASSESSMENT-BRIEF.md)
 
@@ -10,7 +10,7 @@
 
 ## 1. Engagement sought
 
-Engage an external, independent application-security assessor to perform a manual, source-assisted (white-box/grey-box) tenant-isolation and authorization review of SystemFabric 0.5.1.
+Engage an external, independent application-security assessor to perform a manual, source-assisted (white-box/grey-box) tenant-isolation and authorization review of VirgoScorpio Hub 0.5.1.
 
 This is not a generic vulnerability scan, a compliance checklist, or a short unauthenticated perimeter test. The highest-value questions concern broken object-level authorization (BOLA/IDOR), tenant-context confusion, role/capability escalation, and tenant data or side effects leaking through asynchronous and realtime paths.
 
@@ -59,7 +59,7 @@ No pricing is assumed here. Ask each firm for a fixed-scope proposal and an opti
 
 A candidate must:
 
-- Be independent from SystemFabric's implementation team and disclose any prior work, financial interest, personal relationship or other conflict involving the project, repository, owner or contributors.
+- Be independent from VirgoScorpio Hub's implementation team and disclose any prior work, financial interest, personal relationship or other conflict involving the project, repository, owner or contributors.
 - Name the individual(s) who will conduct the work and provide relevant examples of manual web/API authorization and multi-tenant application assessments.
 - Agree to a source-assisted assessment and an explicit route/capability coverage inventory.
 - Test only against an isolated, owner-authorized non-production environment populated with synthetic data.
@@ -113,11 +113,11 @@ Ask each candidate to answer these points in writing:
 
 ## 6. Initial outreach template
 
-**Subject:** Proposal request — independent multi-tenant application security assessment (SystemFabric 0.5.1)
+**Subject:** Proposal request — independent multi-tenant application security assessment (VirgoScorpio Hub 0.5.1)
 
 Hello,
 
-Golden Obsidian LLC is seeking an independent application-security assessor for SystemFabric 0.5.1, a Node.js/PostgreSQL application with multi-site tenancy, background/outbox processing, graph projections, Redis-backed realtime collaboration, and object-library storage.
+Golden Obsidian LLC is seeking an independent application-security assessor for VirgoScorpio Hub 0.5.1, a Node.js/PostgreSQL application with multi-site tenancy, background/outbox processing, graph projections, Redis-backed realtime collaboration, and object-library storage.
 
 We are looking for a manual, source-assisted review focused on tenant/site isolation and authorization: route/capability coverage, BOLA/IDOR, privilege boundaries, cross-tenant data access and side effects, and tenant context propagation through workers, events, caches, graph projections and SSE/WebSocket collaboration.
 
@@ -154,4 +154,4 @@ Golden Obsidian LLC
 
 The project owner should approve a spend ceiling and authorize outreach to the shortlisted firms. Once that authority exists, send the same RFP to each candidate, compare written proposals using the scorecard, complete conflict checks, and select the named assessor. Do not close issue #14 or create a passing evidence file until the review and required retesting are complete.
 
-SystemFabric 0.5.1 remains **NOT_PRODUCTION_CERTIFIED / NO-GO**.
+VirgoScorpio Hub 0.5.1 remains **NOT_PRODUCTION_CERTIFIED / NO-GO**.

@@ -12,7 +12,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 async function seedLibraryAsset({ pool, libraryRoot, siteId, id, bytes, displayName, isPublic, createdBy = null }) {
@@ -98,14 +98,14 @@ test(
       AI_PROVIDER: 'mock',
       LIBRARY_STORAGE_PROVIDER: 'local',
     };
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
 
     const identity = createIdentityService({ pool, env });
 
     t.after(async () => {
       if (server) {
         if (server.listening) await new Promise(resolve => server.close(resolve));
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
       if (siteIds.length) {
         await pool.query('DELETE FROM sites WHERE id=ANY($1::uuid[])', [siteIds]).catch(() => {});
@@ -119,7 +119,7 @@ test(
       await pool.end();
     });
 
-    libraryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'systemfabric-tenant-library-'));
+    libraryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-tenant-library-'));
     env.LIBRARY_ROOT = libraryRoot;
 
     const siteAResult = await pool.query(
@@ -214,7 +214,7 @@ test(
     const base = `http://127.0.0.1:${server.address().port}`;
     const headers = {
       authorization: `Bearer ${session.token}`,
-      'x-systemfabric-site-id': siteB,
+      'x-virgoscorpio-hub-site-id': siteB,
     };
     const before = await librarySideEffects(pool, siteA, assetAId);
     assert.equal(before.asset.length, 1);
@@ -243,7 +243,7 @@ test(
         const response = await fetch(`${base}/api/v1/sites/${siteB}/library/items/${assetA.id}${endpoint}`, { headers });
         const payload = await response.json();
         assert.equal(response.status, 404);
-        assert.equal(payload.code, 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND');
+        assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND');
         assert.doesNotMatch(JSON.stringify(payload), /SITE_A_PRIVATE_LIBRARY_PAYLOAD|PRIVATE_SITE_A_LIBRARY_MARKER/);
       }
       await assertSiteAUnchanged();
@@ -268,7 +268,7 @@ test(
       });
       assert.equal(response.status, 404);
       const payload = await response.json();
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -280,7 +280,7 @@ test(
       });
       assert.equal(response.status, 404);
       const payload = await response.json();
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND');
       await assertSiteAUnchanged();
     });
 
@@ -292,7 +292,7 @@ test(
       });
       assert.equal(response.status, 409);
       const payload = await response.json();
-      assert.equal(payload.code, 'ERR_SYSTEMFABRIC_VERSION_CONFLICT');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT');
       await assertSiteAUnchanged();
     });
 

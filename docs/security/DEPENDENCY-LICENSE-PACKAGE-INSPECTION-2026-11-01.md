@@ -38,6 +38,6 @@ For each package below, the downloaded tarball's SHA-512 digest matched the `int
 - **Declared license metadata:** recorded for all seven inspected packages.
 - **Bundled license-text completeness:** OPEN. Two Linux libvips archives contain no license text file; compound license expressions in WASM/Windows Sharp platform archives need mapping.
 - **Distribution notices/source obligations:** OPEN, requires maintainer/legal review against the actual binary/container and hosted distribution model.
-- **Release approval:** NOT implied. SystemFabric remains `NOT_PRODUCTION_CERTIFIED / NO-GO`.
+- **Release approval:** NOT implied. VirgoScorpio Hub remains `NOT_PRODUCTION_CERTIFIED / NO-GO`.
 
 No dependency was installed into the repository or runtime for this inspection. The downloaded tarballs and extracted contents were confined to a temporary directory outside the repository. No paid service or external assessor was engaged, and no spending or liquid reserve is assumed.

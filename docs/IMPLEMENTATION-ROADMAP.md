@@ -1,6 +1,6 @@
-# SystemFabric Implementation Roadmap — 0.5.1
+# VirgoScorpio Hub Implementation Roadmap — 0.5.1
 
-> **Validation baseline note — 1 November 2026:** the latest reviewed candidate evidence covers 14 migrations on a fresh disposable PostgreSQL database (14/14 applied, then 14/14 skipped) and a supported v0008-to-current migration-upgrade fixture. The latest live PostgreSQL/Memgraph integration job passed 22/22 with zero skips. Candidate PR #36 is not merged, and the downstream provider, security, operations and release-approval milestones remain open. See the [project status report](reports/2026-11-01-SystemFabric-0.5.1-Project-Status-Report.md).
+> **Validation baseline note — 1 November 2026:** the latest reviewed candidate evidence covers 14 migrations on a fresh disposable PostgreSQL database (14/14 applied, then 14/14 skipped) and a supported v0008-to-current migration-upgrade fixture. The latest live PostgreSQL/Memgraph integration job passed 22/22 with zero skips. Candidate PR #36 is not merged, and the downstream provider, security, operations and release-approval milestones remain open. See the [project status report](reports/2026-11-01-VirgoScorpio-Hub-0.5.1-Project-Status-Report.md).
 
 ## Completed foundations in this source snapshot
 
@@ -46,4 +46,4 @@
 
 ## Release policy
 
-The CI workflow is a test definition, not evidence that a job passed. Each milestone needs retained acceptance logs/results. Capability files, UI surfaces and database tables alone do not imply user-facing parity. SystemFabric must not claim production certification until all release-gate requirements are satisfied.
+The CI workflow is a test definition, not evidence that a job passed. Each milestone needs retained acceptance logs/results. Capability files, UI surfaces and database tables alone do not imply user-facing parity. VirgoScorpio Hub must not claim production certification until all release-gate requirements are satisfied.

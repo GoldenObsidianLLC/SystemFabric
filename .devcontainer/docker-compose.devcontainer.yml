@@ -8,23 +8,23 @@ services:
       NODE_ENV: development
       HOST: 0.0.0.0
       PORT: "8787"
-      DATABASE_URL: postgres://systemfabric:systemfabric_dev@postgres:5432/systemfabric
-      TEST_DATABASE_URL: postgres://systemfabric:systemfabric_dev@postgres:5432/systemfabric_test
+      DATABASE_URL: postgres://virgoscorpio_hub:virgoscorpio_hub_dev@postgres:5432/virgoscorpio_hub
+      TEST_DATABASE_URL: postgres://virgoscorpio_hub:virgoscorpio_hub_dev@postgres:5432/virgoscorpio_hub_test
       MEMGRAPH_URL: bolt://memgraph:7687
       MEMGRAPH_TEST_URL: bolt://memgraph:7687
       AI_PROVIDER: mock
       AI_ALLOWED_PROVIDERS: mock
       AI_ALLOW_EXTERNAL_CONTENT: "false"
-      SYSTEMFABRIC_MAIL_PROVIDER: disabled
-      SF_DEVCONTAINER: "true"
+      VIRGOSCORPIO_HUB_MAIL_PROVIDER: disabled
+      VIRGOSCORPIO_HUB_DEVCONTAINER: "true"
       S3_ENDPOINT: http://minio:9000
       S3_FORCE_PATH_STYLE: "true"
-      AWS_ACCESS_KEY_ID: systemfabric_minio
-      AWS_SECRET_ACCESS_KEY: systemfabric_minio_dev_only
-      S3_BUCKET: systemfabric-assets
+      AWS_ACCESS_KEY_ID: virgoscorpio_hub_minio
+      AWS_SECRET_ACCESS_KEY: virgoscorpio_hub_minio_dev_only
+      S3_BUCKET: virgoscorpio-hub-assets
     volumes:
       - .:/workspace:cached
-      - systemfabric-node-modules:/workspace/node_modules
+      - virgoscorpio_hub-node-modules:/workspace/node_modules
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,4 +33,4 @@ services:
     init: true
 
 volumes:
-  systemfabric-node-modules:
+  virgoscorpio_hub-node-modules:

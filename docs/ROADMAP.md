@@ -1,4 +1,4 @@
-# SystemFabric Roadmap
+# VirgoScorpio Hub Roadmap
 
 This roadmap is evidence-oriented rather than a promise of dates. Items should move to complete only when linked evidence exists for the target commit and environment. The roadmap now covers two complementary tracks: completing the current secure, reliable platform foundation and developing toward a real-time collaborative AI-native platform.
 
@@ -6,7 +6,7 @@ Priorities: **P0** = critical reliability/security/release work; **P1** = founda
 
 ## Human-AI agency — cross-cutting product and engineering gate
 
-The [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) is the project's north star for human-AI collaboration. It frames the goal as amplifying human capability, preserving creative dignity and productive relevance, and resisting designs that treat human obsolescence or concentrated control as inevitable. This roadmap translates those values into engineering work; it does not claim that software alone can guarantee employment, income or broader economic outcomes.
+The [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md) is the project's north star for human-AI collaboration. It frames the goal as amplifying human capability, preserving creative dignity and productive relevance, and resisting designs that treat human obsolescence or concentrated control as inevitable. This roadmap translates those values into engineering work; it does not claim that software alone can guarantee employment, income or broader economic outcomes.
 
 Apply these checks to every AI-enabled product track:
 
@@ -107,7 +107,7 @@ This track establishes reusable infrastructure before individual screens and fea
 
 ### Collaborative CMS and writing assistant (P1)
 
-- [x] Evaluate CRDT and operational-transformation approaches against SystemFabric's structured document model; record the provisional semantic-OT direction and trade-offs in [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019.
+- [x] Evaluate CRDT and operational-transformation approaches against VirgoScorpio Hub's structured document model; record the provisional semantic-OT direction and trade-offs in [Collaborative Editing Spike](COLLABORATIVE-EDITING-SPIKE.md) and ADR-019.
 - [x] Implement a two-client semantic-OT proof with durable PostgreSQL operation sequencing, typed conflict handling, authenticated document REST/WebSocket transport, reconnect/replay, persisted revision/workflow/outbox integration and a two-context Playwright convergence proof (F1.9; production gates remain open).
 - [ ] Implement collaborative document sessions, presence, cursors/selections, conflict handling, recovery and integration with persisted revisions.
 - [ ] Add comments and review threads with tenant-scoped authorization and immutable audit context.

@@ -33,13 +33,13 @@ test('consumer groups and event subscriptions are constrained and fail closed', 
   assert.equal(validateConsumerGroup('graph.projection-v1'), 'graph.projection-v1');
   for (const value of ['', 'UpperCase', 'bad group', '../unsafe', 42]) {
     assert.throws(() => validateConsumerGroup(value), {
-      code: 'ERR_SYSTEMFABRIC_CONSUMER_GROUP_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_GROUP_INVALID'
     });
   }
   assert.deepEqual(validateEventTypes(['content.publish', 'content.upsert']), ['content.publish', 'content.upsert']);
   for (const value of [[], ['Bad.Event'], ['content.upsert', 'content.upsert'], ['bad event'], null]) {
     assert.throws(() => validateEventTypes(value), {
-      code: 'ERR_SYSTEMFABRIC_CONSUMER_EVENT_TYPES_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_EVENT_TYPES_INVALID'
     });
   }
 });
@@ -121,10 +121,10 @@ test('replay resets only explicitly selected dead/processed deliveries', async (
   assert.deepEqual(queryParams[2], ['dead']);
   await assert.rejects(() => replayOutboxDeliveries({
     pool, consumerGroup: 'test.replay', eventIds: ['not-a-uuid']
-  }), { code: 'ERR_SYSTEMFABRIC_REPLAY_EVENT_IDS_INVALID' });
+  }), { code: 'ERR_VIRGOSCORPIO_HUB_REPLAY_EVENT_IDS_INVALID' });
   await assert.rejects(() => replayOutboxDeliveries({
     pool, consumerGroup: 'test.replay', eventIds: [EVENT_ID], statuses: ['processing']
-  }), { code: 'ERR_SYSTEMFABRIC_REPLAY_STATUS_INVALID' });
+  }), { code: 'ERR_VIRGOSCORPIO_HUB_REPLAY_STATUS_INVALID' });
 });
 
 
@@ -144,6 +144,6 @@ test('worker refuses to silently change a persisted consumer-group subscription'
     handler: async () => {}
   });
   await assert.rejects(() => worker.runOnce(), {
-    code: 'ERR_SYSTEMFABRIC_CONSUMER_EVENT_TYPES_MISMATCH'
+    code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_EVENT_TYPES_MISMATCH'
   });
 });

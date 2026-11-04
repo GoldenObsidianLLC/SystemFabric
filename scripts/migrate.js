@@ -11,6 +11,24 @@ const MIGRATION_DIR = path.resolve(__dirname, '../database/migrations');
 const LOCK_KEY_A = 57_493_100;
 const LOCK_KEY_B = 1;
 
+async function assertFreshDatabaseForIdentity(client) {
+  const applied = await client.query('SELECT version FROM virgoscorpio_hub_schema_migrations LIMIT 1');
+  if (applied.rows.length > 0) return;
+
+  const existing = await client.query(`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_type = 'BASE TABLE'
+      AND table_name <> 'virgoscorpio_hub_schema_migrations'
+    ORDER BY table_name
+    LIMIT 1
+  `);
+  if (existing.rows[0]) {
+    throw new Error('Refusing to initialize a non-empty database without an initialized VirgoScorpio Hub migration ledger. Provision a new empty database and transfer retained data through a separately reviewed procedure.');
+  }
+}
+
 async function main() {
   loadEnvFile(path.resolve(process.cwd(), '.env'));
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL must be set before running migrations.');
@@ -20,16 +38,17 @@ async function main() {
   const client = await pool.connect();
   try {
     await client.query('SELECT pg_advisory_lock($1::integer, $2::integer)', [LOCK_KEY_A, LOCK_KEY_B]);
-    await client.query(`CREATE TABLE IF NOT EXISTS systemfabric_schema_migrations (
+    await client.query(`CREATE TABLE IF NOT EXISTS virgoscorpio_hub_schema_migrations (
       version text PRIMARY KEY,
       sha256 text NOT NULL,
       applied_at timestamptz NOT NULL DEFAULT now()
     )`);
+    await assertFreshDatabaseForIdentity(client);
     for (const file of files) {
       const rawSql = fs.readFileSync(path.join(MIGRATION_DIR, file), 'utf8');
       const sql = normalizeMigrationSql(rawSql);
       const sha256 = migrationChecksum(rawSql);
-      const existing = await client.query('SELECT sha256 FROM systemfabric_schema_migrations WHERE version=$1', [file]);
+      const existing = await client.query('SELECT sha256 FROM virgoscorpio_hub_schema_migrations WHERE version=$1', [file]);
       if (existing.rows[0]) {
         if (existing.rows[0].sha256 !== sha256) throw new Error(`Applied migration ${file} has changed. Create a new forward migration instead of editing an applied migration.`);
         console.log(`SKIP ${file} (already applied)`);
@@ -40,7 +59,7 @@ async function main() {
       try {
         // Migration files are trusted repository code and are deliberately executed without user-supplied SQL parameters.
         await client.query(sql);
-        await client.query('INSERT INTO systemfabric_schema_migrations(version,sha256) VALUES($1,$2)', [file, sha256]);
+        await client.query('INSERT INTO virgoscorpio_hub_schema_migrations(version,sha256) VALUES($1,$2)', [file, sha256]);
         await client.query('COMMIT');
         console.log(`OK   ${file}`);
       } catch (error) {
@@ -56,8 +75,8 @@ async function main() {
 }
 
 if (require.main === module) main().catch(error => {
-  console.error(`SystemFabric migration failed: ${error.message}`);
+  console.error(`VirgoScorpio Hub migration failed: ${error.message}`);
   process.exitCode = 1;
 });
 
-module.exports = { MIGRATION_DIR, main, normalizeMigrationSql, migrationChecksum };
+module.exports = { MIGRATION_DIR, main, assertFreshDatabaseForIdentity, normalizeMigrationSql, migrationChecksum };

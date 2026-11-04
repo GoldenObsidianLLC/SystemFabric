@@ -4,8 +4,8 @@ const { getTraceContext, getTraceparent } = require('../../observability/src/tra
 const { withClientSpan } = require('../../observability/src/tracing');
 
 function createRemotePluginRunner({
-  url = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_URL,
-  token = process.env.SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN,
+  url = process.env.VIRGOSCORPIO_HUB_PLUGIN_RUNNER_URL,
+  token = process.env.VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN,
   timeoutMs = 8000,
   allowHttpInternal = process.env.PLUGIN_RUNNER_ALLOW_HTTP_INTERNAL === 'true'
 } = {}) {
@@ -23,12 +23,12 @@ function createRemotePluginRunner({
   return Object.freeze({
     async invoke(payload) {
       return withClientSpan('plugin_runner.invoke', {
-        'systemfabric.component': 'plugins',
-        'systemfabric.operation': 'invoke'
+        'virgoscorpio_hub.component': 'plugins',
+        'virgoscorpio_hub.operation': 'invoke'
       }, async () => {
         if (!endpoint || typeof token !== 'string' || token.length < 32) {
           const error = new Error('Secure plugin execution is disabled until an isolated plugin-runner service and strong service token are configured.');
-          error.code = 'ERR_SYSTEMFABRIC_PLUGIN_RUNTIME_DISABLED';
+          error.code = 'ERR_VIRGOSCORPIO_HUB_PLUGIN_RUNTIME_DISABLED';
           throw error;
         }
 
@@ -54,14 +54,14 @@ function createRemotePluginRunner({
           const data = await response.json().catch(() => ({}));
           if (!response.ok) {
             const error = new Error(data.error || 'Plugin runner rejected the invocation.');
-            error.code = data.code || 'ERR_SYSTEMFABRIC_PLUGIN_RUNNER';
+            error.code = data.code || 'ERR_VIRGOSCORPIO_HUB_PLUGIN_RUNNER';
             error.statusCode = response.status;
             throw error;
           }
           return data.result;
         } catch (error) {
           if (error.name === 'AbortError') {
-            error.code = 'ERR_SYSTEMFABRIC_PLUGIN_TIMEOUT';
+            error.code = 'ERR_VIRGOSCORPIO_HUB_PLUGIN_TIMEOUT';
             error.message = 'Plugin runner request timed out.';
           }
           throw error;

@@ -1,14 +1,14 @@
-# SystemFabric Real-Time and AI-Native Architecture
+# VirgoScorpio Hub Real-Time and AI-Native Architecture
 
 **Status:** Proposed architecture for research and staged implementation
-**Baseline:** SystemFabric 0.5.1 developer-preview hardening candidate
+**Baseline:** VirgoScorpio Hub 0.5.1 developer-preview hardening candidate
 **Scope:** Real-time events, presence, collaboration, AI orchestration/governance, contextual intelligence and collaborative workflow planning
 
-This document describes a target architecture, not an inventory of currently shipped services. Components and data flows are proposed until implemented and validated. The design must preserve the current platform boundaries: PostgreSQL is authoritative for transactional state, Memgraph is a derived graph projection, and external AI/provider integrations are optional dependencies that require explicit policy and environment validation. It is also guided by the SystemFabric Manifesto: AI should augment human capability and preserve agency, creative dignity and meaningful participation. Those values are engineering goals, not claims of guaranteed economic outcomes.
+This document describes a target architecture, not an inventory of currently shipped services. Components and data flows are proposed until implemented and validated. The design must preserve the current platform boundaries: PostgreSQL is authoritative for transactional state, Memgraph is a derived graph projection, and external AI/provider integrations are optional dependencies that require explicit policy and environment validation. It is also guided by the VirgoScorpio Hub Manifesto: AI should augment human capability and preserve agency, creative dignity and meaningful participation. Those values are engineering goals, not claims of guaranteed economic outcomes.
 
 ## 1. Architectural goals
 
-SystemFabric should make real-time collaboration and contextual AI reusable platform capabilities rather than independent features embedded separately in the CMS, admin interface, community, and workflow tools.
+VirgoScorpio Hub should make real-time collaboration and contextual AI reusable platform capabilities rather than independent features embedded separately in the CMS, admin interface, community, and workflow tools.
 
 The architecture should provide:
 
@@ -21,7 +21,7 @@ The architecture should provide:
 
 ### 1.1 Human-AI symbiosis, agency and consent
 
-The [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md) describes the project's mission in terms of economic agency, creative dignity and productive relevance. It states the design thesis that technology should amplify human capability rather than eliminate human necessity, and highlights technological determinism, concentration of power and loss of human agency as concerns. This section translates that thesis into proposed technical constraints; it does not claim that the platform can guarantee employment, income or societal outcomes.
+The [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md) describes the project's mission in terms of economic agency, creative dignity and productive relevance. It states the design thesis that technology should amplify human capability rather than eliminate human necessity, and highlights technological determinism, concentration of power and loss of human agency as concerns. This section translates that thesis into proposed technical constraints; it does not claim that the platform can guarantee employment, income or societal outcomes.
 
 The system should model three distinct participants:
 

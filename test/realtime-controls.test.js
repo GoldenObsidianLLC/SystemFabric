@@ -31,7 +31,7 @@ class FakeRedisQuotaClient {
       for (const [member, expiry] of set) if (expiry <= now) set.delete(member);
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_ACQUIRE')) {
+    if (script.includes('VSH_REALTIME_QUOTA_ACQUIRE')) {
       const [expiresAt, maxGlobal, maxSite, maxPrincipal, connectionId, ttl] = args.slice(1).map((value, index) => index < 5 ? (index < 4 ? Number(value) : value) : Number(value));
       if (sets[0].size >= maxGlobal) return [0, 'global'];
       if (sets[1].size >= maxSite) return [0, 'site'];
@@ -40,7 +40,7 @@ class FakeRedisQuotaClient {
       return [1, sets[0].size, sets[1].size, sets[2].size, ttl];
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_RENEW')) {
+    if (script.includes('VSH_REALTIME_QUOTA_RENEW')) {
       const [expiresAt, connectionId] = args.slice(1);
       if (sets.some(set => !set.has(connectionId))) {
         for (const set of sets) set.delete(connectionId);
@@ -50,7 +50,7 @@ class FakeRedisQuotaClient {
       return 1;
     }
 
-    if (script.includes('SF_REALTIME_QUOTA_RELEASE')) {
+    if (script.includes('VSH_REALTIME_QUOTA_RELEASE')) {
       const [connectionId] = args.slice(1);
       for (const set of sets) set.delete(connectionId);
       return 1;
@@ -70,19 +70,19 @@ test('memory quota rejects global, per-site and per-principal excess connections
   const first = await limiter.acquire({ siteId: SITE_A, principalId: 'user-a' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   const second = await limiter.acquire({ siteId: SITE_A, principalId: 'user-b' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-c' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   const third = await limiter.acquire({ siteId: SITE_B, principalId: 'user-c' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_B, principalId: 'user-d' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   await Promise.all([first.release(), second.release(), third.release()]);
@@ -127,7 +127,7 @@ test('Redis quota adapter uses atomic leases for acquire, renew and release', as
   const first = await limiter.acquire({ siteId: SITE_A, principalId: 'user-a' });
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
   assert.equal(await first.renew(), true);
   await first.release();
@@ -149,7 +149,7 @@ test('Redis quota adapter fails closed when its backing store is unavailable', a
   client.eval = async () => { throw Object.assign(new Error('redis unavailable'), { code: 'ECONNRESET' }); };
   await assert.rejects(
     limiter.acquire({ siteId: SITE_A, principalId: 'user-a' }),
-    error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_REALTIME_QUOTA_UNAVAILABLE'
+    error => error.statusCode === 503 && error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_QUOTA_UNAVAILABLE'
   );
   await limiter.close();
 });

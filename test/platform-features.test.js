@@ -20,7 +20,7 @@ test('library type detection trusts file signatures and rejects unsafe display n
   assert.equal(sniffMime(Buffer.from('hello world')), 'text/plain');
   assert.equal(sniffMime(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>')), 'text/plain');
   assert.equal(sanitizeDisplayName('../../a\\b:<script>.png'), 'a-b--script-.png');
-  assert.throws(() => decodeDataBase64('not base64!', 100), { code: 'ERR_SYSTEMFABRIC_LIBRARY_INVALID' });
+  assert.throws(() => decodeDataBase64('not base64!', 100), { code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_INVALID' });
 });
 
 test('icon catalog renders only curated SVG paths and escapes titles', () => {
@@ -29,15 +29,15 @@ test('icon catalog renders only curated SVG paths and escapes titles', () => {
   assert.match(svg, /^<svg /);
   assert.match(svg, /&lt;script&gt;/);
   assert.doesNotMatch(svg, /<script>/i);
-  assert.throws(() => renderIcon('unknown'), { code: 'ERR_SYSTEMFABRIC_ICON_NOT_FOUND' });
-  assert.throws(() => renderIcon('check', { size: 1000 }), { code: 'ERR_SYSTEMFABRIC_ICON_OPTIONS' });
+  assert.throws(() => renderIcon('unknown'), { code: 'ERR_VIRGOSCORPIO_HUB_ICON_NOT_FOUND' });
+  assert.throws(() => renderIcon('check', { size: 1000 }), { code: 'ERR_VIRGOSCORPIO_HUB_ICON_OPTIONS' });
 });
 
 test('math formulas reject dangerous TeX commands and use an escaped fallback when KaTeX is absent', () => {
   assert.equal(validateFormula('\\frac{a}{b}').valid, true);
   assert.equal(validateFormula('\\href{javascript:alert(1)}{x}').valid, false);
   assert.equal(validateFormula('{x').valid, false);
-  assert.throws(() => renderMath('\\write18{touch /tmp/x}'), { code: 'ERR_SYSTEMFABRIC_MATH_INVALID' });
+  assert.throws(() => renderMath('\\write18{touch /tmp/x}'), { code: 'ERR_VIRGOSCORPIO_HUB_MATH_INVALID' });
   const fallback = renderMath('<script>x</script>', { katex: false });
   assert.equal(fallback.rendered, false);
   assert.match(fallback.html, /&lt;script&gt;/);
@@ -81,7 +81,7 @@ test('firewall validates IPv4 CIDR and matches exact safe rules', () => {
 });
 
 test('cloud configs only accept secret references and a whitelisted non-secret provider configuration', () => {
-  assert.equal(cloudConfigStatus({ provider: 'aws-s3', credentialReference: 'env://SYSTEMFABRIC_STORAGE_KEY', config: { bucket: 'assets' } }).valid, true);
+  assert.equal(cloudConfigStatus({ provider: 'aws-s3', credentialReference: 'env://VIRGOSCORPIO_HUB_STORAGE_KEY', config: { bucket: 'assets' } }).valid, true);
   assert.equal(cloudConfigStatus({ provider: 'aws-s3', credentialReference: 'super-secret-access-key', config: {} }).valid, false);
   assert.equal(cloudConfigStatus({ provider: 'aws-s3', credentialReference: 'vault://production/storage', config: {} }).valid, false, 'vault references must be resolved by an integration not present in this build');
   assert.equal(cloudConfigStatus({ provider: 'unknown', credentialReference: 'env://STORAGE_KEY', config: {} }).valid, false);
@@ -89,9 +89,9 @@ test('cloud configs only accept secret references and a whitelisted non-secret p
   assert.equal(cloudConfigStatus({ provider: 's3-compatible', credentialReference: 'env://AWS_SECRET_ACCESS_KEY', config: { endpoint: 'https://user:secret@bucket.example.test' } }).valid, false);
   assert.equal(cloudConfigStatus({ provider: 's3-compatible', credentialReference: 'env://AWS_SECRET_ACCESS_KEY', config: { endpoint: 'https://bucket.example.test?token=secret' } }).valid, false);
   assert.equal(cloudConfigStatus({ provider: 'google-cloud-storage', credentialReference: 'env://GOOGLE_APPLICATION_CREDENTIALS', config: { endpoint: 'https://storage.example.test' } }).valid, false, 'provider-specific ignored configuration is rejected');
-  assert.equal(cloudEndpointAllowed('https://minio.example.test:9000', { NODE_ENV: 'production', SYSTEMFABRIC_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), true);
-  assert.equal(cloudEndpointAllowed('https://169.254.169.254', { NODE_ENV: 'production', SYSTEMFABRIC_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), false);
-  assert.equal(cloudEndpointAllowed('http://minio.example.test:9000', { NODE_ENV: 'production', SYSTEMFABRIC_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), false);
+  assert.equal(cloudEndpointAllowed('https://minio.example.test:9000', { NODE_ENV: 'production', VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), true);
+  assert.equal(cloudEndpointAllowed('https://169.254.169.254', { NODE_ENV: 'production', VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), false);
+  assert.equal(cloudEndpointAllowed('http://minio.example.test:9000', { NODE_ENV: 'production', VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_ALLOWLIST: 'minio.example.test:9000' }), false);
 });
 
 test('Stripe webhook signatures are timestamped, compared in constant time, and reject stale payloads', () => {
@@ -104,14 +104,14 @@ test('Stripe webhook signatures are timestamped, compared in constant time, and 
 });
 
 test('page document supports video, icon, and math widgets and renders bounded deterministic HTML', () => {
-  const document = { schemaVersion: 1, documentId: 'systemfabric-test-document', type: 'page', title: 'Mixed media', children: [
+  const document = { schemaVersion: 1, documentId: 'virgoscorpio_hub-test-document', type: 'page', title: 'Mixed media', children: [
     { id: 'vid1', type: 'widget.video', props: { assetId: '00000000-0000-4000-8000-000000000001', title: 'Demo video', controls: true }, children: [] },
     { id: 'ico1', type: 'widget.icon', props: { iconName: 'check', size: 24, title: 'Complete' }, children: [] },
     { id: 'math1', type: 'widget.math', props: { formula: 'x^2+y^2=z^2', displayMode: true }, children: [] }
   ] };
   assert.equal(validatePageDocument(document).valid, true);
   const html = renderPageDocument(document);
-  assert.match(html, /<video/); assert.match(html, /\/library\/public\/00000000-0000-4000-8000-000000000001/); assert.match(html, /<svg/); assert.match(html, /sf-math/);
+  assert.match(html, /<video/); assert.match(html, /\/library\/public\/00000000-0000-4000-8000-000000000001/); assert.match(html, /<svg/); assert.match(html, /vsh-math/);
   assert.doesNotMatch(html, /<script\b/i);
   const invalid = structuredClone(document); invalid.children[1].props.iconName = '<script>';
   assert.equal(validatePageDocument(invalid).valid, false);

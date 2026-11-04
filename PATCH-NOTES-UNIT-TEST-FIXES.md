@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 — cross-platform unit-test fixes
+# VirgoScorpio Hub 0.5.1 — cross-platform unit-test fixes
 
 This patch addresses three failures reported by the Windows development run of `npm run check`.
 
@@ -15,4 +15,4 @@ This patch addresses three failures reported by the Windows development run of `
 - `node --test test/*.test.js`: **105 passed, 0 failed**.
 - `node scripts/verify.js`: passed (112 required paths and 96 JavaScript files syntax-checked).
 
-The packaging environment used Node.js 22.16.0, below SystemFabric's declared minimum of Node.js 22.23.4. These results are development checks, not supported-runtime certification. PostgreSQL/Memgraph live integration, Playwright E2E, provider calls, production security and release certification are not covered by these checks.
+The packaging environment used Node.js 22.16.0, below VirgoScorpio Hub's declared minimum of Node.js 22.23.4. These results are development checks, not supported-runtime certification. PostgreSQL/Memgraph live integration, Playwright E2E, provider calls, production security and release certification are not covered by these checks.

@@ -51,9 +51,9 @@ async function createServer(t, options = {}) {
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: TOKEN,
-      SYSTEMFABRIC_DEFAULT_SITE_ID: SITE_ID,
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_API_TOKEN: TOKEN,
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: SITE_ID,
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -64,7 +64,7 @@ async function createServer(t, options = {}) {
   const origin = 'http://127.0.0.1:' + server.address().port;
   const url = origin.replace('http://', 'ws://') + '/api/v1/sites/' + SITE_ID + '/realtime/ws';
   t.after(async () => {
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
     await new Promise(resolve => server.close(resolve));
   });
   return { server, origin, url };
@@ -116,7 +116,7 @@ test('WebSocket presence heartbeat is session-scoped and updates the authoritati
   const result = await response.json();
   assert.equal(result.presence.length, 1);
   assert.equal(result.presence[0].availability, 'active');
-  assert.equal(server.systemfabric.realtimeMetrics.counters.websocket_messages_received_total, 1);
+  assert.equal(server.virgoScorpioHub.realtimeMetrics.counters.websocket_messages_received_total, 1);
 });
 
 test('WebSocket rejects unauthenticated and cross-origin upgrade attempts before connection', async t => {
@@ -155,10 +155,10 @@ test('WebSocket rejects unknown and malformed commands and cleans up on close', 
   socket.send('{bad-json');
   const [code] = await new Promise(resolve => socket.once('close', (status, reason) => resolve([status, reason.toString()])));
   assert.equal(code, 1008);
-  for (let attempt = 0; attempt < 100 && server.systemfabric.realtimeMetrics.gauges.active_websocket_connections !== 0; attempt += 1) {
+  for (let attempt = 0; attempt < 100 && server.virgoScorpioHub.realtimeMetrics.gauges.active_websocket_connections !== 0; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
-  assert.equal(server.systemfabric.realtimeMetrics.gauges.active_websocket_connections, 0);
+  assert.equal(server.virgoScorpioHub.realtimeMetrics.gauges.active_websocket_connections, 0);
 });
 
 test('SSE and WebSocket consume the same principal connection quota and release it on disconnect', async t => {
@@ -288,7 +288,7 @@ test('API shutdown closes active WebSockets and awaits shared quota release', as
   assert.equal(limiter.activeCount, 1);
 
   const closed = new Promise(resolve => socket.once('close', code => resolve(code)));
-  await server.systemfabric.close();
+  await server.virgoScorpioHub.close();
   assert.equal(await closed, 1001);
   assert.equal(limiter.activeCount, 0);
 });
@@ -307,7 +307,7 @@ test('API shutdown ends active SSE streams and awaits shared quota release', asy
   assert.match(new TextDecoder().decode(ready.value), /event: connection\.ready/);
   assert.equal(limiter.activeCount, 1);
 
-  await server.systemfabric.close();
+  await server.virgoScorpioHub.close();
   assert.equal(limiter.activeCount, 0);
   const shutdownFrame = await reader.read();
   assert.match(new TextDecoder().decode(shutdownFrame.value), /server-shutdown/);
@@ -374,7 +374,7 @@ test('two WebSocket sessions join the same draft, receive committed operations, 
 
   second.send(JSON.stringify({ type: 'document.leave', contentId }));
   assert.equal((await nextMessage(second)).type, 'document.left');
-  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 3, 'the first session still holds its document subscription');
+  assert.equal(server.virgoScorpioHub.realtimeHub.subscriberCount, 3, 'the first session still holds its document subscription');
 });
 
 test('WebSocket document subscription rejects missing, non-draft, and oversized document operations', async t => {
@@ -391,7 +391,7 @@ test('WebSocket document subscription rejects missing, non-draft, and oversized 
     async applyCollaborationOperation() {
       const error = new Error('operation too large');
       error.statusCode = 400;
-      error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+      error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION';
       throw error;
     }
   };
@@ -403,13 +403,13 @@ test('WebSocket document subscription rejects missing, non-draft, and oversized 
   socket.send(JSON.stringify({ type: 'document.join', contentId: '33333333-3333-4333-8333-333333333333', afterSequence: 0 }));
   const missing = await nextMessage(socket);
   assert.equal(missing.type, 'document.error');
-  assert.equal(missing.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+  assert.equal(missing.code, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN');
 
   status = 'published';
   socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
   const notDraft = await nextMessage(socket);
   assert.equal(notDraft.type, 'document.error');
-  assert.equal(notDraft.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+  assert.equal(notDraft.code, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN');
 
   status = 'draft';
   socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
@@ -428,7 +428,7 @@ test('WebSocket document subscription rejects missing, non-draft, and oversized 
   }));
   const oversizedOperation = await nextMessage(socket);
   assert.equal(oversizedOperation.type, 'document.error');
-  assert.equal(oversizedOperation.code, 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION');
+  assert.equal(oversizedOperation.code, 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION');
 });
 
 test('WebSocket document collaboration requires an active session and edit or edit-own capability', async t => {
@@ -478,7 +478,7 @@ test('WebSocket document collaboration requires an active session and edit or ed
   socket.send(JSON.stringify({ type: 'document.join', contentId: otherId, afterSequence: 0 }));
   const denied = await nextMessage(socket);
   assert.equal(denied.type, 'document.error');
-  assert.equal(denied.code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+  assert.equal(denied.code, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN');
 
   active = false;
   const revoked = new Promise(resolve => socket.once('close', code => resolve(code)));
@@ -623,14 +623,14 @@ test('WebSocket disconnect releases both the base and document subscriptions', a
   await nextMessage(socket);
   socket.send(JSON.stringify({ type: 'document.join', contentId, afterSequence: 0 }));
   assert.equal((await nextMessage(socket)).type, 'document.joined');
-  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 2);
+  assert.equal(server.virgoScorpioHub.realtimeHub.subscriberCount, 2);
   const closed = new Promise(resolve => socket.once('close', resolve));
   socket.close();
   await closed;
-  for (let attempt = 0; attempt < 20 && server.systemfabric.realtimeHub.subscriberCount !== 0; attempt += 1) {
+  for (let attempt = 0; attempt < 20 && server.virgoScorpioHub.realtimeHub.subscriberCount !== 0; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
-  assert.equal(server.systemfabric.realtimeHub.subscriberCount, 0);
+  assert.equal(server.virgoScorpioHub.realtimeHub.subscriberCount, 0);
 });
 
 test('WebSocket committed operations use the shared publisher and report degraded relay after commit', async t => {
@@ -787,7 +787,7 @@ test('document heartbeat reconciles a lost final notification and shares single-
 
   // A sequence-2 Pub/Sub event arrives while the heartbeat reconciliation is
   // pending. The gateway must share the same promise, not issue another query.
-  await server.systemfabric.realtimeHub.publish({
+  await server.virgoScorpioHub.realtimeHub.publish({
     siteId: SITE_ID,
     topic: 'document:' + contentId,
     payload: {
@@ -817,7 +817,7 @@ test('document heartbeat reconciles a lost final notification and shares single-
     'the Pub/Sub hint that initiated gap recovery is not delivered a second time'
   );
   assert.equal(socket.readyState, WebSocket.OPEN);
-  const counters = server.systemfabric.realtimeMetrics.counters;
+  const counters = server.virgoScorpioHub.realtimeMetrics.counters;
   assert.equal(counters.document_sync_failures_total, 1);
   assert.equal(counters.document_sync_reconciliations_total, 2);
   assert.equal(counters.document_sync_recovered_operations_total, 2);

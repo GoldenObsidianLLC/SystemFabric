@@ -6,10 +6,10 @@ const { randomUUID } = require('node:crypto');
 const { createPostgresPool } = require('../../packages/db/src/postgres-store');
 const { handlePlatformRoute } = require('../../apps/api/src/platform-routes');
 
-const enabled = Boolean(process.env.DATABASE_URL && process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true');
+const enabled = Boolean(process.env.DATABASE_URL && process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true');
 
 function apiContext({ pool, siteId, user, method, pathname, body = {}, query = '' }) {
-  const url = new URL(`http://systemfabric.integration${pathname}${query}`);
+  const url = new URL(`http://virgoscorpio-hub.integration${pathname}${query}`);
   const res = {};
   return {
     req: { method, headers: {} }, res, url,
@@ -18,7 +18,7 @@ function apiContext({ pool, siteId, user, method, pathname, body = {}, query = '
     async siteIdFor({ body: requested }) {
       const requestedSiteId = requested.siteId;
       const member = await pool.query('SELECT 1 FROM site_memberships WHERE site_id=$1 AND user_id=$2 LIMIT 1', [requestedSiteId, user.id]);
-      if (!member.rows[0]) throw Object.assign(new Error('Site membership required.'), { code: 'ERR_SYSTEMFABRIC_SITE_ACCESS', statusCode: 403 });
+      if (!member.rows[0]) throw Object.assign(new Error('Site membership required.'), { code: 'ERR_VIRGOSCORPIO_HUB_SITE_ACCESS', statusCode: 403 });
       return requestedSiteId;
     },
     async requireCapability(actor, requestedSiteId, capability) {
@@ -26,7 +26,7 @@ function apiContext({ pool, siteId, user, method, pathname, body = {}, query = '
         'SELECT 1 FROM site_memberships sm JOIN roles r ON r.id=sm.role_id WHERE sm.site_id=$1 AND sm.user_id=$2 AND r.capabilities ? $3 LIMIT 1',
         [requestedSiteId, actor.user.id, capability]
       );
-      if (!result.rows[0]) throw Object.assign(new Error('Capability required.'), { code: 'ERR_SYSTEMFABRIC_CAPABILITY', statusCode: 403 });
+      if (!result.rows[0]) throw Object.assign(new Error('Capability required.'), { code: 'ERR_VIRGOSCORPIO_HUB_CAPABILITY', statusCode: 403 });
     },
     async readJson() { return body; },
     sendJson(response, statusCode, payload) { response.statusCode = statusCode; response.payload = payload; return true; },
@@ -97,7 +97,7 @@ test('community direct messages, blocks, reports, notifications, and moderation 
   assert.equal(messages.payload.messages[0].sender_id, alice.id);
   await assert.rejects(
     invoke({ pool, siteId: otherSiteId, user: alice, method: 'GET', pathname: `/api/v1/sites/${otherSiteId}/community/conversations/${fixtures.conversationId}/messages` }),
-    error => error.code === 'ERR_SYSTEMFABRIC_SITE_ACCESS' && error.statusCode === 403
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_SITE_ACCESS' && error.statusCode === 403
   );
 
   const block = await invoke({
@@ -107,7 +107,7 @@ test('community direct messages, blocks, reports, notifications, and moderation 
   assert.equal(block.statusCode, 201);
   await assert.rejects(
     invoke({ pool, siteId, user: alice, method: 'POST', pathname: `/api/v1/sites/${siteId}/community/conversations/${fixtures.conversationId}/messages`, body: { body: 'This should be blocked.' } }),
-    error => error.code === 'ERR_SYSTEMFABRIC_COMMUNITY_BLOCKED' && error.statusCode === 403
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_BLOCKED' && error.statusCode === 403
   );
 
   const report = await invoke({
@@ -144,6 +144,6 @@ test('community direct messages, blocks, reports, notifications, and moderation 
   assert.ok(notifications.payload.notifications.length > 0);
   const readAll = await invoke({ pool, siteId, user: bob, method: 'POST', pathname: `/api/v1/sites/${siteId}/community/notifications/read-all` });
   assert.ok(readAll.payload.markedRead >= 1);
-  const moderationAudit = await pool.query("SELECT count(*)::int AS count FROM systemfabric_moderation_actions WHERE site_id=$1 AND target_id=$2", [siteId, fixtures.reportId]);
+  const moderationAudit = await pool.query("SELECT count(*)::int AS count FROM virgoscorpio_hub_moderation_actions WHERE site_id=$1 AND target_id=$2", [siteId, fixtures.reportId]);
   assert.equal(moderationAudit.rows[0].count, 1);
 });

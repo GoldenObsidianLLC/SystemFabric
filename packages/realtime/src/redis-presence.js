@@ -5,7 +5,7 @@ const { createHash } = require('node:crypto');
 const { SITE_ID_RE, realtimeError } = require('./event-hub');
 const { createPresenceService, AVAILABILITY } = require('./presence');
 
-const DEFAULT_KEY_PREFIX = 'systemfabric:presence:v1';
+const DEFAULT_KEY_PREFIX = 'virgoscorpio_hub:presence:v1';
 const PRINCIPAL_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 const KEY_PREFIX_RE = /^[A-Za-z0-9:_-]{1,96}$/;
 
@@ -61,14 +61,14 @@ return { values, expired }
 
 function validateSiteId(siteId) {
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
-    throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
+    throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
   }
   return siteId.toLowerCase();
 }
 
 function validatePrincipalId(value, field) {
   if (typeof value !== 'string' || !PRINCIPAL_ID_RE.test(value)) {
-    throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_SCOPE_INVALID', `${field} must be a safe identifier.`);
+    throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SCOPE_INVALID', `${field} must be a safe identifier.`);
   }
 }
 
@@ -153,11 +153,11 @@ function createRedisPresenceAdapter({
   }
 
   async function evaluate(script, keys, args) {
-    if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_CLOSED', 'The shared presence store is closed.');
+    if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_CLOSED', 'The shared presence store is closed.');
     try {
       return await client.eval(script, { keys, arguments: args.map(value => String(value)) });
     } catch {
-      throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_UNAVAILABLE', 'The shared presence store is unavailable.');
+      throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_UNAVAILABLE', 'The shared presence store is unavailable.');
     }
   }
 
@@ -165,15 +165,15 @@ function createRedisPresenceAdapter({
     async upsert(record) {
       const scope = validateScope(record);
       if (!AVAILABILITY.has(record.availability)) {
-        throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_AVAILABILITY_INVALID', 'availability must be active, idle, away or hidden.');
+        throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_AVAILABILITY_INVALID', 'availability must be active, idle, away or hidden.');
       }
       if (!Number.isSafeInteger(record.lastSeenAtMs) || !Number.isSafeInteger(record.expiresAtMs)) {
-        throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_RECORD_INVALID', 'Presence timestamps must be safe integer milliseconds.');
+        throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_RECORD_INVALID', 'Presence timestamps must be safe integer milliseconds.');
       }
       const timestamp = now();
       const ttlMs = record.expiresAtMs - timestamp;
       if (ttlMs < 1 || ttlMs > 120_000) {
-        throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_RECORD_INVALID', 'Presence lease must expire within 120 seconds.');
+        throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_RECORD_INVALID', 'Presence lease must expire within 120 seconds.');
       }
       const key = keysFor(scope.siteId, scope.principalId, scope.sessionId);
       const payload = JSON.stringify({
@@ -191,14 +191,14 @@ function createRedisPresenceAdapter({
           record.expiresAtMs, expiryRetentionMs, key.leasePrefix]
       );
       if (!Array.isArray(result) || result.length !== 2) {
-        throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store returned an invalid response.');
+        throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store returned an invalid response.');
       }
       notifyExpired(result[1], scope.siteId);
       if (Number(result[0]) === -1) {
-        throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY', 'The shared presence store has reached its per-site session limit.');
+        throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_CAPACITY', 'The shared presence store has reached its per-site session limit.');
       }
       if (Number(result[0]) !== 1) {
-        throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store rejected the session lease.');
+        throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store rejected the session lease.');
       }
     },
 
@@ -216,7 +216,7 @@ function createRedisPresenceAdapter({
       const result = await evaluate(LIST_SCRIPT, [indexKey], [now(), leasePrefix]);
       if (!Array.isArray(result) || result.length !== 2 ||
           !Array.isArray(result[0]) || !Array.isArray(result[1])) {
-        throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store returned an invalid response.');
+        throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_INVALID_RESPONSE', 'The shared presence store returned an invalid response.');
       }
       notifyExpired(result[1], safeSiteId);
       const records = result[0]
@@ -254,14 +254,14 @@ async function createRedisPresenceService({
   metrics = null
 } = {}) {
   if (typeof url !== 'string' || !url) {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL is required when the Redis presence store is selected.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL is required when the Redis presence store is selected.');
   }
   let parsed;
   try { parsed = new URL(url); } catch {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL must be a valid redis:// or rediss:// URL.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL must be a valid redis:// or rediss:// URL.');
   }
   if (!['redis:', 'rediss:'].includes(parsed.protocol) || !parsed.hostname) {
-    throw new Error('SYSTEMFABRIC_PRESENCE_REDIS_URL must use redis:// or rediss://.');
+    throw new Error('VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL must use redis:// or rediss://.');
   }
   if (typeof onExpired !== 'function' || typeof onError !== 'function') {
     throw new TypeError('onExpired and onError must be functions.');

@@ -1,7 +1,7 @@
 'use strict';
 const { createHmac, timingSafeEqual, createHash, randomUUID } = require('node:crypto');
 
-function billingError(message, code = 'ERR_SYSTEMFABRIC_BILLING_CONFIG', statusCode = 400) { const error = new Error(message); error.code = code; error.statusCode = statusCode; return error; }
+function billingError(message, code = 'ERR_VIRGOSCORPIO_HUB_BILLING_CONFIG', statusCode = 400) { const error = new Error(message); error.code = code; error.statusCode = statusCode; return error; }
 function verifyStripeSignature(rawBody, header, secret, { nowSeconds = Math.floor(Date.now()/1000), toleranceSeconds = 300 } = {}) {
   if (!Buffer.isBuffer(rawBody) || typeof header !== 'string' || typeof secret !== 'string' || !secret) return false;
   const fields = Object.create(null);
@@ -11,7 +11,7 @@ function verifyStripeSignature(rawBody, header, secret, { nowSeconds = Math.floo
   return (fields.v1 || []).some(value => { if (!/^[a-f0-9]{64}$/i.test(value)) return false; const got=Buffer.from(value,'hex'); return got.length===expected.length && timingSafeEqual(got,expected); });
 }
 async function createStripeCheckoutSession({ secretKey, mode = 'payment', lineItems, successUrl, cancelUrl, customerEmail, metadata = {}, idempotencyKey = randomUUID(), fetchImpl = fetch, subscriptionMetadata = null, expiresAt = null }) {
-  if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 503);
+  if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_VIRGOSCORPIO_HUB_BILLING_DISABLED', 503);
   if (!['payment','subscription'].includes(mode) || !Array.isArray(lineItems) || lineItems.length < 1 || lineItems.length > 100) throw billingError('Checkout mode or line items are invalid.');
   for (const item of lineItems) if (!item || !/^[A-Z]{3}$/.test(item.currency) || !Number.isSafeInteger(item.unitAmount) || item.unitAmount < 0 || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000 || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 250) throw billingError('A checkout line item is invalid.');
   for (const value of [successUrl,cancelUrl]) { let u; try { u=new URL(value); } catch { throw billingError('Success and cancellation URLs must be absolute URLs.'); } if (!['https:','http:'].includes(u.protocol) || u.username || u.password || (process.env.NODE_ENV === 'production' && u.protocol !== 'https:')) throw billingError('Checkout URLs must use HTTPS in production and cannot contain credentials.'); }
@@ -29,20 +29,20 @@ async function createStripeCheckoutSession({ secretKey, mode = 'payment', lineIt
   try {
     response = await fetchImpl('https://api.stripe.com/v1/checkout/sessions',{ method:'POST', headers:{ authorization:`Bearer ${secretKey}`, 'content-type':'application/x-www-form-urlencoded', 'idempotency-key':idempotencyKey }, body:form.toString() });
   } catch (cause) {
-    const error = billingError('Payment provider request outcome is unknown. Retry with the same idempotency key to recover the session.', 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 502);
+    const error = billingError('Payment provider request outcome is unknown. Retry with the same idempotency key to recover the session.', 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN', 502);
     error.cause = cause;
     throw error;
   }
   let raw;
   try { raw = await response.text(); } catch (cause) {
-    const error = billingError('Payment provider response was interrupted. Retry with the same idempotency key to recover the session.', 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 502);
+    const error = billingError('Payment provider response was interrupted. Retry with the same idempotency key to recover the session.', 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN', 502);
     error.cause = cause;
     throw error;
   }
-  if (!response.ok && Number(response.status) >= 500) throw billingError('Payment provider response is ambiguous. Retry with the same idempotency key to recover the session.', 'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN', 502);
-  let data; try { data=JSON.parse(raw); } catch { throw billingError('Payment provider returned an unreadable response.','ERR_SYSTEMFABRIC_BILLING_PROVIDER',502); }
-  if (!response.ok) throw billingError('Payment provider rejected checkout.','ERR_SYSTEMFABRIC_BILLING_PROVIDER',502);
-  if (typeof data.url !== 'string' || typeof data.id !== 'string') throw billingError('Payment provider returned an incomplete checkout session.','ERR_SYSTEMFABRIC_BILLING_PROVIDER',502);
+  if (!response.ok && Number(response.status) >= 500) throw billingError('Payment provider response is ambiguous. Retry with the same idempotency key to recover the session.', 'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN', 502);
+  let data; try { data=JSON.parse(raw); } catch { throw billingError('Payment provider returned an unreadable response.','ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER',502); }
+  if (!response.ok) throw billingError('Payment provider rejected checkout.','ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER',502);
+  if (typeof data.url !== 'string' || typeof data.id !== 'string') throw billingError('Payment provider returned an incomplete checkout session.','ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER',502);
   return { id:data.id, url:data.url, mode:data.mode, status:data.status, paymentStatus:data.payment_status, customerId:data.customer || null, subscriptionId:data.subscription || null };
 }
 async function createStripeRefund({
@@ -55,7 +55,7 @@ async function createStripeRefund({
   fetchImpl = fetch
 }) {
   if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) {
-    throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 503);
+    throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_VIRGOSCORPIO_HUB_BILLING_DISABLED', 503);
   }
   if (typeof paymentIntentId !== 'string' || !/^pi_[A-Za-z0-9]+$/.test(paymentIntentId)) {
     throw billingError('A valid Stripe payment intent is required.');
@@ -98,7 +98,7 @@ async function createStripeRefund({
   } catch (cause) {
     const error = billingError(
       'Refund provider outcome is unknown. Retry with the same idempotency key to recover the refund.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
     error.cause = cause;
@@ -111,7 +111,7 @@ async function createStripeRefund({
   } catch (cause) {
     const error = billingError(
       'Refund provider response was interrupted. Retry with the same idempotency key to recover the refund.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
     error.cause = cause;
@@ -122,12 +122,12 @@ async function createStripeRefund({
   if (!response.ok && (statusCode >= 500 || statusCode === 429)) {
     throw billingError(
       'Refund provider outcome is unknown. Retry with the same idempotency key to recover the refund.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
   }
   if (!response.ok) {
-    throw billingError('Payment provider rejected the refund.', 'ERR_SYSTEMFABRIC_BILLING_PROVIDER', 502);
+    throw billingError('Payment provider rejected the refund.', 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER', 502);
   }
 
   let data;
@@ -136,14 +136,14 @@ async function createStripeRefund({
   } catch {
     throw billingError(
       'Refund provider response was unreadable; the refund outcome must be reconciled.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw billingError(
       'Refund provider response had an invalid shape; the refund outcome must be reconciled.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
   }
@@ -163,7 +163,7 @@ async function createStripeRefund({
   ) {
     throw billingError(
       'Refund provider response did not match the requested payment and amount; reconcile before retrying.',
-      'ERR_SYSTEMFABRIC_BILLING_OUTCOME_UNKNOWN',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_OUTCOME_UNKNOWN',
       502
     );
   }
@@ -193,13 +193,13 @@ async function retrieveStripeSubscription({
   timeoutMs = 5000
 }) {
   if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) {
-    throw billingError('STRIPE_SECRET_KEY is required to reconcile subscription events.', 'ERR_SYSTEMFABRIC_BILLING_DISABLED', 503);
+    throw billingError('STRIPE_SECRET_KEY is required to reconcile subscription events.', 'ERR_VIRGOSCORPIO_HUB_BILLING_DISABLED', 503);
   }
   if (typeof subscriptionId !== 'string' || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) {
-    throw billingError('A valid Stripe subscription ID is required.', 'ERR_SYSTEMFABRIC_BILLING_WEBHOOK_INVALID', 400);
+    throw billingError('A valid Stripe subscription ID is required.', 'ERR_VIRGOSCORPIO_HUB_BILLING_WEBHOOK_INVALID', 400);
   }
   if (typeof fetchImpl !== 'function' || !Number.isSafeInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
-    throw billingError('Stripe subscription retrieval is not configured.', 'ERR_SYSTEMFABRIC_BILLING_CONFIG', 503);
+    throw billingError('Stripe subscription retrieval is not configured.', 'ERR_VIRGOSCORPIO_HUB_BILLING_CONFIG', 503);
   }
 
   let response;
@@ -218,7 +218,7 @@ async function retrieveStripeSubscription({
   } catch (cause) {
     const error = billingError(
       'Stripe subscription state could not be retrieved. The webhook will be retried.',
-      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE',
       503
     );
     error.cause = cause;
@@ -231,7 +231,7 @@ async function retrieveStripeSubscription({
   } catch (cause) {
     const error = billingError(
       'Stripe subscription response was interrupted. The webhook will be retried.',
-      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE',
       503
     );
     error.cause = cause;
@@ -242,7 +242,7 @@ async function retrieveStripeSubscription({
     const temporary = Number(response.status) === 429 || Number(response.status) >= 500;
     throw billingError(
       'Stripe subscription state could not be retrieved. The webhook will be retried.',
-      temporary ? 'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE' : 'ERR_SYSTEMFABRIC_BILLING_PROVIDER',
+      temporary ? 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE' : 'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER',
       temporary ? 503 : 502
     );
   }
@@ -253,7 +253,7 @@ async function retrieveStripeSubscription({
   } catch {
     throw billingError(
       'Stripe returned an unreadable subscription response. The webhook will be retried.',
-      'ERR_SYSTEMFABRIC_BILLING_PROVIDER_UNAVAILABLE',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER_UNAVAILABLE',
       503
     );
   }
@@ -270,7 +270,7 @@ async function retrieveStripeSubscription({
   ) {
     throw billingError(
       'Stripe returned a subscription response that did not match the requested resource.',
-      'ERR_SYSTEMFABRIC_BILLING_PROVIDER',
+      'ERR_VIRGOSCORPIO_HUB_BILLING_PROVIDER',
       502
     );
   }

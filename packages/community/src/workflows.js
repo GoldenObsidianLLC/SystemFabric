@@ -21,8 +21,8 @@ function sitePath(pathName) { return pathName.match(/^\/api\/v1\/sites\/([0-9a-f
 
 async function requireSignedInSite(ctx, siteId, body = {}) {
   const { actor, localPool } = ctx;
-  if (!localPool) routeError(ctx, 503, 'ERR_SYSTEMFABRIC_COMMUNITY_DISABLED', 'Community workflows require PostgreSQL.');
-  if (!actor?.user?.id || !isUuid(actor.user.id)) routeError(ctx, 401, 'ERR_SYSTEMFABRIC_UNAUTHORIZED', 'A signed-in user account is required.');
+  if (!localPool) routeError(ctx, 503, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_DISABLED', 'Community workflows require PostgreSQL.');
+  if (!actor?.user?.id || !isUuid(actor.user.id)) routeError(ctx, 401, 'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED', 'A signed-in user account is required.');
   await ctx.siteIdFor({ req: ctx.req, url: ctx.url, body: { ...body, siteId }, actor });
 }
 
@@ -35,7 +35,7 @@ async function assertConversationMember(client, ctx, siteId, conversationId, use
       ${lock ? 'FOR UPDATE OF c,m' : ''}`,
     [siteId, conversationId, userId]
   );
-  if (!result.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_CONVERSATION_NOT_FOUND', 'Conversation not found.');
+  if (!result.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_NOT_FOUND', 'Conversation not found.');
   return result.rows[0];
 }
 
@@ -78,22 +78,22 @@ async function createDirectConversation(ctx, siteId, body) {
   const { localPool, actor, requestId } = ctx;
   const recipientId = body.recipientId || body.userId;
   if (!isUuid(recipientId) || recipientId === actor.user.id) {
-    routeError(ctx, 400, 'ERR_SYSTEMFABRIC_CONVERSATION_RECIPIENT', 'A different, valid recipientId is required.');
+    routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_RECIPIENT', 'A different, valid recipientId is required.');
   }
   const recipient = await localPool.query(
     `SELECT u.id FROM users u JOIN site_memberships sm ON sm.user_id=u.id
       WHERE sm.site_id=$1 AND u.id=$2 AND u.status='active' LIMIT 1`,
     [siteId, recipientId]
   );
-  if (!recipient.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_COMMUNITY_USER_NOT_FOUND', 'Recipient is not an active member of this site.');
+  if (!recipient.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_USER_NOT_FOUND', 'Recipient is not an active member of this site.');
 
   const client = await localPool.connect();
   try {
     await client.query('BEGIN');
     const pair = [actor.user.id, recipientId].sort();
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`systemfabric:direct:${siteId}:${pair.join(':')}`]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`virgoscorpio_hub:direct:${siteId}:${pair.join(':')}`]);
     if (await hasBlockBetween(client, siteId, actor.user.id, recipientId)) {
-      routeError(ctx, 403, 'ERR_SYSTEMFABRIC_COMMUNITY_BLOCKED', 'A conversation cannot be created between these users.');
+      routeError(ctx, 403, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_BLOCKED', 'A conversation cannot be created between these users.');
     }
     const existing = await client.query(
       `SELECT c.id FROM social_conversations c
@@ -155,7 +155,7 @@ async function listMessages(ctx, siteId, conversationId) {
 
 async function createMessage(ctx, siteId, conversationId, body) {
   const content = cleanRequiredText(body.body, MAX_MESSAGE_LENGTH);
-  if (!content) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_MESSAGE_INVALID', 'Message body must contain 1–10000 characters.');
+  if (!content) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_MESSAGE_INVALID', 'Message body must contain 1–10000 characters.');
   const client = await ctx.localPool.connect();
   try {
     await client.query('BEGIN');
@@ -167,17 +167,17 @@ async function createMessage(ctx, siteId, conversationId, body) {
     );
     for (const recipient of recipients.rows) {
       if (await hasBlockBetween(client, siteId, ctx.actor.user.id, recipient.user_id)) {
-        routeError(ctx, 403, 'ERR_SYSTEMFABRIC_COMMUNITY_BLOCKED', 'Messages are disabled between these users.');
+        routeError(ctx, 403, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_BLOCKED', 'Messages are disabled between these users.');
       }
     }
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`systemfabric:message-rate:${siteId}:${ctx.actor.user.id}`]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`virgoscorpio_hub:message-rate:${siteId}:${ctx.actor.user.id}`]);
     const recent = await client.query(
       `SELECT count(*)::int AS count FROM social_messages
         WHERE site_id=$1 AND sender_id=$2 AND created_at>now()-interval '1 minute' AND status IN ('sent','edited')`,
       [siteId, ctx.actor.user.id]
     );
     if (Number(recent.rows[0]?.count || 0) >= MESSAGES_PER_MINUTE) {
-      routeError(ctx, 429, 'ERR_SYSTEMFABRIC_MESSAGE_RATE_LIMIT', 'Message rate limit exceeded. Try again shortly.');
+      routeError(ctx, 429, 'ERR_VIRGOSCORPIO_HUB_MESSAGE_RATE_LIMIT', 'Message rate limit exceeded. Try again shortly.');
     }
     const saved = await client.query(
       `INSERT INTO social_messages(site_id,conversation_id,sender_id,body)
@@ -214,13 +214,13 @@ async function handleBlocks(ctx, siteId, targetId, method) {
   if (method === 'POST' && !targetId) {
     const body = await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000));
     const blockedId = body.userId;
-    if (!isUuid(blockedId) || blockedId === actorId) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_BLOCK_INVALID', 'A different, valid userId is required.');
+    if (!isUuid(blockedId) || blockedId === actorId) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_BLOCK_INVALID', 'A different, valid userId is required.');
     const exists = await ctx.localPool.query(
       `SELECT 1 FROM site_memberships sm JOIN users u ON u.id=sm.user_id
         WHERE sm.site_id=$1 AND sm.user_id=$2 AND u.status='active' LIMIT 1`,
       [siteId, blockedId]
     );
-    if (!exists.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_COMMUNITY_USER_NOT_FOUND', 'User is not an active member of this site.');
+    if (!exists.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_COMMUNITY_USER_NOT_FOUND', 'User is not an active member of this site.');
     const reason = cleanRequiredText(body.reason, 500);
     const result = await ctx.localPool.query(
       `INSERT INTO social_blocks(site_id,blocker_id,blocked_id,reason) VALUES($1,$2,$3,$4)
@@ -231,9 +231,9 @@ async function handleBlocks(ctx, siteId, targetId, method) {
     return ctx.sendJson(ctx.res, 201, { block: result.rows[0], requestId: ctx.requestId });
   }
   if (method === 'DELETE' && targetId) {
-    if (!isUuid(targetId) || targetId === actorId) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_BLOCK_INVALID', 'Blocked user ID is invalid.');
+    if (!isUuid(targetId) || targetId === actorId) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_BLOCK_INVALID', 'Blocked user ID is invalid.');
     const result = await ctx.localPool.query('DELETE FROM social_blocks WHERE site_id=$1 AND blocker_id=$2 AND blocked_id=$3 RETURNING blocked_id', [siteId, actorId, targetId]);
-    if (!result.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_BLOCK_NOT_FOUND', 'Block record not found.');
+    if (!result.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_BLOCK_NOT_FOUND', 'Block record not found.');
     return ctx.sendJson(ctx.res, 200, { unblocked: true, userId: targetId, requestId: ctx.requestId });
   }
   return false;
@@ -256,7 +256,7 @@ async function handleReports(ctx, siteId, reportId, method) {
   if (method === 'GET' && !reportId) {
     await ctx.requireCapability(ctx.actor, siteId, 'community:moderate');
     const requestedStatus = ctx.url.searchParams.get('status') || 'open';
-    if (!REPORT_STATUSES.has(requestedStatus)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_REPORT_STATUS', 'Report status filter is invalid.');
+    if (!REPORT_STATUSES.has(requestedStatus)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_STATUS', 'Report status filter is invalid.');
     const result = await ctx.localPool.query(
       `SELECT r.id,r.reporter_id,u.display_name AS reporter_name,r.target_type,r.target_id,r.category,r.detail,r.status,r.moderation_note,r.reviewed_by,r.created_at,r.updated_at
          FROM social_reports r JOIN users u ON u.id=r.reporter_id
@@ -267,22 +267,22 @@ async function handleReports(ctx, siteId, reportId, method) {
   }
   if (method === 'POST' && !reportId) {
     const body = await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000));
-    if (!REPORT_TYPES.has(body.targetType) || !isUuid(body.targetId)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_REPORT_TARGET', 'Report targetType and targetId are invalid.');
-    if (!REPORT_CATEGORIES.has(body.category)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_REPORT_CATEGORY', 'Report category is invalid.');
+    if (!REPORT_TYPES.has(body.targetType) || !isUuid(body.targetId)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_TARGET', 'Report targetType and targetId are invalid.');
+    if (!REPORT_CATEGORIES.has(body.category)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_CATEGORY', 'Report category is invalid.');
     const detail = cleanRequiredText(body.detail, MAX_REPORT_DETAIL_LENGTH);
     const client = await ctx.localPool.connect();
     try {
       await client.query('BEGIN');
       // Serialize rate-limit accounting by reporter so concurrent requests cannot
       // all pass the count check and exceed the documented ceiling.
-      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`systemfabric:report-rate:${siteId}:${ctx.actor.user.id}`]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`virgoscorpio_hub:report-rate:${siteId}:${ctx.actor.user.id}`]);
       const prior = await client.query(
         "SELECT count(*)::int AS count FROM social_reports WHERE site_id=$1 AND reporter_id=$2 AND created_at>now()-interval '1 hour'",
         [siteId, ctx.actor.user.id]
       );
-      if (Number(prior.rows[0]?.count || 0) >= REPORTS_PER_HOUR) routeError(ctx, 429, 'ERR_SYSTEMFABRIC_REPORT_RATE_LIMIT', 'Report rate limit exceeded.');
+      if (Number(prior.rows[0]?.count || 0) >= REPORTS_PER_HOUR) routeError(ctx, 429, 'ERR_VIRGOSCORPIO_HUB_REPORT_RATE_LIMIT', 'Report rate limit exceeded.');
       if (!(await reportTargetExists(client, siteId, body.targetType, body.targetId))) {
-        routeError(ctx, 404, 'ERR_SYSTEMFABRIC_REPORT_TARGET_NOT_FOUND', 'Reported target was not found in this site.');
+        routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_REPORT_TARGET_NOT_FOUND', 'Reported target was not found in this site.');
       }
       const result = await client.query(
         `INSERT INTO social_reports(site_id,reporter_id,target_type,target_id,category,detail)
@@ -306,9 +306,9 @@ async function handleReports(ctx, siteId, reportId, method) {
   }
   if (method === 'PATCH' && reportId) {
     await ctx.requireCapability(ctx.actor, siteId, 'community:moderate');
-    if (!isUuid(reportId)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_REPORT_ID', 'Report ID is invalid.');
+    if (!isUuid(reportId)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_ID', 'Report ID is invalid.');
     const body = await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000));
-    if (!['reviewing', 'resolved', 'dismissed'].includes(body.status)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_REPORT_STATUS', 'A report may be moved to reviewing, resolved, or dismissed.');
+    if (!['reviewing', 'resolved', 'dismissed'].includes(body.status)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_REPORT_STATUS', 'A report may be moved to reviewing, resolved, or dismissed.');
     const note = cleanRequiredText(body.moderationNote, MAX_REPORT_DETAIL_LENGTH);
     const client = await ctx.localPool.connect();
     try {
@@ -317,10 +317,10 @@ async function handleReports(ctx, siteId, reportId, method) {
         'UPDATE social_reports SET status=$3,moderation_note=$4,reviewed_by=$5,updated_at=now() WHERE site_id=$1 AND id=$2 RETURNING id,site_id,reporter_id,target_type,target_id,category,detail,status,moderation_note,reviewed_by,updated_at',
         [siteId, reportId, body.status, note, ctx.actor.user.id]
       );
-      if (!updated.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_REPORT_NOT_FOUND', 'Report not found.');
+      if (!updated.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_REPORT_NOT_FOUND', 'Report not found.');
       if (body.status === 'dismissed') {
         await client.query(
-          "INSERT INTO systemfabric_moderation_actions(site_id,actor_id,target_type,target_id,action,reason) VALUES($1,$2,'report',$3,'dismiss_report',$4)",
+          "INSERT INTO virgoscorpio_hub_moderation_actions(site_id,actor_id,target_type,target_id,action,reason) VALUES($1,$2,'report',$3,'dismiss_report',$4)",
           [siteId, ctx.actor.user.id, reportId, note]
         );
       }
@@ -339,7 +339,7 @@ async function handleModeration(ctx, siteId) {
   if (ctx.req.method !== 'POST') return false;
   const body = await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000));
   if (!['activity', 'message'].includes(body.targetType) || !isUuid(body.targetId) || !MODERATION_ACTIONS.has(body.action)) {
-    routeError(ctx, 400, 'ERR_SYSTEMFABRIC_MODERATION_ACTION', 'Only hide/restore actions on an activity or message are currently supported.');
+    routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_MODERATION_ACTION', 'Only hide/restore actions on an activity or message are currently supported.');
   }
   const reason = cleanRequiredText(body.reason, MAX_MODERATION_REASON_LENGTH);
   const client = await ctx.localPool.connect();
@@ -359,9 +359,9 @@ async function handleModeration(ctx, siteId) {
         [siteId, body.targetId, body.action === 'hide' ? 'moderated' : 'sent']
       );
     }
-    if (!result.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_MODERATION_TARGET_NOT_FOUND', 'Moderation target was not found.');
+    if (!result.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_MODERATION_TARGET_NOT_FOUND', 'Moderation target was not found.');
     await client.query(
-      'INSERT INTO systemfabric_moderation_actions(site_id,actor_id,target_type,target_id,action,reason) VALUES($1,$2,$3,$4,$5,$6)',
+      'INSERT INTO virgoscorpio_hub_moderation_actions(site_id,actor_id,target_type,target_id,action,reason) VALUES($1,$2,$3,$4,$5,$6)',
       [siteId, ctx.actor.user.id, body.targetType, body.targetId, body.action, reason]
     );
     await client.query('COMMIT');
@@ -388,9 +388,9 @@ async function handleNotifications(ctx, siteId, notificationId, action, method) 
     return ctx.sendJson(ctx.res, 200, { markedRead: result.rows.length, requestId: ctx.requestId });
   }
   if (method === 'POST' && action === 'read' && notificationId) {
-    if (!isUuid(notificationId)) routeError(ctx, 400, 'ERR_SYSTEMFABRIC_NOTIFICATION_ID', 'Notification ID is invalid.');
+    if (!isUuid(notificationId)) routeError(ctx, 400, 'ERR_VIRGOSCORPIO_HUB_NOTIFICATION_ID', 'Notification ID is invalid.');
     const result = await ctx.localPool.query('UPDATE social_notifications SET read_at=COALESCE(read_at,now()) WHERE site_id=$1 AND user_id=$2 AND id=$3 RETURNING id,read_at', [siteId, userId, notificationId]);
-    if (!result.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_NOTIFICATION_NOT_FOUND', 'Notification not found.');
+    if (!result.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_NOTIFICATION_NOT_FOUND', 'Notification not found.');
     return ctx.sendJson(ctx.res, 200, { notification: result.rows[0], requestId: ctx.requestId });
   }
   return false;
@@ -411,7 +411,7 @@ async function handleCommunityWorkflowRoute(ctx) {
     if (itemId && subaction === 'messages' && method === 'POST') return createMessage(ctx, siteId, itemId, await ctx.readJson(ctx.req, Math.min(ctx.maxBody || 64_000, 16_000)));
     if (itemId && subaction === 'read' && method === 'POST') {
       const result = await ctx.localPool.query('UPDATE social_conversation_members SET last_read_at=now() WHERE site_id=$1 AND conversation_id=$2 AND user_id=$3 AND left_at IS NULL RETURNING conversation_id,last_read_at', [siteId, itemId, ctx.actor.user.id]);
-      if (!result.rows[0]) routeError(ctx, 404, 'ERR_SYSTEMFABRIC_CONVERSATION_NOT_FOUND', 'Conversation not found.');
+      if (!result.rows[0]) routeError(ctx, 404, 'ERR_VIRGOSCORPIO_HUB_CONVERSATION_NOT_FOUND', 'Conversation not found.');
       await ctx.localPool.query("UPDATE social_notifications SET read_at=COALESCE(read_at,now()) WHERE site_id=$1 AND user_id=$2 AND read_at IS NULL AND payload->>'conversationId'=$3", [siteId, ctx.actor.user.id, itemId]);
       return ctx.sendJson(ctx.res, 200, { conversationRead: result.rows[0], requestId: ctx.requestId });
     }

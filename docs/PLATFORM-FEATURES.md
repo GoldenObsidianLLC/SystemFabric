@@ -1,6 +1,6 @@
-# SystemFabric Platform Features — 0.5.0
+# VirgoScorpio Hub Platform Features — 0.5.0
 
-SystemFabric 0.4.0 originally expanded the developer preview with a media/document library, visual page widgets, commerce and membership foundations, community primitives, mega-menu presentation, firewall rule management, and cloud storage adapter configuration.
+VirgoScorpio Hub 0.4.0 originally expanded the developer preview with a media/document library, visual page widgets, commerce and membership foundations, community primitives, mega-menu presentation, firewall rule management, and cloud storage adapter configuration.
 
 > **Maturity notice:** This is a developer preview, not a completed WordPress/WooCommerce/BuddyPress/Elementor replacement and not a production-certified security platform. A database-backed route is only functional after migrations are applied to a compatible PostgreSQL instance. Provider and cloud integration status is documented separately from configuration acceptance.
 
@@ -62,7 +62,7 @@ A cloud connection marked `configured` means its configuration passed validation
 
 ## AI integration
 
-AI can draft page documents, provide constrained content assistance, suggest SEO metadata, translate text, and help with preview/review workflows. AI output remains untrusted and is validated by SystemFabric. Publication, billing, permissions, and plugin activation are not granted to AI tools by default. External provider use is disabled unless the operator opts in and configures the appropriate policy.
+AI can draft page documents, provide constrained content assistance, suggest SEO metadata, translate text, and help with preview/review workflows. AI output remains untrusted and is validated by VirgoScorpio Hub. Publication, billing, permissions, and plugin activation are not granted to AI tools by default. External provider use is disabled unless the operator opts in and configures the appropriate policy.
 
 
 ## 0.5.0 release hardening

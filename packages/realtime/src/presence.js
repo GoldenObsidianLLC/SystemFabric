@@ -11,13 +11,13 @@ function validPrincipalId(value) {
 
 function validatePresenceScope({ siteId, principalId, sessionId }) {
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
-    throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
+    throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
   }
   if (!validPrincipalId(principalId)) {
-    throw realtimeError(401, 'ERR_SYSTEMFABRIC_PRESENCE_PRINCIPAL_REQUIRED', 'An authenticated principal is required.');
+    throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_PRINCIPAL_REQUIRED', 'An authenticated principal is required.');
   }
   if (!validPrincipalId(sessionId)) {
-    throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_SESSION_INVALID', 'A valid server-issued session identifier is required.');
+    throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SESSION_INVALID', 'A valid server-issued session identifier is required.');
   }
 }
 
@@ -50,11 +50,11 @@ function createMemoryPresenceAdapter({ now = Date.now, maxEntries = 10_000, metr
 
   return Object.freeze({
     async upsert(record) {
-      if (closed) throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_STORE_CLOSED', 'The presence store is closed.');
+      if (closed) throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_CLOSED', 'The presence store is closed.');
       sweep();
       const key = keyOf(record);
       if (!entries.has(key) && entries.size >= maxEntries) {
-        throw realtimeError(503, 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY', 'The local presence store has reached its capacity.');
+        throw realtimeError(503, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_CAPACITY', 'The local presence store has reached its capacity.');
       }
       entries.set(key, { ...record });
       setLeaseGauge();
@@ -90,7 +90,7 @@ function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now, metr
   async function heartbeat({ siteId, principalId, sessionId, availability = 'active' }) {
     validatePresenceScope({ siteId, principalId, sessionId });
     if (!AVAILABILITY.has(availability)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_AVAILABILITY_INVALID', 'availability must be active, idle, away or hidden.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_AVAILABILITY_INVALID', 'availability must be active, idle, away or hidden.');
     }
 
     const timestamp = now();
@@ -121,10 +121,10 @@ function createPresenceService({ adapter, leaseMs = 30_000, now = Date.now, metr
 
   async function list({ siteId, viewerId }) {
     if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
-      throw realtimeError(400, 'ERR_SYSTEMFABRIC_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
+      throw realtimeError(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SITE_INVALID', 'A valid siteId is required.');
     }
     if (!validPrincipalId(viewerId)) {
-      throw realtimeError(401, 'ERR_SYSTEMFABRIC_PRESENCE_VIEWER_REQUIRED', 'An authenticated viewer is required.');
+      throw realtimeError(401, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_VIEWER_REQUIRED', 'An authenticated viewer is required.');
     }
 
     const timestamp = now();

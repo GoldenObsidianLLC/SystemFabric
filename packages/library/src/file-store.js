@@ -24,7 +24,7 @@ const EXTENSIONS = Object.freeze({
   'font/woff':'woff','application/font-woff':'woff','font/woff2':'woff2','application/font-woff2':'woff2'
 });
 
-function libraryError(message, code = 'ERR_SYSTEMFABRIC_LIBRARY_INVALID', statusCode = 400) {
+function libraryError(message, code = 'ERR_VIRGOSCORPIO_HUB_LIBRARY_INVALID', statusCode = 400) {
   const error = new Error(message); error.code = code; error.statusCode = statusCode; return error;
 }
 function sniffMime(buffer) {
@@ -55,7 +55,7 @@ function sanitizeDisplayName(value) {
 function decodeDataBase64(value, maxBytes) {
   if (typeof value !== 'string' || value.length > Math.ceil(maxBytes * 4 / 3) + 8 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw libraryError('dataBase64 must be valid base64 data.');
   const data = Buffer.from(value, 'base64');
-  if (!data.length || data.length > maxBytes) throw libraryError(`File must be between 1 byte and ${maxBytes} bytes.`, 'ERR_SYSTEMFABRIC_LIBRARY_SIZE_LIMIT', 413);
+  if (!data.length || data.length > maxBytes) throw libraryError(`File must be between 1 byte and ${maxBytes} bytes.`, 'ERR_VIRGOSCORPIO_HUB_LIBRARY_SIZE_LIMIT', 413);
   return data;
 }
 
@@ -64,21 +64,21 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
   const libraryRoot = path.resolve(root);
   async function scanForMalware(buffer, fileName) {
     if (!malwareScanner || typeof malwareScanner.scan !== 'function') {
-      if (requireMalwareScan) throw libraryError('Uploads are disabled because a malware scanner is required but not configured.', 'ERR_SYSTEMFABRIC_MALWARE_SCANNER_REQUIRED', 503);
+      if (requireMalwareScan) throw libraryError('Uploads are disabled because a malware scanner is required but not configured.', 'ERR_VIRGOSCORPIO_HUB_MALWARE_SCANNER_REQUIRED', 503);
       return { clean: false, status: 'not_scanned', engine: null };
     }
     let result;
     try { result = await malwareScanner.scan({ buffer, fileName }); }
-    catch (error) { throw libraryError(`Malware scanning failed closed: ${error.code || 'scanner error'}.`, error.code || 'ERR_SYSTEMFABRIC_MALWARE_SCAN_FAILED', 503); }
+    catch (error) { throw libraryError(`Malware scanning failed closed: ${error.code || 'scanner error'}.`, error.code || 'ERR_VIRGOSCORPIO_HUB_MALWARE_SCAN_FAILED', 503); }
     if (!result || result.clean !== true || result.status && result.status !== 'clean') {
-      throw libraryError('The uploaded file did not pass malware scanning.', 'ERR_SYSTEMFABRIC_MALWARE_DETECTED', 422);
+      throw libraryError('The uploaded file did not pass malware scanning.', 'ERR_VIRGOSCORPIO_HUB_MALWARE_DETECTED', 422);
     }
     return { clean: true, status: 'clean', engine: String(result.engine || malwareScanner.engine || 'configured-scanner').slice(0, 100) };
   }
   async function put(key, buffer, mimeType) {
     if (storageAdapter) return storageAdapter.putObject({ key, body: buffer, contentType: mimeType });
     const filePath = path.resolve(libraryRoot, key);
-    if (!filePath.startsWith(`${libraryRoot}${path.sep}`)) throw libraryError('Unsafe storage path.', 'ERR_SYSTEMFABRIC_LIBRARY_PATH');
+    if (!filePath.startsWith(`${libraryRoot}${path.sep}`)) throw libraryError('Unsafe storage path.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_PATH');
     await fs.promises.mkdir(path.dirname(filePath), { recursive: true, mode: 0o750 });
     const handle = await fs.promises.open(filePath, 'wx', 0o640);
     try { await handle.writeFile(buffer); await handle.sync(); } finally { await handle.close(); }
@@ -100,7 +100,7 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
       const kind = CATEGORY_TO_KIND[category];
       if (!kind) throw libraryError('category must be image, video, audio, document, file, or font.');
       const data = decodeDataBase64(dataBase64, maxFileBytes); const detected = sniffMime(data);
-      if (!detected || detected !== mimeType || !KIND_MIMES[kind].has(detected)) throw libraryError('File signature does not match an allowed MIME type for this library category.', 'ERR_SYSTEMFABRIC_LIBRARY_TYPE');
+      if (!detected || detected !== mimeType || !KIND_MIMES[kind].has(detected)) throw libraryError('File signature does not match an allowed MIME type for this library category.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE');
       const originalName = sanitizeDisplayName(fileName || displayName); const name = sanitizeDisplayName(displayName || originalName);
       for (const [key, value, limit] of [['altText',altText,1000],['caption',caption,4000],['description',description,12000]]) if (typeof value !== 'string' || value.length > limit) throw libraryError(`${key} must be a string up to ${limit} characters.`);
       if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || Buffer.byteLength(JSON.stringify(metadata)) > 16_384) throw libraryError('metadata must be a small JSON object.');
@@ -146,15 +146,15 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
       try {
         await client.query('BEGIN');
         const old = await client.query('SELECT * FROM library_assets WHERE site_id=$1 AND id=$2 AND deleted_at IS NULL FOR UPDATE', [siteId,id]);
-        if (!old.rows[0]) throw libraryError('Library asset not found.', 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND', 404);
-        const row = old.rows[0]; if (!Number.isInteger(Number(expectedVersion)) || Number(expectedVersion) !== row.version) throw libraryError('Asset version is stale.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT', 409);
+        if (!old.rows[0]) throw libraryError('Library asset not found.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', 404);
+        const row = old.rows[0]; if (!Number.isInteger(Number(expectedVersion)) || Number(expectedVersion) !== row.version) throw libraryError('Asset version is stale.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 409);
         const next = { displayName: row.display_name, altText: row.alt_text, caption: row.caption, description: row.description, isPublic: row.is_public, metadata: row.metadata, ...patch };
         next.displayName = sanitizeDisplayName(next.displayName);
         for (const [key, limit] of [['altText',1000],['caption',4000],['description',12000]]) if (typeof next[key] !== 'string' || next[key].length > limit) throw libraryError(`${key} is invalid.`);
         if (typeof next.isPublic !== 'boolean' || !next.metadata || typeof next.metadata !== 'object' || Array.isArray(next.metadata) || Buffer.byteLength(JSON.stringify(next.metadata)) > 16_384) throw libraryError('isPublic must be boolean and metadata must be a bounded JSON object.');
         await client.query(`INSERT INTO library_asset_versions(asset_id,version,snapshot,storage_key,sha256,created_by) VALUES($1,$2,$3::jsonb,$4,$5,$6) ON CONFLICT(asset_id,version) DO NOTHING`, [id,row.version,JSON.stringify({displayName:row.display_name,originalName:row.original_name,altText:row.alt_text,caption:row.caption,description:row.description,isPublic:row.is_public,metadata:row.metadata}),row.storage_key,row.sha256,row.updated_by]);
         const updated = await client.query(`UPDATE library_assets SET display_name=$3,alt_text=$4,caption=$5,description=$6,is_public=$7,metadata=$8::jsonb,version=version+1,updated_by=$9,updated_at=now() WHERE site_id=$1 AND id=$2 AND version=$10 RETURNING id,site_id,asset_kind,display_name,original_name,mime_type,byte_size,sha256,alt_text,caption,description,is_public,version,status,optimization_status,metadata,created_by,updated_by,created_at,updated_at`, [siteId,id,next.displayName,next.altText,next.caption,next.description,next.isPublic,JSON.stringify(next.metadata),actorId || null,row.version]);
-        if (!updated.rows[0]) throw libraryError('Asset version is stale.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT', 409);
+        if (!updated.rows[0]) throw libraryError('Asset version is stale.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 409);
         const updatedRow = updated.rows[0];
         await client.query('INSERT INTO library_asset_versions(asset_id,version,snapshot,storage_key,sha256,created_by) VALUES($1,$2,$3::jsonb,$4,$5,$6) ON CONFLICT(asset_id,version) DO NOTHING', [id, updatedRow.version, JSON.stringify({ displayName: updatedRow.display_name, originalName: updatedRow.original_name, altText: updatedRow.alt_text, caption: updatedRow.caption, description: updatedRow.description, isPublic: updatedRow.is_public, metadata: updatedRow.metadata }), row.storage_key, row.sha256, actorId || null]);
         await client.query('COMMIT'); return updatedRow;
@@ -168,7 +168,7 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
     async replaceVersion({ siteId, id, actorId, expectedVersion, dataBase64, mimeType, fileName }) {
       const data = decodeDataBase64(dataBase64, maxFileBytes);
       const detected = sniffMime(data);
-      if (!detected || detected !== mimeType) throw libraryError('Replacement file signature does not match MIME type.', 'ERR_SYSTEMFABRIC_LIBRARY_TYPE');
+      if (!detected || detected !== mimeType) throw libraryError('Replacement file signature does not match MIME type.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE');
       const safeFileName = sanitizeDisplayName(fileName || 'replacement');
       const scan = await scanForMalware(data, safeFileName);
       const nextStatus = scan.clean ? 'active' : 'quarantined';
@@ -180,9 +180,9 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
         await client.query('BEGIN');
         const selected = await client.query("SELECT * FROM library_assets WHERE site_id=$1 AND id=$2 AND deleted_at IS NULL AND status='active' FOR UPDATE", [siteId, id]);
         const old = selected.rows[0];
-        if (!old) throw libraryError('Library asset not found.', 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND', 404);
-        if (old.version !== Number(expectedVersion)) throw libraryError('Asset version is stale.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT', 409);
-        if (!KIND_MIMES[old.asset_kind]?.has(detected)) throw libraryError('A new asset version must keep the same library category.', 'ERR_SYSTEMFABRIC_LIBRARY_TYPE');
+        if (!old) throw libraryError('Library asset not found.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', 404);
+        if (old.version !== Number(expectedVersion)) throw libraryError('Asset version is stale.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 409);
+        if (!KIND_MIMES[old.asset_kind]?.has(detected)) throw libraryError('A new asset version must keep the same library category.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE');
         const ext = EXTENSIONS[detected];
         if (!ext) throw libraryError('Replacement MIME type is not supported.');
         const nextVersion = old.version + 1;
@@ -193,7 +193,7 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
         await put(storageKey, data, detected);
         const result = await client.query(`UPDATE library_assets SET original_name=$3,storage_key=$4,mime_type=$5,byte_size=$6,sha256=$7,version=$8,optimization_status='pending',updated_by=$9,updated_at=now(),status=$11,malware_scan_status=$12,malware_scan_engine=$13,malware_scanned_at=CASE WHEN $12='clean' THEN now() ELSE NULL END,is_public=CASE WHEN $12='clean' THEN is_public ELSE false END,metadata=metadata || $14::jsonb
           WHERE site_id=$1 AND id=$2 AND version=$10 RETURNING id,site_id,asset_kind,display_name,original_name,mime_type,byte_size,sha256,alt_text,caption,description,is_public,version,status,optimization_status,malware_scan_status,malware_scan_engine,metadata,updated_at`, [siteId, id, safeFileName || old.original_name, storageKey, detected, data.length, digest, nextVersion, actorId || null, old.version, nextStatus, scan.status, scan.engine, JSON.stringify({securityScan:nextScanMetadata})]);
-        if (!result.rows[0]) throw libraryError('Asset version is stale.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT', 409);
+        if (!result.rows[0]) throw libraryError('Asset version is stale.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 409);
         await client.query('INSERT INTO library_asset_versions(asset_id,version,snapshot,storage_key,sha256,created_by) VALUES($1,$2,$3::jsonb,$4,$5,$6) ON CONFLICT(asset_id,version) DO NOTHING', [id, nextVersion, JSON.stringify({ displayName: old.display_name, originalName: sanitizeDisplayName(fileName || old.original_name), mimeType: detected, byteSize: data.length }), storageKey, digest, actorId || null]);
         await client.query('COMMIT');
         committed = true;
@@ -213,7 +213,7 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
     async createVariant({ siteId,id,variantKey,data,mimeType,width=null,height=null }) {
       if (!/^[a-z0-9][a-z0-9_-]{0,60}$/.test(String(variantKey)) || !Buffer.isBuffer(data) || data.length < 1 || data.length > maxFileBytes || typeof mimeType !== 'string') throw libraryError('Variant metadata or bytes are invalid.');
       const current = await pool.query("SELECT id,asset_kind,version FROM library_assets WHERE site_id=$1 AND id=$2 AND deleted_at IS NULL AND status='active'",[siteId,id]);
-      if (!current.rows[0]) throw libraryError('Library asset not found.','ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND',404);
+      if (!current.rows[0]) throw libraryError('Library asset not found.','ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND',404);
       const ext = EXTENSIONS[mimeType]; if (!ext) throw libraryError('Variant MIME type is not allowed.');
       const storageKey = `${siteId}/${id}/variants/${variantKey}-${randomUUID()}.${ext}`; const digest = createHash('sha256').update(data).digest('hex');
       await put(storageKey,data,mimeType);
@@ -228,7 +228,7 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
     },
     async delete({ siteId,id,expectedVersion }) {
       const result = await pool.query("UPDATE library_assets SET status='deleted',deleted_at=now(),version=version+1,updated_at=now() WHERE site_id=$1 AND id=$2 AND version=$3 AND deleted_at IS NULL RETURNING id,version", [siteId,id,Number(expectedVersion)]);
-      if (!result.rows[0]) throw libraryError('Asset missing or version is stale.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT', 409);
+      if (!result.rows[0]) throw libraryError('Asset missing or version is stale.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 409);
       return result.rows[0];
     },
     async getBufferById({ siteId,id }) {

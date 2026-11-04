@@ -14,7 +14,7 @@ function detectImageType(buffer) {
   if (buffer.length >= 12 && buffer.subarray(0,4).toString('ascii') === 'RIFF' && buffer.subarray(8,12).toString('ascii') === 'WEBP') return 'image/webp';
   return null;
 }
-function invalid(message, code = 'ERR_SYSTEMFABRIC_MEDIA_INVALID') { const error = new Error(message); error.statusCode = 400; error.code = code; return error; }
+function invalid(message, code = 'ERR_VIRGOSCORPIO_HUB_MEDIA_INVALID') { const error = new Error(message); error.statusCode = 400; error.code = code; return error; }
 
 function createLocalMediaStore({ pool, root = path.resolve(process.env.MEDIA_ROOT || path.join(process.cwd(), 'var', 'media')) }) {
   if (!pool) throw new TypeError('Media store requires a PostgreSQL pool.');
@@ -23,7 +23,7 @@ function createLocalMediaStore({ pool, root = path.resolve(process.env.MEDIA_ROO
     async upload({ siteId, actorId, dataBase64, mimeType, altText = '', isPublic = true }) {
       if (typeof dataBase64 !== 'string' || dataBase64.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 8 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(dataBase64)) throw invalid('dataBase64 must be a valid base64-encoded image up to 10 MiB.');
       const buffer = Buffer.from(dataBase64, 'base64');
-      if (!buffer.length || buffer.length > MAX_FILE_BYTES) throw invalid('Image must be between 1 byte and 10 MiB.', 'ERR_SYSTEMFABRIC_MEDIA_SIZE_LIMIT');
+      if (!buffer.length || buffer.length > MAX_FILE_BYTES) throw invalid('Image must be between 1 byte and 10 MiB.', 'ERR_VIRGOSCORPIO_HUB_MEDIA_SIZE_LIMIT');
       const detected = detectImageType(buffer);
       if (!detected || detected !== mimeType || !MIME_TYPES[detected]) throw invalid('Only verified PNG, JPEG, WebP, and GIF images are supported. SVG and unrecognized formats are rejected.');
       if (typeof altText !== 'string' || altText.length > 1000) throw invalid('altText must be a string up to 1000 characters.');

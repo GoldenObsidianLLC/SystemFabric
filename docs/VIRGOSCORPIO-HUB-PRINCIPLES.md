@@ -1,11 +1,11 @@
-# SystemFabric Engineering Principles
+# VirgoScorpio Hub Engineering Principles
 
-**Status:** Project-level design principles derived from the [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md)  
+**Status:** Project-level design principles derived from the [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md)
 **Applies to:** Product planning, application architecture, AI features, collaboration, operations and contributor decisions
 
 ## Purpose
 
-The SystemFabric Manifesto sets the project's mission around human economic agency, creative dignity and productive relevance in an era of accelerating AI. Its core thesis is that technology should amplify human capability rather than eliminate human necessity. It also identifies technological determinism, concentration of power and loss of human agency as guiding concerns.
+The VirgoScorpio Hub Manifesto sets the project's mission around human economic agency, creative dignity and productive relevance in an era of accelerating AI. Its core thesis is that technology should amplify human capability rather than eliminate human necessity. It also identifies technological determinism, concentration of power and loss of human agency as guiding concerns.
 
 This document translates those commitments into engineering principles that can guide concrete design reviews and acceptance tests. It does not claim that software alone can guarantee employment, income, job protection or macroeconomic outcomes.
 
@@ -33,7 +33,7 @@ People remain active participants and decision-makers in the work they are respo
 
 ## 3. Use proportional automation and oversight
 
-SystemFabric does not reject automation. Bounded, low-risk, reversible tasks may be automated when the actor has explicitly delegated the necessary authority and policy allows it. Consequential, privileged, sensitive, externally visible or difficult-to-reverse actions require appropriate human review.
+VirgoScorpio Hub does not reject automation. Bounded, low-risk, reversible tasks may be automated when the actor has explicitly delegated the necessary authority and policy allows it. Consequential, privileged, sensitive, externally visible or difficult-to-reverse actions require appropriate human review.
 
 **Design checks:**
 
@@ -90,7 +90,7 @@ Prefer transparent, inspectable and interoperable boundaries. Keep user data, pe
 
 Support creators, administrators, workers, contributors and community members with tools that lower barriers to participation without assuming that every human activity should be automated. Provide ways for people to contribute judgment, domain knowledge, review, creativity and care.
 
-SystemFabric may support skill development, contribution discovery and transparent recognition. It must not promise that a feature will create jobs, preserve employment, generate income or produce a particular economic outcome.
+VirgoScorpio Hub may support skill development, contribution discovery and transparent recognition. It must not promise that a feature will create jobs, preserve employment, generate income or produce a particular economic outcome.
 
 ## 9. Build trustworthy and accessible systems
 
@@ -121,7 +121,7 @@ Use this document in feature proposals, architecture decision records, security 
 
 ## Source and related documents
 
-- [SystemFabric Manifesto](../SYSTEMFABRIC_MANIFESTO.md)
+- [VirgoScorpio Hub Manifesto](../VIRGOSCORPIO-HUB-MANIFESTO.md)
 - [Feature Coverage Matrix](FEATURE-PARITY.md)
 - [Roadmap](ROADMAP.md)
 - [Real-Time and AI Architecture](REALTIME-AI-ARCHITECTURE.md)

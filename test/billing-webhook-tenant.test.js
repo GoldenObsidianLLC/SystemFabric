@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { createHmac } = require('node:crypto');
 const { createApiServer } = require('../apps/api/src/server');
 
-const WEBHOOK_SECRET = 'whsec_systemfabric_tenant_test';
+const WEBHOOK_SECRET = 'whsec_virgoscorpio_hub_tenant_test';
 const SITE_A = '11111111-1111-4111-8111-111111111111';
 const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PLAN_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -96,7 +96,7 @@ function createSubscriptionWebhookHarness(t, {
       NODE_ENV: 'test',
       AI_PROVIDER: 'mock',
       STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET,
-      STRIPE_SECRET_KEY: 'sk_test_systemfabric_fixture',
+      STRIPE_SECRET_KEY: 'sk_test_virgoscorpio_hub_fixture',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
     pool,
@@ -108,7 +108,7 @@ function createSubscriptionWebhookHarness(t, {
     server.listen(0, '127.0.0.1', () => {
       t.after(async () => {
         await new Promise(done => server.close(done));
-        await server.systemfabric.close();
+        await server.virgoScorpioHub.close();
       });
       resolve({ state, base: 'http://127.0.0.1:' + server.address().port });
     });
@@ -143,7 +143,7 @@ test('Stripe subscription webhooks reconcile the current provider state, not sta
   assert.equal(state.providerCalls.length, 1);
   assert.equal(state.providerCalls[0].url, 'https://api.stripe.com/v1/subscriptions/' + SUBSCRIPTION_ID);
   assert.equal(state.providerCalls[0].options.method, 'GET');
-  assert.equal(state.providerCalls[0].options.headers.authorization, 'Bearer sk_test_systemfabric_fixture');
+  assert.equal(state.providerCalls[0].options.headers.authorization, 'Bearer sk_test_virgoscorpio_hub_fixture');
 
   const scopedUpdate = state.updates[0];
   assert.ok(scopedUpdate, 'a tenant-bound membership must be updated');
@@ -340,7 +340,7 @@ function createOrderWebhookHarness(t, { providerSessionId = SESSION_A } = {}) {
     server.listen(0, '127.0.0.1', () => {
       t.after(async () => {
         await new Promise(done => server.close(done));
-        await server.systemfabric.close();
+        await server.virgoScorpioHub.close();
       });
       resolve({ state, base: 'http://127.0.0.1:' + server.address().port });
     });

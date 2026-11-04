@@ -34,8 +34,8 @@ function createMemgraphProjector({ driver }) {
     const session = driver.session();
     try {
       return await withClientSpan('db.memgraph.write', {
-        'systemfabric.component': 'graph',
-        'systemfabric.operation': 'write',
+        'virgoscorpio_hub.component': 'graph',
+        'virgoscorpio_hub.operation': 'write',
         'db.system': 'memgraph',
         'db.operation.name': 'write'
       }, () => session.executeWrite(tx => tx.run(cypher, params)));
@@ -163,8 +163,8 @@ function createMemgraphProjector({ driver }) {
       const session = driver.session();
       try {
         const result = await withClientSpan('db.memgraph.query', {
-          'systemfabric.component': 'graph',
-          'systemfabric.operation': 'query',
+          'virgoscorpio_hub.component': 'graph',
+          'virgoscorpio_hub.operation': 'query',
           'db.system': 'memgraph',
           'db.operation.name': 'read'
         }, () => session.run(

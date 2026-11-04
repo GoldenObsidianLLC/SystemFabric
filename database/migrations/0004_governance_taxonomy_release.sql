@@ -1,4 +1,4 @@
--- SystemFabric 0.3.0 hardening: AI governance, daily tenant budgets, and taxonomy soft deletion.
+-- VirgoScorpio Hub 0.3.0 hardening: AI governance, daily tenant budgets, and taxonomy soft deletion.
 -- Validate against the supported PostgreSQL version before production deployment.
 
 ALTER TABLE taxonomy_terms ADD COLUMN IF NOT EXISTS deleted_at timestamptz;

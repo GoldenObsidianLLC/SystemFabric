@@ -7,49 +7,49 @@ function cloudEndpointAllowed(endpoint, env = process.env) {
   if (!['http:','https:'].includes(parsed.protocol) || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash) return false;
   if (String(env.NODE_ENV || '').toLowerCase() !== 'production') return true;
   if (parsed.protocol !== 'https:') return false;
-  const allow = String(env.SYSTEMFABRIC_CLOUD_ENDPOINT_ALLOWLIST || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
+  const allow = String(env.VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_ALLOWLIST || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
   // Exact authority matching (hostname and optional port). No wildcard suffixes.
   return allow.includes(parsed.host.toLowerCase());
 }
 
-function cloudError(message, code = 'ERR_SYSTEMFABRIC_CLOUD_CONFIG') { const error = new Error(message); error.code = code; return error; }
+function cloudError(message, code = 'ERR_VIRGOSCORPIO_HUB_CLOUD_CONFIG') { const error = new Error(message); error.code = code; return error; }
 function createS3CompatibleAdapter({ bucket, client, commands, provider = 's3-compatible' }) {
   if (!bucket || !client?.send || !commands?.PutObjectCommand || !commands?.GetObjectCommand || !commands?.DeleteObjectCommand) throw cloudError('S3-compatible adapter requires bucket, client, and Put/Get/Delete command constructors.');
   return Object.freeze({ provider,
-    async probe() { if (typeof commands.HeadBucketCommand !== 'function') throw cloudError('S3 SDK does not expose HeadBucketCommand.', 'ERR_SYSTEMFABRIC_CLOUD_PROBE_UNAVAILABLE'); await client.send(new commands.HeadBucketCommand({ Bucket: bucket })); return { provider, ok: true, operation: 'HeadBucket' }; },
+    async probe() { if (typeof commands.HeadBucketCommand !== 'function') throw cloudError('S3 SDK does not expose HeadBucketCommand.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_UNAVAILABLE'); await client.send(new commands.HeadBucketCommand({ Bucket: bucket })); return { provider, ok: true, operation: 'HeadBucket' }; },
     async putObject({ key, body, contentType }) { await client.send(new commands.PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType, ContentLength: body.length, ServerSideEncryption: 'AES256' })); },
     async getObject({ key }) { const result = await client.send(new commands.GetObjectCommand({ Bucket: bucket, Key: key })); return bodyToBuffer(result.Body); },
     async deleteObject({ key }) { await client.send(new commands.DeleteObjectCommand({ Bucket: bucket, Key: key })); }
   });
 }
 async function bodyToBuffer(body, maxBytes = 52 * 1024 * 1024) {
-  if (Buffer.isBuffer(body)) { if (body.length > maxBytes) throw cloudError('Downloaded object exceeds the byte limit.', 'ERR_SYSTEMFABRIC_CLOUD_SIZE_LIMIT'); return body; }
-  if (body && typeof body.transformToByteArray === 'function') { const out = Buffer.from(await body.transformToByteArray()); if (out.length > maxBytes) throw cloudError('Downloaded object exceeds the byte limit.', 'ERR_SYSTEMFABRIC_CLOUD_SIZE_LIMIT'); return out; }
+  if (Buffer.isBuffer(body)) { if (body.length > maxBytes) throw cloudError('Downloaded object exceeds the byte limit.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_SIZE_LIMIT'); return body; }
+  if (body && typeof body.transformToByteArray === 'function') { const out = Buffer.from(await body.transformToByteArray()); if (out.length > maxBytes) throw cloudError('Downloaded object exceeds the byte limit.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_SIZE_LIMIT'); return out; }
   const chunks=[]; let size=0;
-  if (body && body[Symbol.asyncIterator]) for await (const chunk of body) { size+=chunk.length; if (size>maxBytes) throw cloudError('Downloaded object exceeds the byte limit.','ERR_SYSTEMFABRIC_CLOUD_SIZE_LIMIT'); chunks.push(Buffer.from(chunk)); }
+  if (body && body[Symbol.asyncIterator]) for await (const chunk of body) { size+=chunk.length; if (size>maxBytes) throw cloudError('Downloaded object exceeds the byte limit.','ERR_VIRGOSCORPIO_HUB_CLOUD_SIZE_LIMIT'); chunks.push(Buffer.from(chunk)); }
   return Buffer.concat(chunks);
 }
 function createGoogleCloudStorageAdapter({ bucket, provider = 'gcs' }) {
   if (!bucket || typeof bucket.file !== 'function') throw cloudError('Google Cloud Storage adapter requires an authenticated bucket client.');
   return Object.freeze({ provider,
-    async probe() { if (typeof bucket.getMetadata !== 'function') throw cloudError('Google Cloud Storage bucket metadata probe is unavailable.', 'ERR_SYSTEMFABRIC_CLOUD_PROBE_UNAVAILABLE'); await bucket.getMetadata(); return { provider, ok: true, operation: 'GetBucketMetadata' }; },
+    async probe() { if (typeof bucket.getMetadata !== 'function') throw cloudError('Google Cloud Storage bucket metadata probe is unavailable.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_UNAVAILABLE'); await bucket.getMetadata(); return { provider, ok: true, operation: 'GetBucketMetadata' }; },
     async putObject({ key, body, contentType }) { await bucket.file(key).save(body, { resumable: false, validation: 'crc32c', metadata: { contentType, cacheControl: 'private, no-store' }, preconditionOpts: { ifGenerationMatch: 0 } }); },
-    async getObject({ key }) { const [buffer] = await bucket.file(key).download(); if (buffer.length > 52 * 1024 * 1024) throw cloudError('Downloaded object exceeds the byte limit.','ERR_SYSTEMFABRIC_CLOUD_SIZE_LIMIT'); return buffer; },
+    async getObject({ key }) { const [buffer] = await bucket.file(key).download(); if (buffer.length > 52 * 1024 * 1024) throw cloudError('Downloaded object exceeds the byte limit.','ERR_VIRGOSCORPIO_HUB_CLOUD_SIZE_LIMIT'); return buffer; },
     async deleteObject({ key }) { await bucket.file(key).delete({ ignoreNotFound: true }); }
   });
 }
 function createAzureBlobAdapter({ containerClient, provider = 'azure' }) {
   if (!containerClient || typeof containerClient.getBlockBlobClient !== 'function') throw cloudError('Azure Blob adapter requires an authenticated container client.');
   return Object.freeze({ provider,
-    async probe() { if (typeof containerClient.getProperties !== 'function') throw cloudError('Azure container properties probe is unavailable.', 'ERR_SYSTEMFABRIC_CLOUD_PROBE_UNAVAILABLE'); await containerClient.getProperties(); return { provider, ok: true, operation: 'GetContainerProperties' }; },
+    async probe() { if (typeof containerClient.getProperties !== 'function') throw cloudError('Azure container properties probe is unavailable.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_UNAVAILABLE'); await containerClient.getProperties(); return { provider, ok: true, operation: 'GetContainerProperties' }; },
     async putObject({ key, body, contentType }) { const blob=containerClient.getBlockBlobClient(key); await blob.uploadData(body, { blobHTTPHeaders: { blobContentType: contentType, blobCacheControl: 'private, no-store' }, conditions: { ifNoneMatch: '*' } }); },
-    async getObject({ key }) { const blob=containerClient.getBlockBlobClient(key); const response=await blob.download(); if (typeof response.readableStreamBody === 'undefined') throw cloudError('Azure download stream was not returned.','ERR_SYSTEMFABRIC_CLOUD_READ'); return bodyToBuffer(response.readableStreamBody); },
+    async getObject({ key }) { const blob=containerClient.getBlockBlobClient(key); const response=await blob.download(); if (typeof response.readableStreamBody === 'undefined') throw cloudError('Azure download stream was not returned.','ERR_VIRGOSCORPIO_HUB_CLOUD_READ'); return bodyToBuffer(response.readableStreamBody); },
     async deleteObject({ key }) { await containerClient.deleteBlob(key, { deleteSnapshots: 'include' }).catch(error => { if (error.statusCode !== 404) throw error; }); }
   });
 }
 
 async function probeCloudStorageAdapter(adapter) {
-  if (!adapter || typeof adapter.probe !== 'function') throw cloudError('Configured storage adapter does not support live connectivity probes.', 'ERR_SYSTEMFABRIC_CLOUD_PROBE_UNAVAILABLE');
+  if (!adapter || typeof adapter.probe !== 'function') throw cloudError('Configured storage adapter does not support live connectivity probes.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_UNAVAILABLE');
   const started = Date.now();
   try {
     const result = await adapter.probe();
@@ -57,7 +57,7 @@ async function probeCloudStorageAdapter(adapter) {
   } catch (error) {
     // Never return raw provider errors to an API caller; SDK errors can contain
     // endpoints, account names, or request identifiers.
-    const safe = cloudError('Cloud storage connectivity or authorization probe failed.', 'ERR_SYSTEMFABRIC_CLOUD_PROBE_FAILED');
+    const safe = cloudError('Cloud storage connectivity or authorization probe failed.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_FAILED');
     safe.cause = error;
     throw safe;
   }
@@ -149,24 +149,24 @@ function createCloudStorageAdapterFromEnv({ env = process.env } = {}) {
   const configured = String(env.LIBRARY_STORAGE_PROVIDER || 'local').toLowerCase();
   if (configured === 'local') return null;
   if (['s3','aws-s3','s3-compatible','cloudflare-r2','minio'].includes(configured)) {
-    let sdk; try { sdk = require('@aws-sdk/client-s3'); } catch { throw cloudError('Install @aws-sdk/client-s3 to use S3-compatible storage.','ERR_SYSTEMFABRIC_CLOUD_SDK_MISSING'); }
+    let sdk; try { sdk = require('@aws-sdk/client-s3'); } catch { throw cloudError('Install @aws-sdk/client-s3 to use S3-compatible storage.','ERR_VIRGOSCORPIO_HUB_CLOUD_SDK_MISSING'); }
     const bucket = env.LIBRARY_STORAGE_BUCKET || env.S3_BUCKET;
     if (!bucket) throw cloudError('LIBRARY_STORAGE_BUCKET or S3_BUCKET is required.');
     const endpoint = env.LIBRARY_STORAGE_ENDPOINT || env.S3_ENDPOINT || '';
-    if (env.NODE_ENV === 'production' && endpoint && !cloudEndpointAllowed(endpoint, env)) throw cloudError('Production cloud endpoint must use HTTPS and exactly match SYSTEMFABRIC_CLOUD_ENDPOINT_ALLOWLIST.', 'ERR_SYSTEMFABRIC_CLOUD_ENDPOINT_NOT_ALLOWED');
+    if (env.NODE_ENV === 'production' && endpoint && !cloudEndpointAllowed(endpoint, env)) throw cloudError('Production cloud endpoint must use HTTPS and exactly match VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_ALLOWLIST.', 'ERR_VIRGOSCORPIO_HUB_CLOUD_ENDPOINT_NOT_ALLOWED');
     const region = configured === 'cloudflare-r2' ? 'auto' : (env.LIBRARY_STORAGE_REGION || env.S3_REGION || 'us-east-1');
     const client = new sdk.S3Client({ region, endpoint: endpoint || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === 'true' || configured === 'minio', maxAttempts: 3 });
     const provider = configured === 'aws-s3' || configured === 's3' ? 's3' : 's3-compatible';
     return createS3CompatibleAdapter({ bucket, client, commands: sdk, provider });
   }
   if (configured === 'gcs' || configured === 'google-cloud-storage') {
-    let Storage; try { ({ Storage } = require('@google-cloud/storage')); } catch { throw cloudError('Install @google-cloud/storage to use Google Cloud Storage.','ERR_SYSTEMFABRIC_CLOUD_SDK_MISSING'); }
+    let Storage; try { ({ Storage } = require('@google-cloud/storage')); } catch { throw cloudError('Install @google-cloud/storage to use Google Cloud Storage.','ERR_VIRGOSCORPIO_HUB_CLOUD_SDK_MISSING'); }
     const bucketName=env.LIBRARY_STORAGE_BUCKET||env.GCS_BUCKET; if(!bucketName) throw cloudError('LIBRARY_STORAGE_BUCKET or GCS_BUCKET is required.');
     const client=new Storage(env.GOOGLE_CLOUD_PROJECT?{projectId:env.GOOGLE_CLOUD_PROJECT}:undefined);
     return createGoogleCloudStorageAdapter({bucket:client.bucket(bucketName),provider:'gcs'});
   }
   if (configured === 'azure' || configured === 'azure-blob') {
-    let sdk; try { sdk=require('@azure/storage-blob'); } catch { throw cloudError('Install @azure/storage-blob to use Azure Blob Storage.','ERR_SYSTEMFABRIC_CLOUD_SDK_MISSING'); }
+    let sdk; try { sdk=require('@azure/storage-blob'); } catch { throw cloudError('Install @azure/storage-blob to use Azure Blob Storage.','ERR_VIRGOSCORPIO_HUB_CLOUD_SDK_MISSING'); }
     const connectionString=env.AZURE_STORAGE_CONNECTION_STRING; const container=env.LIBRARY_STORAGE_CONTAINER||env.AZURE_STORAGE_CONTAINER;
     if(!connectionString||!container) throw cloudError('AZURE_STORAGE_CONNECTION_STRING and AZURE_STORAGE_CONTAINER are required.');
     const service=sdk.BlobServiceClient.fromConnectionString(connectionString);

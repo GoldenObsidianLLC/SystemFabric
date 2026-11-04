@@ -35,7 +35,7 @@ function createAIProviderFromEnv(env = process.env) {
       baseUrl: env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
       model: env.GEMINI_MODEL || env.AI_MODEL || 'gemini-4-argon', timeoutMs
     });
-    default: throw Object.assign(new Error(`Unsupported AI_PROVIDER: ${provider}`), { code: 'ERR_SYSTEMFABRIC_AI_PROVIDER_UNKNOWN' });
+    default: throw Object.assign(new Error(`Unsupported AI_PROVIDER: ${provider}`), { code: 'ERR_VIRGOSCORPIO_HUB_AI_PROVIDER_UNKNOWN' });
   }
 }
 

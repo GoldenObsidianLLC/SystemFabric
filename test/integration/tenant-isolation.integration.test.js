@@ -9,7 +9,7 @@ const { createApiServer } = require('../../apps/api/src/server');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 test(
@@ -33,7 +33,7 @@ test(
       AI_PROVIDER: 'mock',
     };
     // Ensure the development-token shortcut is not enabled in this API test.
-    delete env.SYSTEMFABRIC_API_TOKEN;
+    delete env.VIRGOSCORPIO_HUB_API_TOKEN;
 
     const identity = createIdentityService({ pool, env });
 
@@ -42,7 +42,7 @@ test(
         if (server.listening) {
           await new Promise(resolve => server.close(resolve));
         }
-        await server.systemfabric.close().catch(() => {});
+        await server.virgoScorpioHub.close().catch(() => {});
       }
 
       if (siteIds.length) {
@@ -125,7 +125,7 @@ test(
     });
     assert.equal(ordinaryForbidden.status, 403, 'site A must reject an actor who belongs only to site B');
     const ordinaryForbiddenBody = await ordinaryForbidden.json();
-    assert.equal(ordinaryForbiddenBody.code, 'ERR_SYSTEMFABRIC_TENANT_FORBIDDEN');
+    assert.equal(ordinaryForbiddenBody.code, 'ERR_VIRGOSCORPIO_HUB_TENANT_FORBIDDEN');
     assert.doesNotMatch(JSON.stringify(ordinaryForbiddenBody), new RegExp(privateMarker));
 
     // Duplicate selectors are rejected even when both values happen to agree.
@@ -136,7 +136,7 @@ test(
     );
     assert.equal(repeatedQuery.status, 400);
     const repeatedQueryBody = await repeatedQuery.json();
-    assert.equal(repeatedQueryBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.equal(repeatedQueryBody.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
     assert.doesNotMatch(JSON.stringify(repeatedQueryBody), new RegExp(privateMarker));
 
     // A malformed standalone selector must fail validation before any site lookup.
@@ -145,15 +145,15 @@ test(
     });
     assert.equal(malformedQuery.status, 400);
     const malformedQueryBody = await malformedQuery.json();
-    assert.equal(malformedQueryBody.code, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID');
+    assert.equal(malformedQueryBody.code, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID');
     assert.doesNotMatch(JSON.stringify(malformedQueryBody), new RegExp(privateMarker));
 
     const headerMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
-      headers: { ...authHeaders, 'x-systemfabric-site-id': siteB },
+      headers: { ...authHeaders, 'x-virgoscorpio-hub-site-id': siteB },
     });
     assert.equal(headerMismatch.status, 400, 'a site B header must not authorize a site A route');
     const headerMismatchBody = await headerMismatch.json();
-    assert.equal(headerMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.equal(headerMismatchBody.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
     assert.doesNotMatch(JSON.stringify(headerMismatchBody), new RegExp(privateMarker));
 
     const queryMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed?siteId=${siteB}`, {
@@ -161,7 +161,7 @@ test(
     });
     assert.equal(queryMismatch.status, 400, 'a site B query selector must not authorize a site A route');
     const queryMismatchBody = await queryMismatch.json();
-    assert.equal(queryMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.equal(queryMismatchBody.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
     assert.doesNotMatch(JSON.stringify(queryMismatchBody), new RegExp(privateMarker));
 
     const bodyMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
@@ -171,17 +171,17 @@ test(
     });
     assert.equal(bodyMismatch.status, 400, 'a site B body selector must not authorize writes to a site A route');
     const bodyMismatchBody = await bodyMismatch.json();
-    assert.equal(bodyMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.equal(bodyMismatchBody.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
     assert.doesNotMatch(JSON.stringify(bodyMismatchBody), new RegExp(privateMarker));
 
     const writeMismatch = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
       method: 'POST',
-      headers: { ...authHeaders, 'content-type': 'application/json', 'x-systemfabric-site-id': siteB },
+      headers: { ...authHeaders, 'content-type': 'application/json', 'x-virgoscorpio-hub-site-id': siteB },
       body: JSON.stringify({ body: writeMarker, visibility: 'members' }),
     });
     assert.equal(writeMismatch.status, 400, 'a site B header must not authorize writes to a site A route');
     const writeMismatchBody = await writeMismatch.json();
-    assert.equal(writeMismatchBody.code, 'ERR_SYSTEMFABRIC_SITE_CONTEXT_MISMATCH');
+    assert.equal(writeMismatchBody.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
     assert.doesNotMatch(JSON.stringify(writeMismatchBody), new RegExp(privateMarker));
 
     const malformedBodySelector = await fetch(`${base}/api/v1/sites/${siteA}/community/feed`, {
@@ -191,7 +191,7 @@ test(
     });
     assert.equal(malformedBodySelector.status, 400);
     const malformedBodySelectorBody = await malformedBodySelector.json();
-    assert.equal(malformedBodySelectorBody.code, 'ERR_SYSTEMFABRIC_INVALID_SITE_ID');
+    assert.equal(malformedBodySelectorBody.code, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID');
     assert.doesNotMatch(JSON.stringify(malformedBodySelectorBody), new RegExp(privateMarker));
 
     const writtenAcrossSites = await pool.query(
@@ -209,7 +209,7 @@ test(
 
     const matchingSelectors = await fetch(
       `${base}/api/v1/sites/${siteB}/community/feed?siteId=${siteB}`,
-      { headers: { ...authHeaders, 'x-systemfabric-site-id': siteB } }
+      { headers: { ...authHeaders, 'x-virgoscorpio-hub-site-id': siteB } }
     );
     assert.equal(matchingSelectors.status, 200, 'matching route, header, and query selectors should be accepted');
     const matchingSelectorsBody = await matchingSelectors.json();

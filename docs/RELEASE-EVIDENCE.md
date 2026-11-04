@@ -1,6 +1,6 @@
-# SystemFabric Release Evidence Contract
+# VirgoScorpio Hub Release Evidence Contract
 
-SystemFabric separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
+VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
 ## Run the report
 
@@ -10,12 +10,12 @@ npm run release:assert-ready
 npm run observability:deployment:validate
 ```
 
-`release:readiness` runs the source artifact/syntax check, SystemFabric unit/security tests, vendored EnginEx tests, available integration tests, and the production-observability evidence gate. It writes:
+`release:readiness` runs the source artifact/syntax check, VirgoScorpio Hub unit/security tests, vendored EnginEx tests, available integration tests, and the production-observability evidence gate. It writes:
 
 - `artifacts/release-readiness.json` — machine-readable gate snapshot.
 - `artifacts/release-readiness.md` — human-readable gate snapshot.
 - `artifacts/evidence/artifact-check.log` — syntax/artifact check log.
-- `artifacts/evidence/unit-tests.tap.log` — SystemFabric unit/security test log.
+- `artifacts/evidence/unit-tests.tap.log` — VirgoScorpio Hub unit/security test log.
 - `artifacts/evidence/enginex-tests.tap.log` — vendored renderer test log.
 - `artifacts/evidence/integration-tests.tap.log` — integration test log, including explicit skips.
 

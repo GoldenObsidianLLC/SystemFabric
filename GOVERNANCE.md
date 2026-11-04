@@ -1,12 +1,12 @@
-# SystemFabric Governance
+# VirgoScorpio Hub Governance
 
 This document describes the project's current working governance model. It is intended to make decision-making, contribution review, project stewardship, and future funding discussions understandable to contributors and supporters.
 
-It is a project policy, not legal advice, a separate legal entity, a promise of funding, or a representation that SystemFabric is production-certified. It does not replace the software licenses, copyright notices, security policy, or contribution instructions.
+It is a project policy, not legal advice, a separate legal entity, a promise of funding, or a representation that VirgoScorpio Hub is production-certified. It does not replace the software licenses, copyright notices, security policy, or contribution instructions.
 
 ## 1. Current Project Stewardship
 
-SystemFabric is developed through Golden Obsidian LLC. The project is currently in an early, maintainer-led stage.
+VirgoScorpio Hub is developed through Golden Obsidian LLC. The project is currently in an early, maintainer-led stage.
 
 At this stage, Golden Obsidian LLC and the project founder/original developer act as the primary project steward and maintainer.
 
@@ -53,7 +53,7 @@ A green CI run or successful pull-request review is evidence for the checks actu
 
 ### Contributions and Licensing
 
-Original SystemFabric materials are published under GPL-2.0-or-later unless a file or component carries a different notice.
+Original VirgoScorpio Hub materials are published under GPL-2.0-or-later unless a file or component carries a different notice.
 
 Third-party and vendored components retain their own applicable licenses and notices.
 
@@ -85,7 +85,7 @@ Use the repository's private vulnerability reporting flow when available, or the
 
 Volunteer feedback, a code review, or a contribution to regression tests is not a substitute for a formal independent security assessment.
 
-SystemFabric remains not production-certified until the required release evidence and approvals are complete.
+VirgoScorpio Hub remains not production-certified until the required release evidence and approvals are complete.
 
 See [release readiness](docs/RELEASE_READINESS.md) and [release evidence](docs/RELEASE-EVIDENCE.md).
 
@@ -103,7 +103,7 @@ Security reports and sensitive personal information must not be posted publicly.
 
 ### Current Status
 
-SystemFabric is currently an unfunded project.
+VirgoScorpio Hub is currently an unfunded project.
 
 No official public donation, sponsorship, grant, or contributor-compensation program is established by this policy.
 
@@ -152,7 +152,7 @@ Significant funding relationships or sponsored work that affect project directio
 
 ## 9. Changes to This Policy
 
-This policy may evolve as SystemFabric develops and its community grows.
+This policy may evolve as VirgoScorpio Hub develops and its community grows.
 
 Proposed material changes should be discussed openly where practical, reviewed by the project steward, and made through a pull request so the history remains visible.
 

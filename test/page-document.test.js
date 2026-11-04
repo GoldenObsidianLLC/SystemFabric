@@ -5,10 +5,10 @@ const assert = require('node:assert/strict');
 const { validatePageDocument, normalizeGeneratedDocument } = require('../packages/domain/src/page-document');
 const { renderPageDocument, rendererInfo, MAX_RENDERED_OUTPUT_BYTES } = require('../packages/render/src');
 
-function fixture(text = 'Hello SystemFabric') {
+function fixture(text = 'Hello VirgoScorpio Hub') {
   return {
     schemaVersion: 1, documentId: 'page-test', type: 'page', title: 'Test Page',
-    children: [{ id: 'section-1', type: 'section', props: { className: 'sf-hero' }, children: [
+    children: [{ id: 'section-1', type: 'section', props: { className: 'vsh-hero' }, children: [
       { id: 'heading-1', type: 'widget.heading', props: { text, level: 1 }, children: [] },
       { id: 'text-1', type: 'widget.text', props: { text: 'A simple introduction.' }, children: [] },
       { id: 'button-1', type: 'widget.button', props: { text: 'Explore', url: '/explore' }, children: [] }
@@ -59,7 +59,7 @@ test('EnginEx renderer escapes text and outputs a safe page', () => {
 test('renderer rejects invalid document rather than best-effort rendering', () => {
   const doc = fixture();
   doc.children[0].children[2].props.url = 'data:text/html,hi';
-  assert.throws(() => renderPageDocument(doc), { code: 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT' });
+  assert.throws(() => renderPageDocument(doc), { code: 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT' });
 });
 
 
@@ -68,7 +68,7 @@ test('renderer rejects excessive output size', () => {
   doc.children[0].children[0].props.text = 'x'.repeat(20_000);
   const extra = Array.from({ length: 100 }, (_, index) => ({ id: `extra-text-${index}`, type: 'widget.text', props: { text: '&'.repeat(20_000) }, children: [] }));
   doc.children[0].children.push(...extra);
-  assert.throws(() => renderPageDocument(doc), error => error.code === 'ERR_SYSTEMFABRIC_RENDER_OUTPUT_LIMIT' && error.statusCode === 413);
+  assert.throws(() => renderPageDocument(doc), error => error.code === 'ERR_VIRGOSCORPIO_HUB_RENDER_OUTPUT_LIMIT' && error.statusCode === 413);
   assert.equal(MAX_RENDERED_OUTPUT_BYTES, 2 * 1024 * 1024);
 });
 
@@ -100,7 +100,7 @@ test('query loop documents are bounded and render only the supplied published ro
     { title: 'Second article', url: 'javascript:alert(1)', excerpt: '<b>Second excerpt</b>' },
     { title: 'Should not render', url: '/third', excerpt: '' }
   ] }, designTokens: { colors: { brand: '#123456' }, spacing: { medium: '16px' }, fontFamilies: { body: 'Inter, system-ui' } } });
-  assert.match(html, /--sf-colors-brand:#123456/);
+  assert.match(html, /--vsh-colors-brand:#123456/);
   assert.match(html, /href="\/public\/demo\/pages\/one"/);
   assert.match(html, /&lt;script&gt;unsafe&lt;\/script&gt;/);
   assert.match(html, /href="\/"/);

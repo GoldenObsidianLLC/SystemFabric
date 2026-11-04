@@ -1,4 +1,4 @@
--- SystemFabric 0.5.3: durable per-consumer-group outbox delivery.
+-- VirgoScorpio Hub 0.5.3: durable per-consumer-group outbox delivery.
 -- The source event remains immutable in outbox_events; each consumer group gets
 -- an independently leased delivery record with its own retry/dead-letter state.
 

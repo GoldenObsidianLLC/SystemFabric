@@ -12,7 +12,7 @@ const STRIPE_API_BASE = 'https://api.stripe.com/v1';
 function validateBatchSize(batchSize) {
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > MAX_BATCH_SIZE) {
     const error = new TypeError(`batchSize must be an integer between 1 and ${MAX_BATCH_SIZE}.`);
-    error.code = 'ERR_SYSTEMFABRIC_CHECKOUT_RECONCILIATION_BATCH';
+    error.code = 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_RECONCILIATION_BATCH';
     throw error;
   }
   return batchSize;

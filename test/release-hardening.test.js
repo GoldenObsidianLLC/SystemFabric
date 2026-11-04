@@ -27,7 +27,7 @@ function poolForInsert(capture = {}) {
 }
 
 test('library uploads are quarantined when no scanner is configured and do not become public', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-library-quarantine-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-quarantine-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const store = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: false });
   const asset = await store.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'sample.png', isPublic: true });
@@ -39,7 +39,7 @@ test('library uploads are quarantined when no scanner is configured and do not b
 });
 
 test('library uploads activate only after scanner confirms clean content', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-library-clean-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-clean-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   let scannerInput;
   const store = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: true, malwareScanner: { engine: 'test-scanner', async scan(input) { scannerInput = input; return { clean: true, status: 'clean', engine: 'test-scanner' }; } } });
@@ -52,17 +52,17 @@ test('library uploads activate only after scanner confirms clean content', async
 });
 
 test('production library uploads fail closed when scanner is missing or reports a detection', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-library-failclosed-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-failclosed-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const noScanner = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: true });
-  await assert.rejects(() => noScanner.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_SYSTEMFABRIC_MALWARE_SCANNER_REQUIRED' });
+  await assert.rejects(() => noScanner.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_SCANNER_REQUIRED' });
   const infected = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: true, malwareScanner: { async scan() { return { clean: false, status: 'infected', signature: 'EICAR' }; } } });
-  await assert.rejects(() => infected.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_SYSTEMFABRIC_MALWARE_DETECTED' });
+  await assert.rejects(() => infected.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_DETECTED' });
   assert.deepEqual(await fs.promises.readdir(root), []);
 });
 
 test('local object reconciler defaults to dry-run, respects references and minimum age, and prevents traversal', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-library-reconcile-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-reconcile-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   await fs.promises.mkdir(path.join(root, 'site-one'), { recursive: true });
   await fs.promises.writeFile(path.join(root, 'site-one', 'referenced.bin'), 'keep');
@@ -99,16 +99,16 @@ test('cloud storage adapters perform explicit read-only connectivity probes', as
 });
 
 test('cloud probe hides upstream errors and requires a supported probe method', async () => {
-  await assert.rejects(() => probeCloudStorageAdapter({ async probe() { throw new Error('secret account identifier'); } }), error => error.code === 'ERR_SYSTEMFABRIC_CLOUD_PROBE_FAILED' && !error.message.includes('secret account identifier'));
-  await assert.rejects(() => probeCloudStorageAdapter({}), { code: 'ERR_SYSTEMFABRIC_CLOUD_PROBE_UNAVAILABLE' });
+  await assert.rejects(() => probeCloudStorageAdapter({ async probe() { throw new Error('secret account identifier'); } }), error => error.code === 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_FAILED' && !error.message.includes('secret account identifier'));
+  await assert.rejects(() => probeCloudStorageAdapter({}), { code: 'ERR_VIRGOSCORPIO_HUB_CLOUD_PROBE_UNAVAILABLE' });
 });
 
 
 test('ClamAV scanner fails closed when the executable is unavailable and cleans temporary files', async t => {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'sf-clamav-unavailable-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-clamav-unavailable-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const scanner = createClamDScanScanner({ executable: path.join(root, 'missing-clamdscan'), tempRoot: root, timeoutMs: 1000, maxBytes: 1024 });
-  await assert.rejects(() => scanner.scan({ buffer: Buffer.from('scanner test'), fileName: 'safe.txt' }), { code: 'ERR_SYSTEMFABRIC_MALWARE_UNAVAILABLE' });
+  await assert.rejects(() => scanner.scan({ buffer: Buffer.from('scanner test'), fileName: 'safe.txt' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_UNAVAILABLE' });
   assert.deepEqual(await fs.promises.readdir(root), []);
 });
 
@@ -118,6 +118,6 @@ test('cloud credential references fail closed unless the active SDK can resolve 
   assert.equal(resolveCloudCredentialReference({ provider: 's3-compatible', reference: 'env://AWS_SECRET_ACCESS_KEY', env: { AWS_ACCESS_KEY_ID: 'id', AWS_SECRET_ACCESS_KEY: 'secret' } }).ok, true);
   assert.equal(resolveCloudCredentialReference({ provider: 's3-compatible', reference: 'env://CUSTOM_AWS_SECRET', env: { CUSTOM_AWS_SECRET: 'secret' } }).ok, false);
   assert.equal(resolveCloudCredentialReference({ provider: 'google-cloud-storage', reference: 'env://GOOGLE_APPLICATION_CREDENTIALS', env: { GOOGLE_APPLICATION_CREDENTIALS: '/run/secrets/gcp.json' } }).ok, true);
-  assert.equal(resolveCloudCredentialReference({ provider: 'google-cloud-storage', reference: 'workload-identity:/systemfabric', env: {} }).ok, true);
-  assert.equal(resolveCloudCredentialReference({ provider: 'azure-blob', reference: 'workload-identity:/systemfabric', env: {} }).ok, false);
+  assert.equal(resolveCloudCredentialReference({ provider: 'google-cloud-storage', reference: 'workload-identity:/virgoscorpio_hub', env: {} }).ok, true);
+  assert.equal(resolveCloudCredentialReference({ provider: 'azure-blob', reference: 'workload-identity:/virgoscorpio_hub', env: {} }).ok, false);
 });

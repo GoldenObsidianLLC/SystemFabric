@@ -1,4 +1,4 @@
-# SystemFabric Manifesto: The Architecture of Human-AI Symbiosis
+# VirgoScorpio Hub Manifesto: The Architecture of Human-AI Symbiosis
 
 ## Mission Statement
 
@@ -14,7 +14,7 @@ Like the combustion engine and the desktop computer before them, intelligent mac
 
 ---
 
-## 2. The Economic Imperative: Why SystemFabric is Needed
+## 2. The Economic Imperative: Why VirgoScorpio Hub is Needed
 
 At its core, the economy is a closed-loop ecosystem built on mutual exchange.
 
@@ -27,11 +27,11 @@ Beyond the balance sheets lies a deeper human cost. Left unchecked, mass displac
 
 ## 3. Our Core Goals & Contributions to Society
 
-SystemFabric is built on a singular, uncompromising thesis: **technology must amplify human capability, not eliminate human necessity.**
+VirgoScorpio Hub is built on a singular, uncompromising thesis: **technology must amplify human capability, not eliminate human necessity.**
 
 * **Symbiotic Efficiency:** We are engineering platforms and workflows designed to make people *more efficient with AI* rather than replaced by it in the workforce.
 * **The AI/Human Workplace Interface:** We build tools that hardcode the human element into the loop, ensuring that people continue working, contributing, and earning.
-* **Preserving the Social Fabric:** By keeping human operators active, skilled, and economically viable, SystemFabric protects both societal stability and sustainable market demand.
+* **Preserving the Social Fabric:** By keeping human operators active, skilled, and economically viable, VirgoScorpio Hub protects both societal stability and sustainable market demand.
 
 ---
 
@@ -47,6 +47,6 @@ As we build the infrastructure of tomorrow, we remain vigilant against the prima
 
 ## Moving Forward
 
-The future is not a zero-sum game between human labor and machine intelligence. Through deliberate design, ethical engineering, and platforms like **SystemFabric**, we can forge a symbiotic future where man and machine elevate one another—keeping the lights on, the economy thriving, and humanity empowered.
+The future is not a zero-sum game between human labor and machine intelligence. Through deliberate design, ethical engineering, and platforms like **VirgoScorpio Hub**, we can forge a symbiotic future where man and machine elevate one another—keeping the lights on, the economy thriving, and humanity empowered.
 
 ---

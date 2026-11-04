@@ -39,19 +39,19 @@ function trustedKeysFromEnv(raw) {
 
 function verifyPluginArtifactSignature({ manifest, artifactDigest, sbomDigest, sourceType, keyId, signature, trustedKeys }) {
   const digest = digestForArtifact(artifactDigest);
-  if (!digest) return { valid: false, reason: 'ERR_SYSTEMFABRIC_PLUGIN_ARTIFACT_DIGEST' };
-  if (typeof signature !== 'string' || signature.length < 40 || signature.length > 4096 || !/^[A-Za-z0-9_-]+$/.test(signature)) return { valid: false, reason: 'ERR_SYSTEMFABRIC_PLUGIN_SIGNATURE_MISSING_OR_INVALID' };
+  if (!digest) return { valid: false, reason: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_ARTIFACT_DIGEST' };
+  if (typeof signature !== 'string' || signature.length < 40 || signature.length > 4096 || !/^[A-Za-z0-9_-]+$/.test(signature)) return { valid: false, reason: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_SIGNATURE_MISSING_OR_INVALID' };
   const keys = trustedKeys && typeof trustedKeys === 'object' ? trustedKeys : Object.create(null);
   let key = keys[keyId];
   try { if (typeof key === 'string') key = crypto.createPublicKey(key); } catch { key = null; }
-  if (!key || key.asymmetricKeyType !== 'ed25519') return { valid: false, reason: 'ERR_SYSTEMFABRIC_PLUGIN_SIGNING_KEY_UNTRUSTED' };
+  if (!key || key.asymmetricKeyType !== 'ed25519') return { valid: false, reason: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_SIGNING_KEY_UNTRUSTED' };
   try {
     const payload = signedArtifactPayload({ manifest, artifactDigest: digest, sbomDigest, sourceType });
     const decoded = Buffer.from(signature, 'base64url');
-    if (decoded.length !== 64) return { valid: false, reason: 'ERR_SYSTEMFABRIC_PLUGIN_SIGNATURE_INVALID' };
+    if (decoded.length !== 64) return { valid: false, reason: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_SIGNATURE_INVALID' };
     const valid = crypto.verify(null, payload, key, decoded);
-    return { valid, reason: valid ? null : 'ERR_SYSTEMFABRIC_PLUGIN_SIGNATURE_INVALID', artifactDigest: digest, sbomDigest: digestForArtifact(sbomDigest), keyId };
-  } catch { return { valid: false, reason: 'ERR_SYSTEMFABRIC_PLUGIN_SIGNATURE_INVALID' }; }
+    return { valid, reason: valid ? null : 'ERR_VIRGOSCORPIO_HUB_PLUGIN_SIGNATURE_INVALID', artifactDigest: digest, sbomDigest: digestForArtifact(sbomDigest), keyId };
+  } catch { return { valid: false, reason: 'ERR_VIRGOSCORPIO_HUB_PLUGIN_SIGNATURE_INVALID' }; }
 }
 
 function signPluginArtifact({ manifest, artifactDigest, sbomDigest, sourceType, privateKey }) {

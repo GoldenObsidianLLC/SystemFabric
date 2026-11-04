@@ -1,4 +1,4 @@
-# SystemFabric Data Model
+# VirgoScorpio Hub Data Model
 
 ## Ownership overview
 
@@ -26,12 +26,12 @@
   "schemaVersion": 1,
   "documentId": "01JEXAMPLEPAGE000000000001",
   "type": "page",
-  "title": "Welcome to SystemFabric",
+  "title": "Welcome to VirgoScorpio Hub",
   "children": [
     {
       "id": "hero-section",
       "type": "section",
-      "props": { "className": "sf-hero" },
+      "props": { "className": "vsh-hero" },
       "children": [
         {
           "id": "hero-title",

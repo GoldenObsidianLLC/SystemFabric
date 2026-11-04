@@ -5,7 +5,7 @@
 
 ## 1. Implemented capabilities
 
-SystemFabric combines the F1.13 trace-correlation foundation with the F1.14 OpenTelemetry instrumentation layer:
+VirgoScorpio Hub combines the F1.13 trace-correlation foundation with the F1.14 OpenTelemetry instrumentation layer:
 
 - The API validates or generates a request ID, creates a W3C Trace Context **version 00** trace, and returns `x-request-id` and `x-trace-id`.
 - Node.js `AsyncLocalStorage` preserves request context across asynchronous work; the OpenTelemetry context manager carries span parentage.
@@ -26,7 +26,7 @@ The implementation parses only W3C `traceparent` version 00. Unknown versions, m
 The API defaults to generating a new trace for every incoming request. To retain an upstream parent, set:
 
 ~~~dotenv
-SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE=true
+VIRGOSCORPIO_HUB_TRACE_CONTEXT_TRUST_REMOTE=true
 ~~~
 
 Enable this only when a trusted ingress/reverse proxy removes any caller-supplied `traceparent`, writes its own validated header, and prevents untrusted direct access. This is a security trust decision, not a convenience setting.
@@ -35,7 +35,7 @@ The plugin runner accepts the API's `traceparent` only after validating its exis
 
 ## 3. Enable OTLP trace export
 
-Tracing is opt-in and disabled by default. SystemFabric now includes a **local development collector profile**. Production deployments must still select, deploy, and operate their own collector and trace backend.
+Tracing is opt-in and disabled by default. VirgoScorpio Hub now includes a **local development collector profile**. Production deployments must still select, deploy, and operate their own collector and trace backend.
 
 ### Local development collector
 
@@ -69,19 +69,19 @@ This local profile is deliberately **ephemeral and development-only**. It does n
 For a deployment-managed collector, configure a private OTLP/HTTP endpoint:
 
 ~~~dotenv
-SYSTEMFABRIC_OTEL_ENABLED=true
-SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT=https://otel-collector.internal:4318/v1/traces
-SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON=
-SYSTEMFABRIC_OTEL_SAMPLE_RATIO=0.1
-SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS=5000
-SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=false
+VIRGOSCORPIO_HUB_OTEL_ENABLED=true
+VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT=https://otel-collector.internal:4318/v1/traces
+VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON=
+VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO=0.1
+VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS=5000
+VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP=false
 ~~~
 
-An endpoint with no path is normalized to `/v1/traces`. Other paths, URL credentials, query strings, and fragments are rejected. HTTPS is required unless `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true` is explicitly set for the isolated local profile.
+An endpoint with no path is normalized to `/v1/traces`. Other paths, URL credentials, query strings, and fragments are rejected. HTTPS is required unless `VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP=true` is explicitly set for the isolated local profile.
 
-When collector authentication is required, inject `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` through the deployment's secret manager. The value must be a JSON object and supports only `authorization` and `x-api-key` headers. Never commit credentials to `.env.example` or source control. The local setup script creates this value automatically; production should use the approved secret-delivery mechanism.
+When collector authentication is required, inject `VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON` through the deployment's secret manager. The value must be a JSON object and supports only `authorization` and `x-api-key` headers. Never commit credentials to `.env.example` or source control. The local setup script creates this value automatically; production should use the approved secret-delivery mechanism.
 
-Configure the same endpoint and authentication policy independently for each process that should emit spans: API, plugin runner, outbox worker, and scheduler. Each process advertises a stable service name: `systemfabric-api`, `systemfabric-plugin-runner`, `systemfabric-outbox-worker`, or `systemfabric-scheduler`.
+Configure the same endpoint and authentication policy independently for each process that should emit spans: API, plugin runner, outbox worker, and scheduler. Each process advertises a stable service name: `virgoscorpio-hub-api`, `virgoscorpio-hub-plugin-runner`, `virgoscorpio-hub-outbox-worker`, or `virgoscorpio-hub-scheduler`.
 
 A production collector should use TLS (prefer mTLS for service identity where supported), explicit receiver authentication, restricted network ingress, bounded memory, batching, an approved durable/retry queue, and an exporter to the deployment's selected backend. Restrict collector health/diagnostic endpoints to management networks. Do not use the local debug exporter as a production backend. The deployment decisions and required evidence are defined in [Production Observability Deployment Contract](OBSERVABILITY-DEPLOYMENT.md); no sample value in the local profile is production approval.
 
@@ -89,20 +89,20 @@ A production collector should use TLS (prefer mTLS for service identity where su
 
 | Setting | Default | Purpose |
 |---|---:|---|
-| `SYSTEMFABRIC_OTEL_ENABLED` | `false` | Initialize the OpenTelemetry trace provider and OTLP/HTTP exporter. |
-| `SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP endpoint; required when tracing is enabled. |
-| `SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON` | unset | Secret-injected JSON object limited to `authorization` and `x-api-key`. |
-| `SYSTEMFABRIC_OTEL_AUTH_TOKEN_FILE` | `./var/secrets/otel-collector-token.txt` | Local Compose profile secret source path; created by `npm run otel:dev:setup`. |
-| `SYSTEMFABRIC_OTEL_SAMPLE_RATIO` | `0.1` | Root trace sampling ratio from 0 to 1; parent-based sampling respects the upstream sampled flag. |
-| `SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS` | `5000` | Bounded traces/logs export timeout (250–30,000 ms). |
-| `SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP` | `false` | Explicitly permit HTTP transport; use only on isolated private networks. |
-| `SYSTEMFABRIC_OTEL_LOGS_ENABLED` | `false` | Independently enable the curated OTLP Logs pipeline. |
-| `SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP Logs endpoint; normalized to `/v1/logs`. |
-| `SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON` | unset | Optional separate secret-injected log exporter headers; falls back to trace headers when unset. |
-| `SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE` | `false` | Accept a valid upstream W3C v00 parent only behind a trusted ingress. |
-| `SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED` | `false` | Emit normalized API request-completion events to the injected logger. |
-| `SYSTEMFABRIC_METRICS_ENABLED` | `false` | Existing protected metrics endpoint switch. |
-| `SYSTEMFABRIC_METRICS_TOKEN` | unset | Dedicated bearer token for the private `/metrics` endpoint. |
+| `VIRGOSCORPIO_HUB_OTEL_ENABLED` | `false` | Initialize the OpenTelemetry trace provider and OTLP/HTTP exporter. |
+| `VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP endpoint; required when tracing is enabled. |
+| `VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON` | unset | Secret-injected JSON object limited to `authorization` and `x-api-key`. |
+| `VIRGOSCORPIO_HUB_OTEL_AUTH_TOKEN_FILE` | `./var/secrets/otel-collector-token.txt` | Local Compose profile secret source path; created by `npm run otel:dev:setup`. |
+| `VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO` | `0.1` | Root trace sampling ratio from 0 to 1; parent-based sampling respects the upstream sampled flag. |
+| `VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS` | `5000` | Bounded traces/logs export timeout (250–30,000 ms). |
+| `VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP` | `false` | Explicitly permit HTTP transport; use only on isolated private networks. |
+| `VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED` | `false` | Independently enable the curated OTLP Logs pipeline. |
+| `VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT` | unset | Private OTLP/HTTP Logs endpoint; normalized to `/v1/logs`. |
+| `VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON` | unset | Optional separate secret-injected log exporter headers; falls back to trace headers when unset. |
+| `VIRGOSCORPIO_HUB_TRACE_CONTEXT_TRUST_REMOTE` | `false` | Accept a valid upstream W3C v00 parent only behind a trusted ingress. |
+| `VIRGOSCORPIO_HUB_HTTP_ACCESS_LOGS_ENABLED` | `false` | Emit normalized API request-completion events to the injected logger. |
+| `VIRGOSCORPIO_HUB_METRICS_ENABLED` | `false` | Existing protected metrics endpoint switch. |
+| `VIRGOSCORPIO_HUB_METRICS_TOKEN` | unset | Dedicated bearer token for the private `/metrics` endpoint. |
 
 The trace and log SDKs are independently opt-in. The Logs SDK uses a bounded batch queue and batch size; exporter failures are best-effort and must not become application request dependencies. Process shutdown attempts to flush both queues. The local Compose collector uses only a debug exporter and stores no trace or log history. OTLP metrics are not added by this increment.
 
@@ -121,7 +121,7 @@ The API, plugin runner, outbox worker, mail worker, and scheduler share the allo
 Optional API request-completion events remain disabled by default:
 
 ~~~dotenv
-SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED=true
+VIRGOSCORPIO_HUB_HTTP_ACCESS_LOGS_ENABLED=true
 ~~~
 
 Safe structured events are emitted locally as JSON and, when independently enabled, sent to the OTLP Logs exporter. Log records contain the event key as their body and only allow-listed attributes; the request-scoped trace/span context is attached as OTLP correlation metadata. The log provider is deliberately not registered globally, so third-party libraries and arbitrary `console` output are not automatically captured. API request-completion events remain disabled unless explicitly enabled.
@@ -131,14 +131,14 @@ Safe structured events are emitted locally as JSON and, when independently enabl
 Set the separate log-export switch and a deployment-managed endpoint:
 
 ~~~dotenv
-SYSTEMFABRIC_OTEL_LOGS_ENABLED=true
-SYSTEMFABRIC_OTEL_LOGS_EXPORTER_ENDPOINT=https://otel-collector.internal:4318/v1/logs
-SYSTEMFABRIC_OTEL_LOGS_EXPORTER_HEADERS_JSON=
+VIRGOSCORPIO_HUB_OTEL_LOGS_ENABLED=true
+VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_ENDPOINT=https://otel-collector.internal:4318/v1/logs
+VIRGOSCORPIO_HUB_OTEL_LOGS_EXPORTER_HEADERS_JSON=
 ~~~
 
 The endpoint must use HTTPS and exactly `/v1/logs` (a root endpoint is normalized); URL credentials, query strings, fragments, and other paths are rejected. The log-specific header setting accepts the same narrow `authorization` and `x-api-key` allow-list as trace export. When the log-specific value is unset, trace exporter headers are reused; inject either value through the deployment secret manager and never commit it. The shared export timeout and explicit private-network HTTP override apply to both pipelines. OTLP log export is independent of trace export and disabled by default.
 
-The SDK uses bounded batching and asynchronous export. Only structured SystemFabric events passed through `createStructuredLogger` enter the OTLP pipeline; raw `console` output, prompts, request/response bodies, SQL text, arbitrary exception messages/stacks, and application payloads are not collected. The log event key is the body, avoiding arbitrary message text. Correlation is carried in the OTLP log record's trace/span context when available.
+The SDK uses bounded batching and asynchronous export. Only structured VirgoScorpio Hub events passed through `createStructuredLogger` enter the OTLP pipeline; raw `console` output, prompts, request/response bodies, SQL text, arbitrary exception messages/stacks, and application payloads are not collected. The log event key is the body, avoiding arbitrary message text. Correlation is carried in the OTLP log record's trace/span context when available.
 
 The F1.15 local Collector profile now accepts both traces and logs with bearer authentication and exports each to the ephemeral `debug` exporter. The smoke command tests HTTP 401 for unauthenticated requests and HTTP 200 for authenticated traces and log records. This proves transport and receiver authentication only: it does not make logs centrally searchable, durable, access-controlled, or retained.
 
@@ -166,4 +166,4 @@ The repository validation and local Docker-host smoke test pass. A real PostgreS
 - Complete production log centralization only after selecting an approved backend and defining log access controls, retention/deletion, audit, and named ownership. The current OTLP transport and local debug exporter do not satisfy these governance requirements.
 - Add additional spans only where they provide actionable operational value without exporting business payloads.
 
-SystemFabric remains **NOT_PRODUCTION_CERTIFIED / NO-GO** until the independent security, deployment, operational, backup/restore, and release gates are satisfied. Optional trace export is not a production-readiness assertion.
+VirgoScorpio Hub remains **NOT_PRODUCTION_CERTIFIED / NO-GO** until the independent security, deployment, operational, backup/restore, and release gates are satisfied. Optional trace export is not a production-readiness assertion.

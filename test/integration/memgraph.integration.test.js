@@ -8,8 +8,8 @@ const { createPostgresPool } = require('../../packages/db/src/postgres-store');
 const { createGraphProjectionWorker, GRAPH_PROJECTION_EVENT_TYPES } = require('../../apps/worker/src/outbox-worker');
 const { replayOutboxDeliveries } = require('../../packages/db/src/outbox-delivery');
 
-const enabled = Boolean(process.env.MEMGRAPH_URL && process.env.SYSTEMFABRIC_RUN_MEMGRAPH_INTEGRATION === 'true');
-const postgresEnabled = Boolean(process.env.DATABASE_URL && process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true');
+const enabled = Boolean(process.env.MEMGRAPH_URL && process.env.VIRGOSCORPIO_HUB_RUN_MEMGRAPH_INTEGRATION === 'true');
+const postgresEnabled = Boolean(process.env.DATABASE_URL && process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true');
 
 test('Memgraph integration: monotonic graph projections, relationship tombstones, and tenant-scoped reads', { skip: !enabled }, async t => {
   const driver = createMemgraphDriver({ url: process.env.MEMGRAPH_URL, username: process.env.MEMGRAPH_USERNAME || '', password: process.env.MEMGRAPH_PASSWORD || '' });

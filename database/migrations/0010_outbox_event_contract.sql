@@ -1,4 +1,4 @@
--- SystemFabric 0.5.2: canonical metadata for durable PostgreSQL outbox events.
+-- VirgoScorpio Hub 0.5.2: canonical metadata for durable PostgreSQL outbox events.
 -- Keep the existing outbox_events.id as the stable eventId. The aggregate uniqueness
 -- constraint remains the producer idempotency key for one event type/version.
 

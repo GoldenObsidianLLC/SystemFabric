@@ -11,7 +11,7 @@ const {
 function createPostgresPool(env = process.env) {
   if (!env.DATABASE_URL) return null;
   const { Pool } = require('pg');
-  return instrumentPostgresPool(new Pool({ connectionString: env.DATABASE_URL, max: Number(env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, application_name: 'systemfabric-api' }));
+  return instrumentPostgresPool(new Pool({ connectionString: env.DATABASE_URL, max: Number(env.DATABASE_POOL_MAX || 10), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000, application_name: 'virgoscorpio-hub-api' }));
 }
 
 function extractPageText(document, maxChars = 200_000) {
@@ -33,7 +33,7 @@ function extractPageText(document, maxChars = 200_000) {
   return parts.join(' ').slice(0, maxChars);
 }
 
-function conflict(message, code = 'ERR_SYSTEMFABRIC_CONFLICT') {
+function conflict(message, code = 'ERR_VIRGOSCORPIO_HUB_CONFLICT') {
   const error = new Error(message); error.statusCode = 409; error.code = code; return error;
 }
 
@@ -110,9 +110,9 @@ function createPostgresStore({ pool }) {
          WHERE id=$1 AND site_id=$2 AND deleted_at IS NULL FOR UPDATE`, [id, siteId]
       );
       const row = selected.rows[0];
-      if (!row) { const error = new Error('Content not found.'); error.statusCode = 404; error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND'; throw error; }
-      if (expectedVersion !== undefined && Number(expectedVersion) !== row.version) throw conflict('Content changed since it was loaded. Reload before retrying.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT');
-      if (!fromStatuses.includes(row.status)) throw conflict(`Cannot ${action} content from status ${row.status}.`, 'ERR_SYSTEMFABRIC_INVALID_WORKFLOW_TRANSITION');
+      if (!row) { const error = new Error('Content not found.'); error.statusCode = 404; error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND'; throw error; }
+      if (expectedVersion !== undefined && Number(expectedVersion) !== row.version) throw conflict('Content changed since it was loaded. Reload before retrying.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT');
+      if (!fromStatuses.includes(row.status)) throw conflict(`Cannot ${action} content from status ${row.status}.`, 'ERR_VIRGOSCORPIO_HUB_INVALID_WORKFLOW_TRANSITION');
       let snapshot = row.published_snapshot;
       if (publish) {
         snapshot = { title: row.title, slug: row.slug, locale: row.locale, contentType: row.content_type, status: 'published', document: row.body, version: row.version };
@@ -135,7 +135,7 @@ function createPostgresStore({ pool }) {
       await writeOutbox(client, { id, siteId, version: row.version, aggregateVersion: updated.rows[0].lock_version, eventType: publish ? 'content.publish' : clearPublished ? 'content.unpublish' : `content.${action}`, payload: { slug: row.slug, locale: row.locale, status: toStatus, action }, actorId, correlationId });
       await client.query('COMMIT');
       return updated.rows[0];
-    } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('A page with that published route already exists.', 'ERR_SYSTEMFABRIC_ROUTE_CONFLICT'); throw error; }
+    } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('A page with that published route already exists.', 'ERR_VIRGOSCORPIO_HUB_ROUTE_CONFLICT'); throw error; }
     finally { client.release(); }
   }
 
@@ -146,8 +146,8 @@ function createPostgresStore({ pool }) {
         await client.query('BEGIN');
         const existing = id ? await client.query('SELECT id,version,status FROM content_items WHERE id=$1 AND site_id=$2 AND deleted_at IS NULL FOR UPDATE', [id, siteId]) : { rows: [] };
         const old = existing.rows[0];
-        if (id && !old) { const error = new Error('Content not found.'); error.statusCode = 404; error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND'; throw error; }
-        if (old && expectedVersion !== undefined && Number(expectedVersion) !== old.version) throw conflict('Content changed since it was loaded. Reload before retrying.', 'ERR_SYSTEMFABRIC_VERSION_CONFLICT');
+        if (id && !old) { const error = new Error('Content not found.'); error.statusCode = 404; error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND'; throw error; }
+        if (old && expectedVersion !== undefined && Number(expectedVersion) !== old.version) throw conflict('Content changed since it was loaded. Reload before retrying.', 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT');
         const contentId = old?.id || id || randomUUID();
         const version = old ? old.version + 1 : 1;
         let committedRow;
@@ -177,7 +177,7 @@ function createPostgresStore({ pool }) {
         await writeWorkflow(client, { siteId, id: committedRow.id, version, action: 'draft_saved', fromStatus: old?.status || null, toStatus: 'draft', actorId: authorId, note });
         await writeOutbox(client, { id: committedRow.id, siteId, version, aggregateVersion: committedRow.lock_version, eventType: 'content.upsert', payload: { contentType, slug, locale, status: 'draft', title }, actorId: authorId, correlationId });
         await client.query('COMMIT'); return committedRow;
-      } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('That content route is already in use.', 'ERR_SYSTEMFABRIC_ROUTE_CONFLICT'); throw error; }
+      } catch (error) { await client.query('ROLLBACK').catch(() => {}); if (error.code === '23505') throw conflict('That content route is already in use.', 'ERR_VIRGOSCORPIO_HUB_ROUTE_CONFLICT'); throw error; }
       finally { client.release(); }
     },
 
@@ -186,7 +186,7 @@ function createPostgresStore({ pool }) {
       if (!validation.valid) {
         const error = new Error(validation.errors.join('; '));
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION';
         error.details = validation.errors;
         throw error;
       }
@@ -194,13 +194,13 @@ function createPostgresStore({ pool }) {
       if (!uuidPattern.test(String(siteId || '')) || !uuidPattern.test(String(contentId || ''))) {
         const error = new Error('siteId and contentId must be UUIDs.');
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SCOPE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_SCOPE';
         throw error;
       }
       if (actorId !== null && !uuidPattern.test(String(actorId))) {
         const error = new Error('actorId must be a UUID or null.');
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_ACTOR';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_ACTOR';
         throw error;
       }
 
@@ -218,7 +218,7 @@ function createPostgresStore({ pool }) {
         if (!row) {
           const error = new Error('Content not found.');
           error.statusCode = 404;
-          error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+          error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND';
           throw error;
         }
 
@@ -247,7 +247,7 @@ function createPostgresStore({ pool }) {
           const sameClient = accepted.client_id === operation.clientId;
           const samePayload = accepted.operation_hash === collaborationOperationHash(operation);
           if (!sameActor || !sameClient || !samePayload) {
-            throw conflict('The collaboration opId was already used by a different actor, client, or payload.', 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE');
+            throw conflict('The collaboration opId was already used by a different actor, client, or payload.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_OP_ID_REUSE');
           }
           const replayed = await client.query(
             'SELECT applied_operation FROM content_collaboration_operations WHERE content_id=$1 AND op_id=$2',
@@ -279,10 +279,10 @@ function createPostgresStore({ pool }) {
         }
 
         if (row.status !== 'draft') {
-          throw conflict('Collaborative editing is available only while content is a draft.', 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT');
+          throw conflict('Collaborative editing is available only while content is a draft.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_DRAFT');
         }
         if (operation.baseSequence > sequence) {
-          throw conflict('The collaboration base sequence is ahead of the server.', 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE');
+          throw conflict('The collaboration base sequence is ahead of the server.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE');
         }
         if (operation.baseSequence < oldestReplaySequence) {
           await client.query('COMMIT');
@@ -416,7 +416,7 @@ function createPostgresStore({ pool }) {
         };
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
-        if (error.code === '23505') throw conflict('The collaboration operation conflicts with an existing operation.', 'ERR_SYSTEMFABRIC_COLLABORATION_CONFLICT');
+        if (error.code === '23505') throw conflict('The collaboration operation conflicts with an existing operation.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_CONFLICT');
         throw error;
       } finally {
         client.release();
@@ -427,7 +427,7 @@ function createPostgresStore({ pool }) {
       if (!Number.isSafeInteger(afterSequence) || afterSequence < 0) {
         const error = new Error('afterSequence must be a non-negative safe integer.');
         error.statusCode = 400;
-        error.code = 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_SEQUENCE';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_SEQUENCE';
         throw error;
       }
       const selected = await pool.query(
@@ -454,16 +454,16 @@ function createPostgresStore({ pool }) {
       if (!row) {
         const error = new Error('Content not found.');
         error.statusCode = 404;
-        error.code = 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND';
+        error.code = 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND';
         throw error;
       }
       if (row.status !== 'draft') {
-        throw conflict('Collaborative sync is available only while content is a draft.', 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT');
+        throw conflict('Collaborative sync is available only while content is a draft.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_DRAFT');
       }
       const sequence = Number(row.collaboration_sequence);
       const oldestReplaySequence = Number(row.oldest_replay_sequence);
       if (afterSequence > sequence) {
-        throw conflict('The requested collaboration sequence is ahead of the server.', 'ERR_SYSTEMFABRIC_COLLABORATION_FUTURE_SEQUENCE');
+        throw conflict('The requested collaboration sequence is ahead of the server.', 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_FUTURE_SEQUENCE');
       }
       if (afterSequence < oldestReplaySequence) {
         return {
@@ -585,7 +585,7 @@ function createPostgresStore({ pool }) {
     async scheduleContent({ siteId, id, actorId, scheduledAt, expectedVersion, note }) {
       const when = new Date(scheduledAt);
       if (!Number.isFinite(when.getTime()) || when.getTime() < Date.now() + 60_000 || when.getTime() > Date.now() + 366 * 24 * 60 * 60_000) {
-        const error = new Error('scheduledAt must be between one minute and one year in the future.'); error.statusCode = 400; error.code = 'ERR_SYSTEMFABRIC_INVALID_SCHEDULE'; throw error;
+        const error = new Error('scheduledAt must be between one minute and one year in the future.'); error.statusCode = 400; error.code = 'ERR_VIRGOSCORPIO_HUB_INVALID_SCHEDULE'; throw error;
       }
       return transition({ siteId, id, actorId, action: 'scheduled', fromStatuses: ['approved'], toStatus: 'scheduled', expectedVersion, note, scheduledAt: when });
     },

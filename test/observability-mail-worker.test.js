@@ -64,7 +64,7 @@ test('mail worker failures emit only allow-listed operational fields', async () 
     assert.equal(message.recipient, secrets.recipient);
     assert.equal(message.payload.token, secrets.payload.token);
     throw Object.assign(new Error('SMTP response included private mailbox and provider detail'), {
-      code: 'ERR_SYSTEMFABRIC_MAIL_PROVIDER'
+      code: 'ERR_VIRGOSCORPIO_HUB_MAIL_PROVIDER'
     });
   };
 
@@ -78,11 +78,11 @@ test('mail worker failures emit only allow-listed operational fields', async () 
   assert.deepEqual(result.results, [{ id: secrets.id, status: 'failed' }]);
   assert.equal(records.length, 1);
   const record = records[0];
-  assert.equal(record.event, 'systemfabric.mail.delivery_failure');
+  assert.equal(record.event, 'virgoscorpio_hub.mail.delivery_failure');
   assert.equal(record.level, 'error');
   assert.equal(record.component, 'mail');
   assert.equal(record.operation, 'delivery');
-  assert.equal(record.code, 'ERR_SYSTEMFABRIC_MAIL_PROVIDER');
+  assert.equal(record.code, 'ERR_VIRGOSCORPIO_HUB_MAIL_PROVIDER');
   assert.equal(record.attempts, 8);
   assert.equal(record.terminal, true);
   assert.equal(record.outcome, 'failed');

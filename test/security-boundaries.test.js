@@ -26,9 +26,9 @@ test('plugin provenance binds artifact, SBOM, version, and source type with Ed25
 test('SAML is disabled by default and invalid production URLs fail closed', () => {
   assert.equal(configFromEnv({ NODE_ENV: 'production' }), null);
   const env = { NODE_ENV: 'production', SAML_ENABLED: 'true', SAML_IDP_ENTRY_POINT: 'http://idp.example.test/sso', SAML_IDP_ISSUER: 'urn:example:idp', SAML_IDP_CERT: `-----BEGIN CERTIFICATE-----\n${'a'.repeat(160)}\n-----END CERTIFICATE-----`, SAML_SP_ISSUER: 'https://cms.example.test/saml/metadata', SAML_ACS_URL: 'https://cms.example.test/api/v1/auth/saml/acs' };
-  assert.throws(() => configFromEnv(env), { code: 'ERR_SYSTEMFABRIC_SAML_HTTPS_REQUIRED' });
+  assert.throws(() => configFromEnv(env), { code: 'ERR_VIRGOSCORPIO_HUB_SAML_HTTPS_REQUIRED' });
   const httpsDev = { ...env, NODE_ENV: 'development', SAML_IDP_ENTRY_POINT: 'https://idp.example.test/sso' };
-  assert.throws(() => configFromEnv(httpsDev), { code: 'ERR_SYSTEMFABRIC_SAML_CERT_INVALID' });
+  assert.throws(() => configFromEnv(httpsDev), { code: 'ERR_VIRGOSCORPIO_HUB_SAML_CERT_INVALID' });
 });
 
 test('PostgreSQL SAML cache namespaces keys by IdP and atomically consumes one-time values', async () => {
@@ -60,9 +60,9 @@ test('S3 media store validates image signatures and writes object metadata befor
   const client = { async send(command) { sent.push(command); if (command instanceof commands.GetObjectCommand) return { Body: Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]) }; return {}; } };
   const poolCalls = [];
   const pool = { async query(sql, args) { poolCalls.push({ sql, args }); return { rows: [{ id: args[0], site_id: args[1], storage_key: args[2], mime_type: args[3], byte_size: args[4], alt_text: args[5], publicly_accessible: args[8], created_at: new Date() }] }; } };
-  const store = createS3MediaStore({ pool, client, commands, env: { S3_BUCKET: 'systemfabric-assets', S3_REGION: 'us-east-1', CDN_BASE_URL: 'https://cdn.example.test', MEDIA_CDN_PUBLIC: 'true' } });
+  const store = createS3MediaStore({ pool, client, commands, env: { S3_BUCKET: 'virgoscorpio-hub-assets', S3_REGION: 'us-east-1', CDN_BASE_URL: 'https://cdn.example.test', MEDIA_CDN_PUBLIC: 'true' } });
   const png = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
-  await assert.rejects(() => store.upload({ siteId: 'site-a', dataBase64: Buffer.from('<svg/>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_SYSTEMFABRIC_MEDIA_INVALID' });
+  await assert.rejects(() => store.upload({ siteId: 'site-a', dataBase64: Buffer.from('<svg/>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_VIRGOSCORPIO_HUB_MEDIA_INVALID' });
   assert.equal(sent.length, 0);
   const asset = await store.upload({ siteId: 'site-a', actorId: 'user-a', dataBase64: png.toString('base64'), mimeType: 'image/png', altText: 'Example' });
   assert.equal(sent.length, 1);

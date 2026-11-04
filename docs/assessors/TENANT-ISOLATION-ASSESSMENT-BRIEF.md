@@ -1,6 +1,6 @@
-# SystemFabric 0.5.1 — Independent Tenant-Isolation Assessment Brief
+# VirgoScorpio Hub 0.5.1 — Independent Tenant-Isolation Assessment Brief
 
-**Purpose:** commission and guide the independent application-security review tracked by [GitHub issue #14](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14).
+**Purpose:** commission and guide the independent application-security review tracked by [GitHub issue #14](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14).
 
 > **Status: ASSESSOR PACKET ONLY — NO REVIEW HAS BEEN PERFORMED.** This document is a hand-off aid. It is not a security assessment, a pass, a waiver, or certification evidence. The reviewer must be independent of the implementation team and must record their own methods, results, findings, and limitations.
 
@@ -8,13 +8,13 @@
 
 | Field | Value |
 |---|---|
-| Repository | `GoldenObsidianLLC/SystemFabric` |
+| Repository | `GoldenObsidianLLC/VirgoScorpio-Hub` |
 | Product version | `0.5.1` |
 | Pre-packet application-source baseline | `ab55892dc33b87d8be4165e13931cd6888f358a1` |
 | Candidate branch | `main` |
 | Formal gate | `tenant-isolation-review` |
 | Evidence destination after completion | `artifacts/evidence/tenant-isolation-review.json` |
-| Coordination issue | [#14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/SystemFabric/issues/14) |
+| Coordination issue | [#14 — Independent tenant/site isolation and authorization review](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14) |
 | Technical plan | [docs/PRODUCTION-CERTIFICATION-PLAN.md](../PRODUCTION-CERTIFICATION-PLAN.md) |
 | Scope proposal | [docs/RELEASE-SCOPE.md](../RELEASE-SCOPE.md) |
 
@@ -63,15 +63,15 @@ npm ci
 npm test
 ```
 
-For PostgreSQL integration coverage, use a disposable local database dedicated to this review (database name should clearly end in `_test`). The existing tenant integration test is gated by `DATABASE_URL` and `SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION=true`:
+For PostgreSQL integration coverage, use a disposable local database dedicated to this review (database name should clearly end in `_test`). The existing tenant integration test is gated by `DATABASE_URL` and `VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION=true`:
 
 ```sh
 # Set DATABASE_URL to a disposable local review database only.
 # Do not point this at production, shared staging, or a developer database.
-SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION=true npm run test:integration
+VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION=true npm run test:integration
 ```
 
-On Windows PowerShell, set the same environment variable with `$env:SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION = 'true'` before running the command. Record all tests skipped because a provider, service, or environment was unavailable.
+On Windows PowerShell, set the same environment variable with `$env:VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION = 'true'` before running the command. Record all tests skipped because a provider, service, or environment was unavailable.
 
 ### B. Build a complete attack-surface inventory
 
@@ -232,4 +232,4 @@ Do not set `status` to `passed` while findings, retests, coverage, independence,
 - [ ] Signed report and sanitized retained artifacts stored.
 - [ ] Evidence JSON accepted and gate re-evaluated on the exact clean candidate revision.
 
-**Current handoff state:** no independent reviewer is assigned and no independent review result exists. Issue #14 remains open. SystemFabric 0.5.1 remains `NOT_PRODUCTION_CERTIFIED` / NO-GO.
+**Current handoff state:** no independent reviewer is assigned and no independent review result exists. Issue #14 remains open. VirgoScorpio Hub 0.5.1 remains `NOT_PRODUCTION_CERTIFIED` / NO-GO.

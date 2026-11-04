@@ -28,11 +28,11 @@ test('real-time hub isolates site topics and emits bounded, versionable envelope
   assert.match(next.value.eventId, /^[0-9a-f-]{36}$/i);
   await assert.rejects(
     hub.publish({ siteId: SITE_A, topic: 'presence', eventId: 'bad\r\nid: injected', payload: {} }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_EVENT_ID_INVALID'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_ID_INVALID'
   );
   await assert.rejects(
     hub.publish({ siteId: SITE_A, topic: 'presence', payload: { text: 'x'.repeat(20_000) } }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_EVENT_TOO_LARGE'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_EVENT_TOO_LARGE'
   );
 
   subscription.close();
@@ -52,7 +52,7 @@ test('real-time subscriptions fail closed and authorization is rechecked before 
 
   await assert.rejects(
     hub.subscribe({ principal: { id: 'user-a' }, siteId: SITE_A, topic: 'presence' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_CONNECTION_LIMIT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_CONNECTION_LIMIT'
   );
 
   allowed = false;
@@ -63,7 +63,7 @@ test('real-time subscriptions fail closed and authorization is rechecked before 
 
   await assert.rejects(
     hub.subscribe({ principal: { id: 'user-b' }, siteId: SITE_A, topic: 'presence' }),
-    error => error.statusCode === 403 && error.code === 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN'
+    error => error.statusCode === 403 && error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN'
   );
   hub.close();
 });
@@ -86,7 +86,7 @@ test('authorization invalidation revokes only the matching site, principal, or s
   await hub.subscribe({ principal: { id: uuidPrincipal }, sessionId: uuidSession, siteId: SITE_A, topic: 'presence' });
   assert.deepEqual(hub.invalidateAuthorization({ siteId: SITE_A.toUpperCase(), principalId: uuidPrincipal.toUpperCase(), sessionId: uuidSession.toUpperCase() }), { revoked: 1 });
   for (const subscription of [userASiteA1, userASiteA2, userASiteB, userBSiteA]) subscription.close();
-  assert.throws(() => hub.invalidateAuthorization({}), { code: 'ERR_SYSTEMFABRIC_REALTIME_INVALIDATION_SCOPE' });
+  assert.throws(() => hub.invalidateAuthorization({}), { code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_INVALIDATION_SCOPE' });
   hub.close();
 });
 
@@ -121,7 +121,7 @@ test('real-time hub disconnects slow consumers rather than growing an unbounded 
   assert.equal(overflow.dropped, 1);
   assert.equal(hub.subscriberCount, 0);
   assert.equal((await iterator.next()).value.payload.sequence, 1);
-  await assert.rejects(iterator.next(), error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_SLOW_CONSUMER');
+  await assert.rejects(iterator.next(), error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_SLOW_CONSUMER');
   hub.close();
 });
 
@@ -155,12 +155,12 @@ test('presence rejects invalid states and enforces adapter capacity', async () =
   const presence = createPresenceService({ adapter });
   await assert.rejects(
     presence.heartbeat({ siteId: SITE_A, principalId: 'user-a', sessionId: 's1', availability: 'watching' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_PRESENCE_AVAILABILITY_INVALID'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_PRESENCE_AVAILABILITY_INVALID'
   );
   await presence.heartbeat({ siteId: SITE_A, principalId: 'user-a', sessionId: 's1' });
   await assert.rejects(
     presence.heartbeat({ siteId: SITE_A, principalId: 'user-a', sessionId: 's2' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_PRESENCE_CAPACITY'
   );
   await presence.close();
 });
@@ -169,8 +169,8 @@ async function withRealtimeServer(fn) {
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: 'test-secret-token',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_API_TOKEN: 'test-secret-token',
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
       AI_PROVIDER: 'mock',
       MAX_REQUEST_BYTES: '16384',
       RATE_LIMIT_MAX_REQUESTS: '100'
@@ -182,7 +182,7 @@ async function withRealtimeServer(fn) {
     await fn('http://127.0.0.1:' + server.address().port);
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 }
 
@@ -255,7 +255,7 @@ test('API enforces site capability checks for authenticated non-developer presen
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -268,10 +268,10 @@ test('API enforces site capability checks for authenticated non-developer presen
       headers: { authorization: 'Bearer session-token' }
     });
     assert.equal(response.status, 403);
-    assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_FORBIDDEN');
+    assert.equal((await response.json()).code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
@@ -289,7 +289,7 @@ test('API refuses long-lived real-time streams when the backing session is no lo
     async isSessionActive() { return false; }
   };
   const server = createApiServer({
-    env: { NODE_ENV: 'test', SYSTEMFABRIC_REALTIME_ENABLED: 'true', AI_PROVIDER: 'mock', RATE_LIMIT_MAX_REQUESTS: '100' },
+    env: { NODE_ENV: 'test', VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true', AI_PROVIDER: 'mock', RATE_LIMIT_MAX_REQUESTS: '100' },
     identityService,
     logger: { error() {} }
   });
@@ -299,16 +299,16 @@ test('API refuses long-lived real-time streams when the backing session is no lo
       headers: { authorization: 'Bearer session-token' }
     });
     assert.equal(response.status, 403);
-    assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN');
+    assert.equal((await response.json()).code, 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
 test('API does not enable presence implicitly when the preview adapter is disabled', async () => {
   const server = createApiServer({
-    env: { NODE_ENV: 'test', SYSTEMFABRIC_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock' },
+    env: { NODE_ENV: 'test', VIRGOSCORPIO_HUB_API_TOKEN: 'test-secret-token', AI_PROVIDER: 'mock' },
     logger: { error() {} }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -317,10 +317,10 @@ test('API does not enable presence implicitly when the preview adapter is disabl
       headers: { authorization: 'Bearer test-secret-token' }
     });
     assert.equal(response.status, 503);
-    assert.equal((await response.json()).code, 'ERR_SYSTEMFABRIC_REALTIME_DISABLED');
+    assert.equal((await response.json()).code, 'ERR_VIRGOSCORPIO_HUB_REALTIME_DISABLED');
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 });
 
@@ -329,8 +329,8 @@ test('API refuses Redis presence when no shared adapter service is injected', ()
   assert.throws(() => createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
       AI_PROVIDER: 'mock'
     },
     logger: { error() {} }
@@ -360,8 +360,8 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
       AI_PROVIDER: 'mock'
     },
     presenceService,
@@ -369,11 +369,11 @@ test('API accepts Redis-backed presence only with an attached cross-instance Pub
     realtimeConnectionLimiter,
     logger: { error() {} }
   });
-  await server.systemfabric.ready();
-  assert.equal(server.systemfabric.presenceService, presenceService);
-  assert.equal(server.systemfabric.presenceStore, 'redis');
-  assert.equal(server.systemfabric.realtimeMode, 'redis-shared-realtime-pubsub');
-  await server.systemfabric.close();
+  await server.virgoScorpioHub.ready();
+  assert.equal(server.virgoScorpioHub.presenceService, presenceService);
+  assert.equal(server.virgoScorpioHub.presenceStore, 'redis');
+  assert.equal(server.virgoScorpioHub.realtimeMode, 'redis-shared-realtime-pubsub');
+  await server.virgoScorpioHub.close();
   assert.equal(closed, true);
   assert.equal(bridgeClosed, true);
   assert.equal(quotaClosed, true);

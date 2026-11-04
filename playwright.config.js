@@ -25,7 +25,7 @@ module.exports = defineConfig({
       NODE_ENV: "test",
       HOST: "127.0.0.1",
       PORT: "8787",
-      SYSTEMFABRIC_API_TOKEN:
+      VIRGOSCORPIO_HUB_API_TOKEN:
         "playwright-local-api-token-not-used-by-cookie-mocks",
       AI_PROVIDER: "mock",
       AI_ALLOWED_PROVIDERS: "mock",

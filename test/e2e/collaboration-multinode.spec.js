@@ -23,7 +23,7 @@ const SITE_B = '99999999-9999-4999-8999-999999999999';
 const CONTENT_A = '22222222-2222-4222-8222-222222222222';
 const CONTENT_B = '33333333-3333-4333-8333-333333333333';
 const CONTENT_C = '44444444-4444-4444-8444-444444444444';
-const REDIS_URL = process.env.SYSTEMFABRIC_TEST_REDIS_URL || '';
+const REDIS_URL = process.env.VIRGOSCORPIO_HUB_TEST_REDIS_URL || '';
 
 function assertApprovedRedisUrl(raw) {
   const url = new URL(raw);
@@ -50,7 +50,7 @@ async function openClient(browser, { baseUrl, siteId, contentId, sessionNumber, 
   const context = await browser.newContext();
   const token = 'f1-10-session-' + sessionNumber;
   await context.addCookies([{
-    name: 'sf_session',
+    name: 'vsh_session',
     value: token,
     url: baseUrl,
     httpOnly: true,
@@ -70,7 +70,7 @@ async function openClient(browser, { baseUrl, siteId, contentId, sessionNumber, 
 
 async function closeClients(clients) {
   for (const client of clients) {
-    await client.page.evaluate(() => window.__systemfabricCollaboration?.close()).catch(() => {});
+    await client.page.evaluate(() => window.__virgoscorpio_hubCollaboration?.close()).catch(() => {});
     await client.context.close().catch(() => {});
   }
 }
@@ -149,7 +149,7 @@ async function openRawCollaborationClient({ baseUrl, siteId, contentId, sessionN
   const socket = new WebSocket(wsUrl, {
     headers: {
       origin: baseUrl,
-      cookie: 'sf_session=f1-10-session-' + sessionNumber
+      cookie: 'vsh_session=f1-10-session-' + sessionNumber
     }
   });
   const client = createRawCollaborationClient(socket);
@@ -179,7 +179,7 @@ async function openRawCollaborationClient({ baseUrl, siteId, contentId, sessionN
 
 async function startTwoNodes({ siteIds = [SITE_A], dropNextOnA = false } = {}) {
   assertApprovedRedisUrl(REDIS_URL);
-  const channelPrefix = 'systemfabric:test:f1-10:' + randomUUID();
+  const channelPrefix = 'virgoscorpio_hub:test:f1-10:' + randomUUID();
   const store = createMemoryCollaborationStore({
     sitesAndDocuments: [
       { siteId: SITE_A, contentId: CONTENT_A, createdBy: makeId(101) },
@@ -361,7 +361,7 @@ test('two-instance PostgreSQL reconciliation repairs reordered and duplicate hin
 
     // Lose one API instance and rejoin its former client to the surviving node.
     await runtime.nodeA.close();
-    pageA.page.evaluate(() => window.__systemfabricCollaboration?.close()).catch(() => {});
+    pageA.page.evaluate(() => window.__virgoscorpio_hubCollaboration?.close()).catch(() => {});
     const reconnected = await openClient(browser, {
       baseUrl: runtime.nodeB.baseUrl, siteId: SITE_A, contentId: CONTENT_A,
       sessionNumber: 1, clientId: 'reconnected-a', afterSequence: 0

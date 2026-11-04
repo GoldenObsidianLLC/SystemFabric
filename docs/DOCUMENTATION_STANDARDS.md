@@ -1,6 +1,6 @@
 # Documentation Standards
 
-These standards adapt established README-design patterns to SystemFabric's actual code and release process. The goal is discoverability and trustworthy guidance, not decorative volume.
+These standards adapt established README-design patterns to VirgoScorpio Hub's actual code and release process. The goal is discoverability and trustworthy guidance, not decorative volume.
 
 ## Root README
 

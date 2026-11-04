@@ -2,7 +2,7 @@
 
 Review date: 2026-10-29
 
-This note records which ideas were adapted from the two requested public repositories and how they were applied to SystemFabric. The wording and technical descriptions in the SystemFabric docs are project-specific; the referenced READMEs are inspiration, not text to copy wholesale.
+This note records which ideas were adapted from the two requested public repositories and how they were applied to VirgoScorpio Hub. The wording and technical descriptions in the VirgoScorpio Hub docs are project-specific; the referenced READMEs are inspiration, not text to copy wholesale.
 
 ## 1. `othneildrew/Best-README-Template`
 
@@ -10,7 +10,7 @@ Repository: https://github.com/othneildrew/Best-README-Template
 
 The repository's current README/blank template organizes a project page around project shields and identity, a concise description, a table of contents, overview, built-with/technology, setup prerequisites, installation, usage, roadmap, contribution instructions, license, contact, and acknowledgements. It uses anchor navigation and reference-style links to keep markup manageable. The template also recommends a separate blank template as a starting point and includes issue templates in `.github/ISSUE_TEMPLATE/`.
 
-### Adapted to SystemFabric
+### Adapted to VirgoScorpio Hub
 
 - A brief identity and status statement above the fold.
 - A compact set of badges linked to the actual CI workflow and license.
@@ -23,7 +23,7 @@ The repository's current README/blank template organizes a project page around p
 
 - No sample logo, fake screenshot, demo URL, social profile, or placeholder framework list.
 - No unverified coverage, download, star, benchmark, or certification badges.
-- No re-use of template prose as SystemFabric content.
+- No re-use of template prose as VirgoScorpio Hub content.
 
 ## 2. `matiassingers/awesome-readme`
 
@@ -31,7 +31,7 @@ Repository: https://github.com/matiassingers/awesome-readme
 
 The repository is a curated list of examples rather than a single rigid template. Its introduction calls attention to images, screenshots, GIFs, and text formatting. The examples repeatedly highlight clear project identity, useful badges, readable structure, quick setup, real demonstrations, architecture diagrams, detailed examples, troubleshooting/FAQ material, release notes, security documentation, licensing, and contributor guidance.
 
-### Adapted to SystemFabric
+### Adapted to VirgoScorpio Hub
 
 - A Mermaid architecture diagram that maps actual repository boundaries.
 - A capabilities table tied to application/package areas, with explicit maturity caveats.
@@ -46,7 +46,7 @@ The repository is a curated list of examples rather than a single rigid template
 - No promise of a live demo or deployment target that has not been verified.
 - No inference that the source list itself provides a license for copying arbitrary entries or README text; this refresh borrows general information-architecture ideas and writes original content.
 
-## 3. SystemFabric-specific adaptations
+## 3. VirgoScorpio Hub-specific adaptations
 
 | Need | Adaptation | Why it matters |
 |---|---|---|

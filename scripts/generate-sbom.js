@@ -8,7 +8,7 @@ const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 const ARTIFACTS = path.join(ROOT, 'artifacts');
 const EVIDENCE = path.join(ARTIFACTS, 'evidence');
-const SBOM_PATH = path.join(ARTIFACTS, 'systemfabric.sbom.cdx.json');
+const SBOM_PATH = path.join(ARTIFACTS, 'virgoscorpio-hub.sbom.cdx.json');
 const LOG_PATH = path.join(EVIDENCE, 'sbom-generation.log');
 const LOCK_PATH = path.join(ROOT, 'package-lock.json');
 
@@ -74,7 +74,7 @@ function renderGenerationLog(input) {
   ).join('; ') || 'none';
 
   const lines = [
-    'SystemFabric CycloneDX SBOM generation evidence',
+    'VirgoScorpio Hub CycloneDX SBOM generation evidence',
     'Generated at: ' + input.generatedAt,
     'Command: npm sbom --sbom-format=cyclonedx --omit=dev',
     'Node.js: ' + input.nodeVersion,
@@ -86,7 +86,7 @@ function renderGenerationLog(input) {
     'Components: ' + summary.components,
     'Dependency records: ' + summary.dependencies,
     'package-lock.json SHA-256: ' + input.lockHash,
-    'systemfabric.sbom.cdx.json SHA-256: ' + input.sbomHash,
+    'virgoscorpio-hub.sbom.cdx.json SHA-256: ' + input.sbomHash,
     'License identifiers/expressions: ' + licenseSummary,
     'Components without an identified license: ' + summary.unidentified.length,
     'Components with LGPL license terms: ' + lgplSummary

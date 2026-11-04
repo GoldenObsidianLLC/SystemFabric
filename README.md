@@ -2,19 +2,19 @@
 
 <div align="center">
 
-# SystemFabric
+# VirgoScorpio Hub
 
 **A modular Node.js application platform designed to augment human capability through secure, governed human-AI collaboration.**
 
-[![SystemFabric CI](https://github.com/GoldenObsidianLLC/SystemFabric/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GoldenObsidianLLC/SystemFabric/actions/workflows/ci.yml)
+[![VirgoScorpio Hub CI](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/workflows/ci.yml)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/License-GPL--2.0--or--later-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.23.4-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-[Overview](#overview) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Architecture](#architecture) · [Documentation](docs/README.md) · [Governance](GOVERNANCE.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Contributors](CONTRIBUTOR_RECOGNITION.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Research & Collaboration](RESEARCH_COLLABORATION.md)
+[Overview](#overview) · [Capabilities](#capabilities) · [Quick start](#quick-start) · [Architecture](#architecture) · [Documentation](docs/README.md) · [Change record](change.md) · [Governance](GOVERNANCE.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [Contributors](CONTRIBUTOR_RECOGNITION.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Research & Collaboration](RESEARCH_COLLABORATION.md)
 
 </div>
 
-> **Project status:** SystemFabric 0.5.1 is an actively developed software baseline. It is **not production-certified**. Passing tests and static checks do not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md).
+> **Project status:** VirgoScorpio Hub 0.5.1 is an actively developed software baseline. It is **not production-certified**. Passing tests and static checks do not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md).
 
 ## Table of contents
 
@@ -34,11 +34,11 @@
 
 ## Overview
 
-SystemFabric is organized as a modular Node.js repository. Its application layer includes API, administration, MCP, plugin-runner, and worker applications. Shared packages provide domain validation, rendering, identity and authentication helpers, AI-provider adapters, data stores, commerce and checkout workflows, community operations, media and cloud adapters, security controls, and related platform services.
+VirgoScorpio Hub is organized as a modular Node.js repository. Its application layer includes API, administration, MCP, plugin-runner, and worker applications. Shared packages provide domain validation, rendering, identity and authentication helpers, AI-provider adapters, data stores, commerce and checkout workflows, community operations, media and cloud adapters, security controls, and related platform services.
 
 The repository aims to make platform behaviors explicit and testable: validate inputs before side effects, bound resource use, fail closed when security-sensitive configuration is missing, keep transactional state in PostgreSQL, and use graph projections for relationship-oriented queries. Provider integrations and operational controls have different maturity levels; consult the test matrix and release-readiness document before relying on any integration in production.
 
-SystemFabric is guided by the [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md): AI should amplify human capability, preserve creative dignity and meaningful participation, and remain subject to clear human agency and accountable governance. These are product and engineering principles, not promises of employment, income or macroeconomic outcomes. See [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) for the technical interpretation.
+VirgoScorpio Hub is guided by the [VirgoScorpio Hub Manifesto](VIRGOSCORPIO-HUB-MANIFESTO.md): AI should amplify human capability, preserve creative dignity and meaningful participation, and remain subject to clear human agency and accountable governance. These are product and engineering principles, not promises of employment, income or macroeconomic outcomes. See [Engineering Principles](docs/VIRGOSCORPIO-HUB-PRINCIPLES.md) for the technical interpretation.
 
 ## Capabilities
 
@@ -84,7 +84,7 @@ See [Architecture and data flow](docs/ARCHITECTURE.md) for component responsibil
 |---|---|---|
 | Node.js | Application runtime | Current supported baseline in project checks: Node.js `>=22.23.4`. |
 | npm | Dependency installation and scripts | Prefer `npm ci` for reproducible dependency installation from the lockfile. |
-| PostgreSQL | Relational persistence and transactional workflows | Live integration tests use a dedicated `systemfabric_test` database; do not point destructive test setup at production data. |
+| PostgreSQL | Relational persistence and transactional workflows | Live integration tests use a dedicated `virgoscorpio_hub_test` database; do not point destructive test setup at production data. |
 | Memgraph | Graph projection and relationship-oriented operations | Required for live graph integration tests. |
 | EnginEx | Vendored rendering/runtime component | Located at `vendor/enginex/`; consult its own license and notices before modifying or redistributing it separately. |
 | GitHub Actions | CI and static analysis | The live workflow badge reflects the latest workflow status, not production certification. |
@@ -103,8 +103,8 @@ The authoritative dependency declarations and exact scripts are `package.json`, 
 ### Install and run the baseline checks
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/SystemFabric.git
-Set-Location SystemFabric
+git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+Set-Location VirgoScorpio-Hub
 npm ci
 npm run check
 ```
@@ -128,7 +128,7 @@ npm audit
 npm audit --omit=dev
 ```
 
-The live integration suite expects a dedicated test database named `systemfabric_test`, a reachable PostgreSQL instance, and a reachable Memgraph service. Configure the test environment using the repository's current integration-test configuration and keep test data isolated. Follow [Development setup](docs/DEVELOPMENT.md) and [Testing](docs/TESTING.md) for scope and prerequisites.
+The live integration suite expects a dedicated test database named `virgoscorpio_hub_test`, a reachable PostgreSQL instance, and a reachable Memgraph service. Configure the test environment using the repository's current integration-test configuration and keep test data isolated. Follow [Development setup](docs/DEVELOPMENT.md) and [Testing](docs/TESTING.md) for scope and prerequisites.
 
 ## Configuration and secrets
 
@@ -150,7 +150,7 @@ Read [Security policy](SECURITY.md) before reporting vulnerabilities.
 | Live database integration | `npm run test:integration:live` | Does not replace fresh-install, upgrade, backup/restore, or load rehearsals. |
 | Dependency audit | `npm audit` | Does not find every code, configuration, or supply-chain risk. |
 | Secret scanning | `gitleaks dir ...` and `gitleaks git ...` | A clean scan reduces risk but cannot guarantee that every sensitive-data pattern was detected. |
-| Consolidated CI evidence | `artifacts/release-readiness-ci.md` in the `systemfabric-release-readiness-ci` workflow artifact | Binds producer jobs, source revisions, run attempts, and SHA-256 evidence; remains a CI report, not production certification. |
+| Consolidated CI evidence | `artifacts/release-readiness-ci.md` in the `virgoscorpio_hub-release-readiness-ci` workflow artifact | Binds producer jobs, source revisions, run attempts, and SHA-256 evidence; remains a CI report, not production certification. |
 | Production observability evidence | `npm run observability:deployment:validate` | Checks the approved manifest structure and declared evidence; does not deploy or independently verify providers or external evidence. |
 
 See [Testing and validation](docs/TESTING.md) for the validation matrix and evidence requirements. Treat CI as authoritative for the commit currently under review; local historical results can become stale after changes.
@@ -162,8 +162,8 @@ Start at **[the documentation index](docs/README.md)**.
 | Document | Purpose |
 |---|---|
 | [Architecture](docs/ARCHITECTURE.md) | Application/package map, data flow, and boundaries. |
-| [SystemFabric Manifesto](SYSTEMFABRIC_MANIFESTO.md) | Project mission and human-AI symbiosis vision. |
-| [Engineering Principles](docs/SYSTEMFABRIC-PRINCIPLES.md) | Human agency, consent, accountability and engineering constraints. |
+| [VirgoScorpio Hub Manifesto](VIRGOSCORPIO-HUB-MANIFESTO.md) | Project mission and human-AI symbiosis vision. |
+| [Engineering Principles](docs/VIRGOSCORPIO-HUB-PRINCIPLES.md) | Human agency, consent, accountability and engineering constraints. |
 | [Real-Time Foundation 1](docs/REALTIME-FOUNDATION-F1.md) | Developer-preview presence and event streaming foundation, with limitations. |
 | [Observability deployment contract](docs/OBSERVABILITY-DEPLOYMENT.md) | Vendor-neutral production OTLP deployment evidence and fail-closed validation. |
 | [Contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) | First clone, dependency install, basic checks, and service requirements. |
@@ -205,9 +205,9 @@ Please do not publish exploitable details or credentials in public issues. Follo
 
 ## License, attribution, and project identity
 
-SystemFabric's original project materials are attributed to **Golden Obsidian LLC**, with **Justin Harlan credited as original developer and founder**, subject to the actual ownership and rights applicable to each component. The project is licensed under **GNU GPL version 2 or, at your option, any later version**; see [`LICENSE`](LICENSE), [`COPYRIGHT`](COPYRIGHT), and [`NOTICE.md`](NOTICE.md).
+VirgoScorpio Hub's original project materials are attributed to **Golden Obsidian LLC**, with **Justin Harlan credited as original developer and founder**, subject to the actual ownership and rights applicable to each component. The project is licensed under **GNU GPL version 2 or, at your option, any later version**; see [`LICENSE`](LICENSE), [`COPYRIGHT`](COPYRIGHT), and [`NOTICE.md`](NOTICE.md).
 
-The software license does not grant blanket permission to use the SystemFabric or Golden Obsidian LLC names, logos, crest, or branding to imply official endorsement. See [`TRADEMARKS.md`](TRADEMARKS.md). Third-party and vendored components remain subject to their own applicable license terms.
+The software license does not grant blanket permission to use the VirgoScorpio Hub or Golden Obsidian LLC names, logos, crest, or branding to imply official endorsement. See [`TRADEMARKS.md`](TRADEMARKS.md). Third-party and vendored components remain subject to their own applicable license terms.
 
 ## Acknowledgements and documentation inspiration
 
@@ -216,6 +216,6 @@ The information architecture of this documentation refresh was informed by:
 - [Best-README-Template](https://github.com/othneildrew/Best-README-Template): a navigable README structure, clear project summary, setup/usage flow, roadmap, contribution entry points, license, acknowledgements, and reference-style links.
 - [awesome-readme](https://github.com/matiassingers/awesome-readme): examples that emphasize visual hierarchy, screenshots or diagrams where available, useful badges, concise introductions, feature examples, architecture explanations, and links to deeper documentation.
 
-This project uses those as **structural inspiration** and original SystemFabric-specific wording, not as a copied README template. Screenshots, demos, coverage badges, and benchmarks should be added only when the underlying assets or evidence exist.
+This project uses those as **structural inspiration** and original VirgoScorpio Hub-specific wording, not as a copied README template. Screenshots, demos, coverage badges, and benchmarks should be added only when the underlying assets or evidence exist.
 
 <p align="right"><a href="#readme-top">Back to top ↑</a></p>

@@ -14,7 +14,7 @@ const {
 const TEST_STRIPE_SECRET_KEY = ["sk", "test", "fixture_not_real"].join("_");
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === "true",
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === "true",
 );
 
 test(

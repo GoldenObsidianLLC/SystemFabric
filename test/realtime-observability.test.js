@@ -27,10 +27,10 @@ test('real-time metric registry is bounded, snapshots are isolated, and Promethe
   assert.throws(() => metrics.setGauge('active_subscriptions', -1), /finite and non-negative/);
 
   const output = metrics.renderPrometheus();
-  assert.match(output, /# TYPE systemfabric_realtime_events_published_total counter/);
-  assert.match(output, /systemfabric_realtime_events_published_total 2/);
-  assert.match(output, /systemfabric_realtime_event_lag_milliseconds_bucket\{le="25"\} 1/);
-  assert.match(output, /systemfabric_realtime_active_subscriptions 3/);
+  assert.match(output, /# TYPE virgoscorpio_hub_realtime_events_published_total counter/);
+  assert.match(output, /virgoscorpio_hub_realtime_events_published_total 2/);
+  assert.match(output, /virgoscorpio_hub_realtime_event_lag_milliseconds_bucket\{le="25"\} 1/);
+  assert.match(output, /virgoscorpio_hub_realtime_active_subscriptions 3/);
   assert.ok(output.endsWith('\n'));
   assert.doesNotMatch(output, new RegExp(SITE_ID));
 });
@@ -59,7 +59,7 @@ test('event hub records subscription, authorization, fan-out, lag, delivery and 
   allowed = false;
   await assert.rejects(
     hub.subscribe({ principal: { id: 'user-b' }, siteId: SITE_ID, topic: 'presence' }),
-    error => error.code === 'ERR_SYSTEMFABRIC_REALTIME_FORBIDDEN'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_REALTIME_FORBIDDEN'
   );
 
   const snapshot = metrics.snapshot();
@@ -98,11 +98,11 @@ test('API serves realtime metrics only through the existing bearer-protected met
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: 'developer-test-token',
-      SYSTEMFABRIC_DEFAULT_SITE_ID: SITE_ID,
-      SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-      SYSTEMFABRIC_METRICS_ENABLED: 'true',
-      SYSTEMFABRIC_METRICS_TOKEN: METRICS_TOKEN,
+      VIRGOSCORPIO_HUB_API_TOKEN: 'developer-test-token',
+      VIRGOSCORPIO_HUB_DEFAULT_SITE_ID: SITE_ID,
+      VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_METRICS_ENABLED: 'true',
+      VIRGOSCORPIO_HUB_METRICS_TOKEN: METRICS_TOKEN,
       AI_PROVIDER: 'mock',
       RATE_LIMIT_MAX_REQUESTS: '100'
     },
@@ -111,7 +111,7 @@ test('API serves realtime metrics only through the existing bearer-protected met
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   });
 
   const base = 'http://127.0.0.1:' + server.address().port;
@@ -134,13 +134,13 @@ test('API serves realtime metrics only through the existing bearer-protected met
   const reader = stream.body.getReader();
   const connected = await reader.read();
   assert.match(new TextDecoder().decode(connected.value), /connected/);
-  assert.equal(server.systemfabric.realtimeMetrics.gauges.active_sse_connections, 1);
+  assert.equal(server.virgoScorpioHub.realtimeMetrics.gauges.active_sse_connections, 1);
   controller.abort();
   await reader.cancel().catch(() => {});
-  for (let attempt = 0; attempt < 20 && server.systemfabric.realtimeMetrics.gauges.active_sse_connections !== 0; attempt++) {
+  for (let attempt = 0; attempt < 20 && server.virgoScorpioHub.realtimeMetrics.gauges.active_sse_connections !== 0; attempt++) {
     await new Promise(resolve => setTimeout(resolve, 5));
   }
-  assert.equal(server.systemfabric.realtimeMetrics.gauges.active_sse_connections, 0);
+  assert.equal(server.virgoScorpioHub.realtimeMetrics.gauges.active_sse_connections, 0);
 
   const unauthorized = await fetch(base + '/metrics');
   assert.equal(unauthorized.status, 401);
@@ -150,9 +150,9 @@ test('API serves realtime metrics only through the existing bearer-protected met
   });
   assert.equal(response.status, 200);
   const output = await response.text();
-  assert.match(output, /systemfabric_realtime_presence_heartbeats_total 1/);
-  assert.match(output, /systemfabric_realtime_events_published_total 1/);
-  assert.match(output, /systemfabric_realtime_sse_connections_opened_total 1/);
-  assert.match(output, /systemfabric_realtime_sse_connections_closed_total 1/);
-  assert.match(output, /systemfabric_http_requests_total/);
+  assert.match(output, /virgoscorpio_hub_realtime_presence_heartbeats_total 1/);
+  assert.match(output, /virgoscorpio_hub_realtime_events_published_total 1/);
+  assert.match(output, /virgoscorpio_hub_realtime_sse_connections_opened_total 1/);
+  assert.match(output, /virgoscorpio_hub_realtime_sse_connections_closed_total 1/);
+  assert.match(output, /virgoscorpio_hub_http_requests_total/);
 });

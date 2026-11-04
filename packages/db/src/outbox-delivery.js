@@ -12,7 +12,7 @@ const REPLAYABLE_STATUSES = new Set(['dead', 'processed']);
 function validateConsumerGroup(consumerGroup) {
   if (typeof consumerGroup !== 'string' || !CONSUMER_GROUP_PATTERN.test(consumerGroup)) {
     throw Object.assign(new TypeError('consumerGroup must be a lowercase identifier of 1-100 characters.'), {
-      code: 'ERR_SYSTEMFABRIC_CONSUMER_GROUP_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_GROUP_INVALID'
     });
   }
   return consumerGroup;
@@ -23,7 +23,7 @@ function validateEventTypes(eventTypes) {
       eventTypes.some(type => typeof type !== 'string' || type.length > 96 || !EVENT_TYPE_PATTERN.test(type)) ||
       new Set(eventTypes).size !== eventTypes.length) {
     throw Object.assign(new TypeError('eventTypes must contain 1-64 unique, valid event identifiers.'), {
-      code: 'ERR_SYSTEMFABRIC_CONSUMER_EVENT_TYPES_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_EVENT_TYPES_INVALID'
     });
   }
   return Object.freeze([...eventTypes].sort());
@@ -34,7 +34,7 @@ function createOutboxDeliveryWorker({
   consumerGroup,
   eventTypes,
   handler,
-  workerId = `sf-delivery-${randomUUID()}`,
+  workerId = `vsh-delivery-${randomUUID()}`,
   batchSize = 25,
   dispatchBatchSize = 250,
   leaseMs = 30_000,
@@ -68,7 +68,7 @@ function createOutboxDeliveryWorker({
     if (persisted.length !== subscribedEventTypes.length ||
         persisted.some((type, index) => type !== subscribedEventTypes[index])) {
       throw Object.assign(new Error('The persisted event subscription for this consumer group does not match worker configuration.'), {
-        code: 'ERR_SYSTEMFABRIC_CONSUMER_EVENT_TYPES_MISMATCH',
+        code: 'ERR_VIRGOSCORPIO_HUB_CONSUMER_EVENT_TYPES_MISMATCH',
         consumerGroup
       });
     }
@@ -158,8 +158,8 @@ function createOutboxDeliveryWorker({
     try {
       envelope = eventEnvelopeFromOutboxRow(event);
       await withSpan('outbox.process_event', {
-        'systemfabric.component': 'outbox',
-        'systemfabric.operation': event.event_type
+        'virgoscorpio_hub.component': 'outbox',
+        'virgoscorpio_hub.operation': event.event_type
       }, () => handler({
         type: event.event_type,
         payload: event.payload,
@@ -214,8 +214,8 @@ function createOutboxDeliveryWorker({
   return Object.freeze({
     async runOnce() {
       return withSpan('outbox.run_once', {
-        'systemfabric.component': 'outbox',
-        'systemfabric.operation': 'run_once'
+        'virgoscorpio_hub.component': 'outbox',
+        'virgoscorpio_hub.operation': 'run_once'
       }, async () => {
         await ensureConsumerGroup();
         const dispatched = await dispatchBatch();
@@ -243,13 +243,13 @@ async function replayOutboxDeliveries({ pool, consumerGroup, eventIds, statuses 
   if (!Array.isArray(eventIds) || eventIds.length < 1 || eventIds.length > 500 ||
       eventIds.some(id => typeof id !== 'string' || !UUID_PATTERN.test(id))) {
     throw Object.assign(new TypeError('eventIds must contain 1-500 valid UUIDs.'), {
-      code: 'ERR_SYSTEMFABRIC_REPLAY_EVENT_IDS_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_REPLAY_EVENT_IDS_INVALID'
     });
   }
   if (!Array.isArray(statuses) || statuses.length < 1 ||
       statuses.some(status => !REPLAYABLE_STATUSES.has(status))) {
     throw Object.assign(new TypeError('Only dead or processed deliveries may be replayed.'), {
-      code: 'ERR_SYSTEMFABRIC_REPLAY_STATUS_INVALID'
+      code: 'ERR_VIRGOSCORPIO_HUB_REPLAY_STATUS_INVALID'
     });
   }
   const result = await pool.query(

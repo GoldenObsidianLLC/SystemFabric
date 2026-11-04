@@ -1,4 +1,4 @@
-# SystemFabric 0.5.1 — Live Test Runner Summary Fix
+# VirgoScorpio Hub 0.5.1 — Live Test Runner Summary Fix
 
 ## Problem
 

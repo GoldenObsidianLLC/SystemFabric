@@ -1,4 +1,4 @@
--- SystemFabric 0.5.1: durable checkout inventory holds and recovery of pending orders.
+-- VirgoScorpio Hub 0.5.1: durable checkout inventory holds and recovery of pending orders.
 -- Reservation expiry is aligned to Stripe Checkout expiration; payment transitions
 -- commit reservations, while expiration/failure releases them only once.
 

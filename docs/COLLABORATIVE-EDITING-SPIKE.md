@@ -1,7 +1,7 @@
 # Collaborative Editing Spike (F1.7)
 
 **Status:** Architecture spike complete; collaboration engine not implemented
-**Scope:** Compare CRDT and operational transformation (OT) against the current SystemFabric page-document v1 model and select a provisional v1 direction.
+**Scope:** Compare CRDT and operational transformation (OT) against the current VirgoScorpio Hub page-document v1 model and select a provisional v1 direction.
 **Decision record:** ADR-019 in [Architecture Decisions](ARCHITECTURE-DECISIONS.md)
 **Related foundation:** [Real-Time Foundation 1](REALTIME-FOUNDATION-F1.md)
 

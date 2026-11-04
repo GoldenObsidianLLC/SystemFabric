@@ -11,7 +11,7 @@ const { migrationChecksum } = require('../../scripts/migration-checksum');
 
 const enabled = Boolean(
   process.env.DATABASE_URL &&
-  process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+  process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
 );
 
 const root = path.resolve(__dirname, '../..');
@@ -52,7 +52,7 @@ test(
     );
 
     const databaseName =
-      `systemfabric_upgrade_${crypto.randomUUID()
+      `virgoscorpio_hub_upgrade_${crypto.randomUUID()
         .replace(/-/g, '')
         .slice(0, 12)}_test`;
 
@@ -100,7 +100,7 @@ test(
 
       try {
         await client.query(`
-          CREATE TABLE systemfabric_schema_migrations (
+          CREATE TABLE virgoscorpio_hub_schema_migrations (
             version text PRIMARY KEY,
             sha256 text NOT NULL,
             applied_at timestamptz NOT NULL DEFAULT now()
@@ -120,7 +120,7 @@ test(
             await client.query(sql);
 
             await client.query(
-              `INSERT INTO systemfabric_schema_migrations(version, sha256)
+              `INSERT INTO virgoscorpio_hub_schema_migrations(version, sha256)
                VALUES($1, $2)`,
               [file, migrationChecksum(sql)]
             );
@@ -135,7 +135,7 @@ test(
         }
 
         const baseline = await client.query(
-          'SELECT count(*)::int AS count FROM systemfabric_schema_migrations'
+          'SELECT count(*)::int AS count FROM virgoscorpio_hub_schema_migrations'
         );
 
         assert.equal(baseline.rows[0].count, 8);
@@ -279,7 +279,7 @@ test(
 
         const registered = await verificationClient.query(
           `SELECT sha256
-             FROM systemfabric_schema_migrations
+             FROM virgoscorpio_hub_schema_migrations
             WHERE version = $1`,
           [targetMigration]
         );

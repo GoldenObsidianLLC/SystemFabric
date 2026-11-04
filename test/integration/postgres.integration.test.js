@@ -8,7 +8,7 @@ const { createAITaskStore } = require('../../packages/db/src/ai-task-store');
 const { createOutboxWorker } = require('../../packages/db/src/outbox-worker');
 const { eventEnvelopeFromOutboxRow } = require('../../packages/realtime/src/event-contract');
 
-const enabled = Boolean(process.env.DATABASE_URL && process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true');
+const enabled = Boolean(process.env.DATABASE_URL && process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true');
 
 test('PostgreSQL integration: revisions, publication snapshots, outbox, and site isolation', { skip: !enabled }, async t => {
   const pool = createPostgresPool({ DATABASE_URL: process.env.DATABASE_URL, DATABASE_POOL_MAX: '4' });
@@ -502,10 +502,10 @@ test('PostgreSQL integration: metadata-only AI task state is durable and actor/s
     taskId: queuedCancellation.id,
     siteId,
     status: 'cancelled',
-    errorCode: 'ERR_SYSTEMFABRIC_AI_CANCELLED'
+    errorCode: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED'
   });
   assert.equal(cancelled.status, 'cancelled');
-  assert.equal(cancelled.errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
+  assert.equal(cancelled.errorCode, 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED');
   assert.ok(cancelled.completedAt);
 
   const persisted = await pool.query('SELECT * FROM ai_tasks WHERE id=$1', [queued.id]);

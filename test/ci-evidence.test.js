@@ -16,8 +16,8 @@ const {
 } = require('../scripts/ci-evidence');
 
 const expected = {
-  repository: 'GoldenObsidianLLC/SystemFabric',
-  workflow: 'SystemFabric CI',
+  repository: 'GoldenObsidianLLC/VirgoScorpio-Hub',
+  workflow: 'VirgoScorpio Hub CI',
   eventName: 'pull_request',
   runId: '123456789',
   runAttempt: 2,
@@ -32,7 +32,7 @@ function write(root, relativePath, value) {
 }
 
 function createFixtures(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'systemfabric-ci-evidence-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'virgoscorpio_hub-ci-evidence-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const artifactRoot = path.join(root, 'artifacts', 'ci-evidence');
   fs.mkdirSync(artifactRoot, { recursive: true });
@@ -46,7 +46,7 @@ function createFixtures(t) {
   readinessChecks.push({ id: 'integration-tests', status: 'PARTIAL' });
   const readiness = {
     schemaVersion: 1,
-    product: 'SystemFabric',
+    product: 'VirgoScorpio Hub',
     version: '0.5.1',
     sourceRevision: expected.mergeSha,
     sourceTree: { clean: true, changedPaths: [], approvedGeneratedPaths: [], blockingPaths: [] },
@@ -58,7 +58,7 @@ function createFixtures(t) {
   const sbom = {
     bomFormat: 'CycloneDX',
     specVersion: '1.6',
-    metadata: { component: { purl: 'pkg:npm/systemfabric@0.5.1' } },
+    metadata: { component: { purl: 'pkg:npm/virgoscorpio-hub@0.5.1' } },
     components: [{ name: 'fixture', version: '1.0.0' }],
     dependencies: [],
   };
@@ -66,8 +66,8 @@ function createFixtures(t) {
     if (file.endsWith('release-readiness.json')) write(root, file, readiness);
     else if (file.endsWith('.cdx.json')) write(root, file, sbom);
     else if (file.endsWith('.md')) write(root, file, '# Candidate readiness\n');
-    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'systemfabric', version: '0.5.1', lockfileVersion: 3 });
-    else if (file.endsWith('artifact-check.log')) write(root, file, 'SystemFabric artifact check passed (157 required paths).\n');
+    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'virgoscorpio-hub', version: '0.5.1', lockfileVersion: 3 });
+    else if (file.endsWith('artifact-check.log')) write(root, file, 'VirgoScorpio Hub artifact check passed (157 required paths).\n');
     else if (file.endsWith('unit-tests.tap.log') || file.endsWith('enginex-tests.tap.log')) {
       write(root, file, ['TAP version 13', '# tests 8', '# pass 8', '# fail 0', '# cancelled 0', '# skipped 0', '# todo 0'].join('\n'));
     } else if (file.endsWith('integration-tests.tap.log')) {
@@ -153,7 +153,7 @@ function createFixtures(t) {
     path: WORKFLOW_FILE,
     repository: { full_name: expected.repository },
     pull_requests: [],
-    html_url: 'https://github.com/GoldenObsidianLLC/SystemFabric/actions/runs/123456789',
+    html_url: 'https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/123456789',
   };
   return { root, artifactRoot, jobApi, runApi };
 }

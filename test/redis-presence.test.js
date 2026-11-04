@@ -60,7 +60,7 @@ test('Redis presence uses site-hash-tagged lease and index keys with opaque sess
   assert.match(call.script, /SET.*PX/);
   assert.match(call.script, /ZADD/);
   assert.match(call.script, /PEXPIREAT/);
-  assert.equal(DEFAULT_KEY_PREFIX, 'systemfabric:presence:v1');
+  assert.equal(DEFAULT_KEY_PREFIX, 'virgoscorpio_hub:presence:v1');
   await adapter.close();
 });
 
@@ -139,7 +139,7 @@ test('Redis presence maps per-site capacity rejection to a bounded service error
     availability: 'active',
     lastSeenAtMs: Date.now(),
     expiresAtMs: Date.now() + 30_000
-  }), { code: 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY', statusCode: 503 });
+  }), { code: 'ERR_VIRGOSCORPIO_HUB_PRESENCE_CAPACITY', statusCode: 503 });
   await adapter.close();
 });
 
@@ -147,13 +147,13 @@ test('Redis presence fails closed on store errors and invalid scopes', async () 
   const client = fakeClient({ error: Object.assign(new Error('private connection detail'), { code: 'ECONNRESET' }) });
   const adapter = createRedisPresenceAdapter({ client });
   await assert.rejects(() => adapter.listBySite({ siteId: SITE_A }), error =>
-    error.code === 'ERR_SYSTEMFABRIC_PRESENCE_STORE_UNAVAILABLE' &&
+    error.code === 'ERR_VIRGOSCORPIO_HUB_PRESENCE_STORE_UNAVAILABLE' &&
     error.statusCode === 503 &&
     !error.message.includes('private connection detail')
   );
   await assert.rejects(() => adapter.remove({
     siteId: SITE_A, principalId: 'user-a', sessionId: 'session\r\n-injection'
-  }), { code: 'ERR_SYSTEMFABRIC_PRESENCE_SCOPE_INVALID' });
+  }), { code: 'ERR_VIRGOSCORPIO_HUB_PRESENCE_SCOPE_INVALID' });
   await adapter.close();
 });
 

@@ -29,7 +29,7 @@ test('sign-in form exposes labels, landmark structure, status messages, and keyb
 test('Platform Hub contains labeled form controls and live status regions', async ({ page }) => {
   await page.route('**/api/v1/auth/me', route => route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Unauthenticated' }) }));
   await page.goto('/platform');
-  await expect(page).toHaveTitle('SystemFabric Platform Hub');
+  await expect(page).toHaveTitle('VirgoScorpio Hub Platform Hub');
   await expect(page.getByRole('heading', { name: 'One platform, connected services.' })).toBeVisible();
   const unlabeled = await page.locator('input:not([type="hidden"]), select, textarea').evaluateAll(elements => elements.filter(el => {
     if (el.disabled || el.closest('[hidden], .hidden')) return false;

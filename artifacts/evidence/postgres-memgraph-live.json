@@ -2,7 +2,7 @@
   "status": "passed",
   "executedAt": "2026-10-31T21:00:59.879Z",
   "command": "npm run test:migrations:fresh; npm run test:integration:live; isolated Memgraph outage/recovery; npm run test:graph:rebuild; current-main GitHub Actions run 41232584439",
-  "environment": "Windows x64, Node.js 26.12.1; isolated PostgreSQL systemfabric_test and disposable fresh-migration database; Memgraph 3.13.1; loopback Memurai/Redis. Current-main hosted CI also passed on Ubuntu with Node.js 22.23.4 and 24.22.1; this is test evidence only.",
+  "environment": "Windows x64, Node.js 26.12.1; isolated PostgreSQL virgoscorpio_hub_test and disposable fresh-migration database; Memgraph 3.13.1; loopback Memurai/Redis. Current-main hosted CI also passed on Ubuntu with Node.js 22.23.4 and 24.22.1; this is test evidence only.",
   "artifacts": [
     "artifacts/evidence/fresh-migrations.json",
     "artifacts/evidence/integration-live.json",

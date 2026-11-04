@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://systemfabric.invalid/schemas/cpt-definition.schema.json",
-  "title": "SystemFabric Custom Content Type Definition v1",
+  "$id": "https://virgoscorpio-hub.invalid/schemas/cpt-definition.schema.json",
+  "title": "VirgoScorpio Hub Custom Content Type Definition v1",
   "type": "object",
   "additionalProperties": false,
   "required": ["apiVersion", "name", "label", "source", "version", "fields", "capabilities", "publicationPolicy"],

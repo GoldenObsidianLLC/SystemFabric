@@ -19,7 +19,7 @@ function dedicatedTestDatabaseUrl(value) {
 }
 
 const databaseUrl = process.env.TEST_DATABASE_URL || '';
-const enabled = process.env.SYSTEMFABRIC_RUN_POSTGRES_INTEGRATION === 'true'
+const enabled = process.env.VIRGOSCORPIO_HUB_RUN_POSTGRES_INTEGRATION === 'true'
   && dedicatedTestDatabaseUrl(databaseUrl);
 
 test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and draft-only', {
@@ -109,7 +109,7 @@ test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and
         siteId: siteA, contentId: saved.id, actorId: authorId,
         operation: { ...firstOperation, payload: { ...firstOperation.payload, value: 3 } }
       }),
-      error => error.code === 'ERR_SYSTEMFABRIC_COLLABORATION_OP_ID_REUSE'
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_OP_ID_REUSE'
     );
 
     const second = await store.applyCollaborationOperation({
@@ -130,7 +130,7 @@ test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and
 
     await assert.rejects(
       store.getCollaborationSync({ siteId: siteB, contentId: saved.id, afterSequence: 0 }),
-      error => error.code === 'ERR_SYSTEMFABRIC_CONTENT_NOT_FOUND'
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND'
     );
 
     // Seed a full replay window to exercise the exact pruning boundary without
@@ -221,7 +221,7 @@ test('PostgreSQL collaboration operations are atomic, idempotent, sequenced, and
         siteId: siteA, contentId: saved.id, actorId: authorId,
         operation: { ...finalOperation, opId: randomUUID(), baseSequence: 1002 }
       }),
-      error => error.code === 'ERR_SYSTEMFABRIC_COLLABORATION_NOT_DRAFT'
+      error => error.code === 'ERR_VIRGOSCORPIO_HUB_COLLABORATION_NOT_DRAFT'
     );
 
     const restored = await store.rejectReview({

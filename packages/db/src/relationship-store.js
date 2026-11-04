@@ -7,8 +7,8 @@ function createRelationshipStore({ pool }) {
   if (!pool) throw new TypeError('PostgreSQL pool is required.');
   return Object.freeze({
     async upsert({ siteId, sourceId, targetId, kind, metadata = {}, actorId = null, correlationId = null }) {
-      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_SYSTEMFABRIC_RELATION_KIND' });
-      if (sourceId === targetId) throw Object.assign(new Error('Self relationships are not allowed.'), { code: 'ERR_SYSTEMFABRIC_RELATION_SELF' });
+      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
+      if (sourceId === targetId) throw Object.assign(new Error('Self relationships are not allowed.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_SELF' });
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -30,7 +30,7 @@ function createRelationshipStore({ pool }) {
       finally { client.release(); }
     },
     async delete({ siteId, sourceId, targetId, kind, actorId = null, correlationId = null }) {
-      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_SYSTEMFABRIC_RELATION_KIND' });
+      if (!ALLOWED_KINDS.has(kind)) throw Object.assign(new Error('Unsupported relation kind.'), { code: 'ERR_VIRGOSCORPIO_HUB_RELATION_KIND' });
       const client = await pool.connect();
       try {
         await client.query('BEGIN');

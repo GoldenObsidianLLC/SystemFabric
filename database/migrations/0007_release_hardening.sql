@@ -1,4 +1,4 @@
--- SystemFabric 0.5.0: upload malware-scan lifecycle and community abuse workflows.
+-- VirgoScorpio Hub 0.5.0: upload malware-scan lifecycle and community abuse workflows.
 -- Forward-only migration. Existing assets are explicitly marked not_scanned; they
 -- are not automatically declared clean by this schema change.
 ALTER TABLE library_assets
@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS commerce_download_entitlements (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(order_item_id,asset_id)
 );
-CREATE TABLE IF NOT EXISTS systemfabric_moderation_actions (
+CREATE TABLE IF NOT EXISTS virgoscorpio_hub_moderation_actions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   site_id uuid NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
   actor_id uuid REFERENCES users(id) ON DELETE SET NULL,
@@ -145,5 +145,5 @@ CREATE TABLE IF NOT EXISTS systemfabric_moderation_actions (
   reason text NOT NULL DEFAULT '' CHECK(length(reason) <= 2000),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS systemfabric_moderation_target_idx
-  ON systemfabric_moderation_actions(site_id,target_type,target_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS virgoscorpio_hub_moderation_target_idx
+  ON virgoscorpio_hub_moderation_actions(site_id,target_type,target_id,created_at DESC);

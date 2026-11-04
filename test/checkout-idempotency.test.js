@@ -19,7 +19,7 @@ function context({ actorId = ownerId, existingStatus = 'pending_payment', metada
   const ctx = {
     req: { method: 'POST', headers: {} },
     res: {},
-    url: new URL(`http://systemfabric.local/api/v1/sites/${siteId}/commerce/checkout`),
+    url: new URL(`http://virgoscorpio-hub.local/api/v1/sites/${siteId}/commerce/checkout`),
     actor: { user: { id: actorId, email: actorId === ownerId ? 'owner@example.test' : 'other@example.test' } },
     localPool: {
       async query(sql, values) {
@@ -56,13 +56,13 @@ test('checkout idempotency replay returns a sanitized order view and saved check
 
 test('checkout idempotency keys cannot disclose another customer order', async () => {
   const { ctx, calls } = context({ actorId: otherId });
-  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 404 && error.code === 'ERR_SYSTEMFABRIC_CHECKOUT_ORDER_NOT_FOUND');
+  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 404 && error.code === 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_ORDER_NOT_FOUND');
   assert.equal(calls.length, 1);
 });
 
 test('closed checkout idempotency keys return a conflict instead of a null checkout link', async () => {
   const { ctx } = context({ existingStatus: 'failed', metadata: {} });
-  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 409 && error.code === 'ERR_SYSTEMFABRIC_CHECKOUT_KEY_CLOSED');
+  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 409 && error.code === 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_KEY_CLOSED');
 });
 
 test('recovered paid-order replay does not return embedded customer or internal snapshot data', async () => {
@@ -114,7 +114,7 @@ test('pending checkout recovery replays the saved Stripe request with the same i
     assert.equal(handled, true);
     assert.equal(ctx.res.statusCode, 200);
     assert.equal(ctx.res.payload.checkoutUrl, 'https://checkout.example.test/cs_recovered');
-    assert.equal(providerHeaders['idempotency-key'], 'sf_1d69eb5b-e8c7-48d7-a041-b67438983f6a');
+    assert.equal(providerHeaders['idempotency-key'], 'vsh_1d69eb5b-e8c7-48d7-a041-b67438983f6a');
     assert.equal(providerForm.get('expires_at'), String(checkoutExpiresAt));
     assert.equal(providerForm.get('line_items[0][price_data][unit_amount]'), '123');
     assert.equal(providerForm.get('line_items[0][price_data][product_data][description]'), 'SKU RES-1');
@@ -139,5 +139,5 @@ test('pending checkout recovery refuses to recreate a Stripe session after stock
     if (sql.includes('FROM commerce_stock_reservations')) return { rows: [{ count: 0 }] };
     throw new Error(`unexpected query: ${sql}`);
   } });
-  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 409 && error.code === 'ERR_SYSTEMFABRIC_CHECKOUT_STOCK_HOLD');
+  await assert.rejects(handlePlatformRoute(ctx), error => error.statusCode === 409 && error.code === 'ERR_VIRGOSCORPIO_HUB_CHECKOUT_STOCK_HOLD');
 });

@@ -14,8 +14,8 @@ async function createQuotaPair(url, keyPrefix) {
   ]);
 }
 
-const enabled = process.env.SYSTEMFABRIC_RUN_REDIS_INTEGRATION === 'true' &&
-  Boolean(process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL);
+const enabled = process.env.VIRGOSCORPIO_HUB_RUN_REDIS_INTEGRATION === 'true' &&
+  Boolean(process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL);
 const SITE_A = '11111111-1111-4111-8111-111111111111';
 const SITE_B = '22222222-2222-4222-8222-222222222222';
 
@@ -23,10 +23,10 @@ test('Redis integration: two service instances share session leases, site isolat
   skip: !enabled
 }, async t => {
   let now = Date.now();
-  const keyPrefix = `systemfabric:presence:it:${randomUUID().replaceAll('-', '')}`;
+  const keyPrefix = `virgoscorpio_hub:presence:it:${randomUUID().replaceAll('-', '')}`;
   const expired = [];
   const options = {
-    url: process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL,
+    url: process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL,
     keyPrefix,
     leaseMs: 5_000,
     maxEntriesPerSite: 3,
@@ -67,7 +67,7 @@ test('Redis integration: two service instances share session leases, site isolat
 
   await assert.rejects(() => presenceA.heartbeat({
     siteId: SITE_A, principalId: 'presence-user-d', sessionId: 'device-five', availability: 'active'
-  }), { code: 'ERR_SYSTEMFABRIC_PRESENCE_CAPACITY' });
+  }), { code: 'ERR_VIRGOSCORPIO_HUB_PRESENCE_CAPACITY' });
 
   // A leave on replica B immediately changes the shared snapshot read by replica A.
   await presenceB.leave({ siteId: SITE_A, principalId: 'presence-user-a', sessionId: 'device-one' });
@@ -87,9 +87,9 @@ test('Redis integration: two service instances share session leases, site isolat
 test('Redis API integration: heartbeat on one API instance is visible from another instance', {
   skip: !enabled
 }, async t => {
-  const keyPrefix = `systemfabric:presence:api-it:${randomUUID().replaceAll('-', '')}`;
+  const keyPrefix = `virgoscorpio_hub:presence:api-it:${randomUUID().replaceAll('-', '')}`;
   const options = {
-    url: process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL,
+    url: process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL,
     keyPrefix,
     leaseMs: 10_000
   };
@@ -97,18 +97,18 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
   const presenceB = await createRedisPresenceService(options);
   const [quotaA, quotaB] = await createQuotaPair(
     options.url,
-    `systemfabric:realtime:quota:presence-api-it:${randomUUID().replaceAll('-', '')}`
+    `virgoscorpio_hub:realtime:quota:presence-api-it:${randomUUID().replaceAll('-', '')}`
   );
   const { createRedisRealtimeBridge } = require('../../packages/realtime/src/redis-realtime');
-  const bridgePrefix = 'systemfabric:realtime:api-snapshot-it:' + randomUUID().replaceAll('-', '');
+  const bridgePrefix = 'virgoscorpio_hub:realtime:api-snapshot-it:' + randomUUID().replaceAll('-', '');
   const bridgeA = await createRedisRealtimeBridge({ url: options.url, channelPrefix: bridgePrefix });
   const bridgeB = await createRedisRealtimeBridge({ url: options.url, channelPrefix: bridgePrefix });
   const { createApiServer } = require('../../apps/api/src/server');
   const sharedEnv = {
     NODE_ENV: 'test',
-    SYSTEMFABRIC_API_TOKEN: 'redis-presence-api-test-token',
-    SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-    SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+    VIRGOSCORPIO_HUB_API_TOKEN: 'redis-presence-api-test-token',
+    VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+    VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
     AI_PROVIDER: 'mock',
     MAX_REQUEST_BYTES: '16384',
     RATE_LIMIT_MAX_REQUESTS: '100'
@@ -127,7 +127,7 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
     realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
-  await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
+  await Promise.all([serverA.virgoScorpioHub.ready(), serverB.virgoScorpioHub.ready()]);
   await Promise.all([
     new Promise(resolve => serverA.listen(0, '127.0.0.1', resolve)),
     new Promise(resolve => serverB.listen(0, '127.0.0.1', resolve))
@@ -138,8 +138,8 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
       new Promise(resolve => serverB.close(resolve))
     ]);
     await Promise.all([
-      serverA.systemfabric.close(),
-      serverB.systemfabric.close()
+      serverA.virgoScorpioHub.close(),
+      serverB.virgoScorpioHub.close()
     ]);
   });
 
@@ -152,8 +152,8 @@ test('Redis API integration: heartbeat on one API instance is visible from anoth
     { method: 'POST', headers, body: JSON.stringify({ availability: 'active' }) }
   );
   assert.equal(heartbeat.status, 200);
-  assert.equal(serverA.systemfabric.presenceStore, 'redis');
-  assert.equal(serverB.systemfabric.presenceStore, 'redis');
+  assert.equal(serverA.virgoScorpioHub.presenceStore, 'redis');
+  assert.equal(serverB.virgoScorpioHub.presenceStore, 'redis');
 
   const snapshot = await fetch(
     `http://127.0.0.1:${serverB.address().port}/api/v1/sites/${SITE_A}/presence`,
@@ -171,9 +171,9 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
   skip: !enabled
 }, async t => {
   const suffix = randomUUID().replaceAll('-', '');
-  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
-  const channelPrefix = 'systemfabric:realtime:api-it:' + suffix;
-  const keyPrefix = 'systemfabric:presence:api-it:' + suffix;
+  const redisUrl = process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL;
+  const channelPrefix = 'virgoscorpio_hub:realtime:api-it:' + suffix;
+  const keyPrefix = 'virgoscorpio_hub:presence:api-it:' + suffix;
   let now = Date.now();
   const bridgeA = await require('../../packages/realtime/src/redis-realtime').createRedisRealtimeBridge({
     url: redisUrl,
@@ -202,14 +202,14 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
   });
   const [quotaA, quotaB] = await createQuotaPair(
     redisUrl,
-    `systemfabric:realtime:quota:presence-sse-it:${suffix}`
+    `virgoscorpio_hub:realtime:quota:presence-sse-it:${suffix}`
   );
   const { createApiServer } = require('../../apps/api/src/server');
   const sharedEnv = {
     NODE_ENV: 'test',
-    SYSTEMFABRIC_API_TOKEN: 'redis-realtime-api-test-token',
-    SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-    SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+    VIRGOSCORPIO_HUB_API_TOKEN: 'redis-realtime-api-test-token',
+    VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+    VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
     AI_PROVIDER: 'mock',
     MAX_REQUEST_BYTES: '16384',
     RATE_LIMIT_MAX_REQUESTS: '100'
@@ -228,7 +228,7 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
     realtimeConnectionLimiter: quotaB,
     logger: { error() {} }
   });
-  await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
+  await Promise.all([serverA.virgoScorpioHub.ready(), serverB.virgoScorpioHub.ready()]);
   await Promise.all([
     new Promise(resolve => serverA.listen(0, '127.0.0.1', resolve)),
     new Promise(resolve => serverB.listen(0, '127.0.0.1', resolve))
@@ -310,8 +310,8 @@ test('Redis Pub/Sub API integration: cross-instance SSE fan-out, site isolation 
       new Promise(resolve => serverB.close(resolve))
     ]);
     await Promise.all([
-      serverA.systemfabric.close(),
-      serverB.systemfabric.close()
+      serverA.virgoScorpioHub.close(),
+      serverB.virgoScorpioHub.close()
     ]);
   }
 });
@@ -321,8 +321,8 @@ test('Redis authorization integration: membership and session invalidations clos
   skip: !enabled
 }, async t => {
   const suffix = randomUUID().replaceAll('-', '');
-  const redisUrl = process.env.SYSTEMFABRIC_PRESENCE_REDIS_URL;
-  const channelPrefix = 'systemfabric:realtime:authz-it:' + suffix;
+  const redisUrl = process.env.VIRGOSCORPIO_HUB_PRESENCE_REDIS_URL;
+  const channelPrefix = 'virgoscorpio_hub:realtime:authz-it:' + suffix;
   const bridgeA = await require('../../packages/realtime/src/redis-realtime').createRedisRealtimeBridge({
     url: redisUrl,
     channelPrefix
@@ -348,12 +348,12 @@ test('Redis authorization integration: membership and session invalidations clos
   const presenceService = { async heartbeat() {}, async leave() {}, async close() {} };
   const [quotaA, quotaB] = await createQuotaPair(
     redisUrl,
-    `systemfabric:realtime:quota:authz-it:${suffix}`
+    `virgoscorpio_hub:realtime:quota:authz-it:${suffix}`
   );
   const sharedEnv = {
     NODE_ENV: 'test',
-    SYSTEMFABRIC_REALTIME_ENABLED: 'true',
-    SYSTEMFABRIC_PRESENCE_STORE: 'redis',
+    VIRGOSCORPIO_HUB_REALTIME_ENABLED: 'true',
+    VIRGOSCORPIO_HUB_PRESENCE_STORE: 'redis',
     AI_PROVIDER: 'mock',
     MAX_REQUEST_BYTES: '16384',
     RATE_LIMIT_MAX_REQUESTS: '100'
@@ -361,7 +361,7 @@ test('Redis authorization integration: membership and session invalidations clos
   const { createApiServer } = require('../../apps/api/src/server');
   const serverA = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeA, realtimeConnectionLimiter: quotaA, logger: { error() {} } });
   const serverB = createApiServer({ env: sharedEnv, identityService, presenceService, realtimeBridge: bridgeB, realtimeConnectionLimiter: quotaB, logger: { error() {} } });
-  await Promise.all([serverA.systemfabric.ready(), serverB.systemfabric.ready()]);
+  await Promise.all([serverA.virgoScorpioHub.ready(), serverB.virgoScorpioHub.ready()]);
   await Promise.all([
     new Promise(resolve => serverA.listen(0, '127.0.0.1', resolve)),
     new Promise(resolve => serverB.listen(0, '127.0.0.1', resolve))
@@ -411,6 +411,6 @@ test('Redis authorization integration: membership and session invalidations clos
       new Promise(resolve => serverA.close(resolve)),
       new Promise(resolve => serverB.close(resolve))
     ]);
-    await Promise.all([serverA.systemfabric.close(), serverB.systemfabric.close()]);
+    await Promise.all([serverA.virgoScorpioHub.close(), serverB.virgoScorpioHub.close()]);
   }
 });

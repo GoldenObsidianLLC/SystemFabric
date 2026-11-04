@@ -25,7 +25,7 @@ async function withServer(fn, envExtra = {}, logger = { error() {} }) {
   const server = createApiServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_API_TOKEN: API_TOKEN,
+      VIRGOSCORPIO_HUB_API_TOKEN: API_TOKEN,
       AI_PROVIDER: 'mock',
       MAX_REQUEST_BYTES: '16384',
       RATE_LIMIT_MAX_REQUESTS: '100',
@@ -38,7 +38,7 @@ async function withServer(fn, envExtra = {}, logger = { error() {} }) {
     await fn('http://127.0.0.1:' + server.address().port);
   } finally {
     await new Promise(resolve => server.close(resolve));
-    await server.systemfabric.close();
+    await server.virgoScorpioHub.close();
   }
 }
 
@@ -112,7 +112,7 @@ test('structured logger allow-lists correlation fields and excludes unapproved d
   const records = [];
   const output = createStructuredLogger({
     logger: { info: line => records.push(JSON.parse(line)) },
-    service: 'systemfabric-api',
+    service: 'virgoscorpio-hub-api',
     environment: 'test',
     accessLogsEnabled: true,
     now: () => Date.UTC(2026, 10, 1)
@@ -134,7 +134,7 @@ test('structured logger allow-lists correlation fields and excludes unapproved d
 
   assert.equal(records.length, 1);
   const record = records[0];
-  assert.equal(record.event, 'systemfabric.http.request_completed');
+  assert.equal(record.event, 'virgoscorpio_hub.http.request_completed');
   assert.equal(record.traceId, context.traceId);
   assert.equal(record.spanId, context.spanId);
   assert.equal(record.requestId, 'request-5678');
@@ -168,9 +168,9 @@ test('API starts a new trace by default and emits privacy-safe completion record
     assert.match(traceId, /^[0-9a-f]{32}$/);
     assert.notEqual(traceId, TRACE_ID);
     await response.arrayBuffer();
-  }, { SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED: 'true' }, logger);
+  }, { VIRGOSCORPIO_HUB_HTTP_ACCESS_LOGS_ENABLED: 'true' }, logger);
 
-  const completed = records.find(record => record.event === 'systemfabric.http.request_completed');
+  const completed = records.find(record => record.event === 'virgoscorpio_hub.http.request_completed');
   assert.ok(completed);
   assert.equal(completed.requestId, 'request-5678');
   assert.notEqual(completed.traceId, TRACE_ID);
@@ -193,11 +193,11 @@ test('API accepts a remote traceparent only behind the explicit trusted-ingress 
     assert.equal(response.headers.get('x-trace-id'), TRACE_ID);
     await response.arrayBuffer();
   }, {
-    SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE: 'true',
-    SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED: 'true'
+    VIRGOSCORPIO_HUB_TRACE_CONTEXT_TRUST_REMOTE: 'true',
+    VIRGOSCORPIO_HUB_HTTP_ACCESS_LOGS_ENABLED: 'true'
   }, logger);
 
-  const completed = records.find(record => record.event === 'systemfabric.http.request_completed');
+  const completed = records.find(record => record.event === 'virgoscorpio_hub.http.request_completed');
   assert.equal(completed.traceId, TRACE_ID);
   assert.equal(completed.parentSpanId, PARENT_SPAN_ID);
   assert.notEqual(completed.spanId, PARENT_SPAN_ID);
@@ -218,17 +218,17 @@ test('API error records carry trace correlation without raw messages or route id
     });
     assert.equal(response.status, 400);
     const body = await response.json();
-    assert.equal(body.code, 'ERR_SYSTEMFABRIC_INVALID_JSON');
+    assert.equal(body.code, 'ERR_VIRGOSCORPIO_HUB_INVALID_JSON');
   }, {
-    SYSTEMFABRIC_TRACE_CONTEXT_TRUST_REMOTE: 'true',
-    SYSTEMFABRIC_HTTP_ACCESS_LOGS_ENABLED: 'true'
+    VIRGOSCORPIO_HUB_TRACE_CONTEXT_TRUST_REMOTE: 'true',
+    VIRGOSCORPIO_HUB_HTTP_ACCESS_LOGS_ENABLED: 'true'
   }, logger);
 
-  const errorRecord = records.find(record => record.event === 'systemfabric.http.error');
+  const errorRecord = records.find(record => record.event === 'virgoscorpio_hub.http.error');
   assert.ok(errorRecord);
   assert.equal(errorRecord.traceId, TRACE_ID);
   assert.equal(errorRecord.route, '/api/v1/ai');
-  assert.equal(errorRecord.code, 'ERR_SYSTEMFABRIC_INVALID_JSON');
+  assert.equal(errorRecord.code, 'ERR_VIRGOSCORPIO_HUB_INVALID_JSON');
   assert.equal('message' in errorRecord, false);
   assert.doesNotMatch(JSON.stringify(errorRecord), /invalid-json|content-assist/);
 });
@@ -267,8 +267,8 @@ test('authenticated plugin-runner hop continues the trace and emits correlated s
   const server = createPluginRunnerServer({
     env: {
       NODE_ENV: 'test',
-      SYSTEMFABRIC_PLUGIN_RUNNER_TOKEN: token,
-      SYSTEMFABRIC_PLUGIN_ALLOWED_IMAGES: imageDigest
+      VIRGOSCORPIO_HUB_PLUGIN_RUNNER_TOKEN: token,
+      VIRGOSCORPIO_HUB_PLUGIN_ALLOWED_IMAGES: imageDigest
     },
     runner: { async invoke() { return { completed: true }; } },
     logger: { info: line => records.push(JSON.parse(line)), error: line => records.push(JSON.parse(line)) }
@@ -301,7 +301,7 @@ test('authenticated plugin-runner hop continues the trace and emits correlated s
     await new Promise(resolve => server.close(resolve));
   }
 
-  const invocation = records.find(record => record.event === 'systemfabric.plugin_runner.invocation_completed');
+  const invocation = records.find(record => record.event === 'virgoscorpio_hub.plugin_runner.invocation_completed');
   assert.ok(invocation);
   assert.equal(invocation.traceId, TRACE_ID);
   assert.equal(invocation.parentSpanId, PARENT_SPAN_ID);

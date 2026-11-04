@@ -16,7 +16,7 @@ async function processBatch(pool, {
 } = {}) {
   const log = structuredLogger || createStructuredLogger({
     logger,
-    service: 'systemfabric-mail-worker',
+    service: 'virgoscorpio_hub-mail-worker',
     environment: env.NODE_ENV || 'development'
   });
   const started = clock();
@@ -41,17 +41,17 @@ async function processBatch(pool, {
     } catch (error) {
       const attempts = Number(row.attempts || 0) + 1;
       const terminal = attempts >= 8 ||
-        error.code === 'ERR_SYSTEMFABRIC_MAIL_REJECTED' ||
-        error.code === 'ERR_SYSTEMFABRIC_MAIL_PROVIDER' ||
-        error.code === 'ERR_SYSTEMFABRIC_MAIL_CONFIG' ||
-        error.code === 'ERR_SYSTEMFABRIC_MAIL_DISABLED';
+        error.code === 'ERR_VIRGOSCORPIO_HUB_MAIL_REJECTED' ||
+        error.code === 'ERR_VIRGOSCORPIO_HUB_MAIL_PROVIDER' ||
+        error.code === 'ERR_VIRGOSCORPIO_HUB_MAIL_CONFIG' ||
+        error.code === 'ERR_VIRGOSCORPIO_HUB_MAIL_DISABLED';
       const delayMs = Math.min(6 * 60 * 60_000, 1_000 * (2 ** Math.min(attempts, 14)));
-      const errorCode = error.code || 'ERR_SYSTEMFABRIC_MAIL_FAILED';
+      const errorCode = error.code || 'ERR_VIRGOSCORPIO_HUB_MAIL_FAILED';
       await pool.query(
         "UPDATE mail_outbox SET status=$2,attempts=$3,available_at=now()+($4 * interval '1 millisecond'),last_error_code=$5,locked_at=NULL WHERE id=$1",
         [row.id, terminal ? 'failed' : 'pending', attempts, delayMs, errorCode]
       );
-      log.emit('error', 'systemfabric.mail.delivery_failure', {
+      log.emit('error', 'virgoscorpio_hub.mail.delivery_failure', {
         component: 'mail',
         operation: 'delivery',
         code: errorCode,
@@ -71,14 +71,14 @@ async function main() {
   const serviceVersion = require('../../../package.json').version;
   const tracingRuntime = initializeTracing({
     env: process.env,
-    serviceName: 'systemfabric-mail-worker',
+    serviceName: 'virgoscorpio_hub-mail-worker',
     serviceVersion
   });
   let logRuntime;
   try {
     logRuntime = initializeLogExport({
       env: process.env,
-      serviceName: 'systemfabric-mail-worker',
+      serviceName: 'virgoscorpio_hub-mail-worker',
       serviceVersion
     });
   } catch (error) {
@@ -88,7 +88,7 @@ async function main() {
   const structuredLogger = createStructuredLogger({
     logger: console,
     otelLogger: logRuntime.logger,
-    service: 'systemfabric-mail-worker',
+    service: 'virgoscorpio_hub-mail-worker',
     environment: process.env.NODE_ENV || 'development'
   });
   let pool = null;
@@ -104,7 +104,7 @@ async function main() {
     const shutdown = () => { stopping = true; };
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
-    structuredLogger.emit('info', 'systemfabric.mail_worker.started', {
+    structuredLogger.emit('info', 'virgoscorpio_hub.mail_worker.started', {
       component: 'mail', operation: 'startup', outcome: 'success'
     });
     await run();
@@ -122,10 +122,10 @@ async function main() {
 
 if (require.main === module) void main().catch(error => {
   const bootstrapLogger = createStructuredLogger({
-    service: 'systemfabric-mail-worker',
+    service: 'virgoscorpio_hub-mail-worker',
     environment: process.env.NODE_ENV || 'development'
   });
-  bootstrapLogger.emit('error', 'systemfabric.mail_worker.start_failed', {
+  bootstrapLogger.emit('error', 'virgoscorpio_hub.mail_worker.start_failed', {
     component: 'mail',
     operation: 'startup',
     outcome: 'failure',

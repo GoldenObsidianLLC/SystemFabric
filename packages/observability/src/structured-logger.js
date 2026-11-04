@@ -19,7 +19,7 @@ const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
 const TRACE_ID_RE = /^[0-9a-f]{32}$/;
 const SPAN_ID_RE = /^[0-9a-f]{16}$/;
 const ROUTE_RE = /^\/[A-Za-z0-9_/:.-]{0,119}$/;
-const EVENT_NAME_RE = /^systemfabric\.[a-z0-9_.-]{1,100}$/;
+const EVENT_NAME_RE = /^virgoscorpio_hub\.[a-z0-9_.-]{1,100}$/;
 const METHOD_RE = /^[A-Z]{1,12}$/;
 const STATUS_CLASS_RE = /^[1-5]xx$/;
 const NUMERIC_FIELDS = new Set([
@@ -28,34 +28,34 @@ const NUMERIC_FIELDS = new Set([
   'pollMs', 'attempts', 'processed', 'durationMs'
 ]);
 const OTEL_ATTRIBUTE_NAMES = Object.freeze({
-  requestId: 'systemfabric.request_id',
-  traceId: 'systemfabric.trace_id',
-  spanId: 'systemfabric.span_id',
-  parentSpanId: 'systemfabric.parent_span_id',
+  requestId: 'virgoscorpio_hub.request_id',
+  traceId: 'virgoscorpio_hub.trace_id',
+  spanId: 'virgoscorpio_hub.span_id',
+  parentSpanId: 'virgoscorpio_hub.parent_span_id',
   method: 'http.request.method',
   route: 'http.route',
   statusCode: 'http.response.status_code',
-  statusClass: 'systemfabric.http.status_class',
-  elapsedMs: 'systemfabric.elapsed_ms',
+  statusClass: 'virgoscorpio_hub.http.status_class',
+  elapsedMs: 'virgoscorpio_hub.elapsed_ms',
   code: 'error.code',
   errorType: 'error.type',
-  component: 'systemfabric.component',
-  operation: 'systemfabric.operation',
-  outcome: 'systemfabric.outcome',
-  count: 'systemfabric.count',
-  checked: 'systemfabric.checked',
-  errors: 'systemfabric.errors',
-  unlinked: 'systemfabric.unlinked',
-  intervalMs: 'systemfabric.interval_ms',
-  batchSize: 'systemfabric.batch_size',
-  dispatchBatchSize: 'systemfabric.dispatch_batch_size',
-  leaseMs: 'systemfabric.lease_ms',
-  maxAttempts: 'systemfabric.max_attempts',
-  pollMs: 'systemfabric.poll_ms',
-  attempts: 'systemfabric.attempts',
-  terminal: 'systemfabric.terminal',
-  processed: 'systemfabric.processed',
-  durationMs: 'systemfabric.duration_ms'
+  component: 'virgoscorpio_hub.component',
+  operation: 'virgoscorpio_hub.operation',
+  outcome: 'virgoscorpio_hub.outcome',
+  count: 'virgoscorpio_hub.count',
+  checked: 'virgoscorpio_hub.checked',
+  errors: 'virgoscorpio_hub.errors',
+  unlinked: 'virgoscorpio_hub.unlinked',
+  intervalMs: 'virgoscorpio_hub.interval_ms',
+  batchSize: 'virgoscorpio_hub.batch_size',
+  dispatchBatchSize: 'virgoscorpio_hub.dispatch_batch_size',
+  leaseMs: 'virgoscorpio_hub.lease_ms',
+  maxAttempts: 'virgoscorpio_hub.max_attempts',
+  pollMs: 'virgoscorpio_hub.poll_ms',
+  attempts: 'virgoscorpio_hub.attempts',
+  terminal: 'virgoscorpio_hub.terminal',
+  processed: 'virgoscorpio_hub.processed',
+  durationMs: 'virgoscorpio_hub.duration_ms'
 });
 const SEVERITY_NUMBERS = Object.freeze({
   debug: 5,
@@ -82,7 +82,7 @@ function sanitizeField(name, value) {
     return Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : undefined;
   }
   if (name === 'terminal') return typeof value === 'boolean' ? value : undefined;
-  if (name === 'code') return typeof value === 'string' && /^ERR_[A-Z0-9_.-]{1,96}$/.test(value) ? value : 'ERR_SYSTEMFABRIC_UNKNOWN';
+  if (name === 'code') return typeof value === 'string' && /^ERR_[A-Z0-9_.-]{1,96}$/.test(value) ? value : 'ERR_VIRGOSCORPIO_HUB_UNKNOWN';
   if (name === 'errorType' || name === 'component' || name === 'operation' || name === 'outcome') {
     return typeof value === 'string' && TOKEN_RE.test(value) ? value : undefined;
   }
@@ -92,7 +92,7 @@ function sanitizeField(name, value) {
 function normalizeEventName(event) {
   return typeof event === 'string' && EVENT_NAME_RE.test(event)
     ? event
-    : 'systemfabric.observability.event';
+    : 'virgoscorpio_hub.observability.event';
 }
 
 function toHrTime(value) {
@@ -142,12 +142,12 @@ function emitOtelLog(otelLogger, record) {
 function createStructuredLogger({
   logger = console,
   otelLogger = null,
-  service = 'systemfabric-api',
+  service = 'virgoscorpio-hub-api',
   environment = 'development',
   accessLogsEnabled = false,
   now = Date.now
 } = {}) {
-  const safeService = TOKEN_RE.test(service) ? service : 'systemfabric';
+  const safeService = TOKEN_RE.test(service) ? service : 'virgoscorpio_hub';
   const safeEnvironment = TOKEN_RE.test(environment) ? environment : 'unknown';
 
   function emit(level, event, fields = {}) {
@@ -198,7 +198,7 @@ function createStructuredLogger({
   function requestCompleted({ requestId, method, route, statusCode, elapsedMs } = {}) {
     if (!accessLogsEnabled) return false;
     const safeStatus = Number.isInteger(statusCode) ? statusCode : 0;
-    return emit('info', 'systemfabric.http.request_completed', {
+    return emit('info', 'virgoscorpio_hub.http.request_completed', {
       requestId,
       method,
       route,

@@ -45,13 +45,13 @@ We agree to restrict the following behaviors in our community. Instances, threat
 
 Tensions can occur between community members even when they are trying their best to collaborate. Not every conflict represents a code of conduct violation, and this Code of Conduct reinforces encouraged behaviors and norms that can help avoid conflicts and minimize harm.
 
-When an incident occurs, please report it promptly. Contact the SystemFabric project maintainer privately at [goldenobsidianllc.business@gmail.com](mailto:goldenobsidianllc.business@gmail.com), using the subject line "SystemFabric Code of Conduct Report."
+When an incident occurs, please report it promptly. Contact the VirgoScorpio Hub project maintainer privately at [goldenobsidianllc.business@gmail.com](mailto:goldenobsidianllc.business@gmail.com), using the subject line "VirgoScorpio Hub Code of Conduct Report."
 
 Please include links to the relevant discussion, issue, pull request, or other community interaction and a concise description of your concern.
 
 Do not publish private reports, personal information, credentials, or sensitive evidence in public GitHub issues or discussions.
 
-SystemFabric is currently maintained by a single primary maintainer. There is no separate moderation committee or funded community-support team, and response times cannot be guaranteed. Reports will be handled as privately as reasonably possible and shared only when necessary to review and address the concern.
+VirgoScorpio Hub is currently maintained by a single primary maintainer. There is no separate moderation committee or funded community-support team, and response times cannot be guaranteed. Reports will be handled as privately as reasonably possible and shared only when necessary to review and address the concern.
 
 For software vulnerabilities, credentials, or exploitable security weaknesses, follow the separate reporting instructions in the repository's SECURITY.md.
 

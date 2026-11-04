@@ -89,14 +89,14 @@ test('rejects moves into descendants and node edits after the target was deleted
     () => applyCollaborationOperation(source, op('node.move', {
       nodeId: 'section-1', parentId: 'section-1', afterNodeId: null
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_OT_CYCLE'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_OT_CYCLE'
   );
   const deleted = applyCollaborationOperation(source, op('node.delete', { nodeId: 'heading-1' }));
   assert.throws(
     () => applyCollaborationOperation(deleted.document, op('node.set_prop', {
       nodeId: 'heading-1', key: 'text', value: 'Late edit'
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_OT_TARGET_DELETED'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_OT_TARGET_DELETED'
   );
 });
 
@@ -161,7 +161,7 @@ test('rejects overlapping concurrent text insertions inside a stale delete range
   });
   assert.throws(
     () => transformCollaborationOperation(staleDelete, [{ sequence: 1, operation: inserted }]),
-    error => error.code === 'ERR_SYSTEMFABRIC_OT_CONFLICT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_OT_CONFLICT'
   );
 });
 
@@ -171,13 +171,13 @@ test('rejects missing or non-sibling anchors and invalid final documents', () =>
       parentId: 'section-1', afterNodeId: 'missing-node',
       node: { id: 'new-node', type: 'widget.text', props: { text: 'X' }, children: [] }
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_OT_CONFLICT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_OT_CONFLICT'
   );
   assert.throws(
     () => applyCollaborationOperation(fixture(), op('node.set_prop', {
       nodeId: 'button-1', key: 'url', value: 'javascript:alert(1)'
     })),
-    error => error.code === 'ERR_SYSTEMFABRIC_INVALID_DOCUMENT'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT'
   );
 });
 
@@ -195,7 +195,7 @@ test('PostgreSQL store rejects invalid collaboration envelopes before acquiring 
       actorId: null,
       operation: op('document.set_title', { title: '' })
     }),
-    error => error.code === 'ERR_SYSTEMFABRIC_INVALID_COLLABORATION_OPERATION'
+    error => error.code === 'ERR_VIRGOSCORPIO_HUB_INVALID_COLLABORATION_OPERATION'
   );
   assert.equal(acquired, false);
 });

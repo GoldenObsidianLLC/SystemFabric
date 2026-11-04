@@ -8,7 +8,7 @@ const path = require('node:path');
 const { updateEnvFile } = require('../scripts/setup-dev');
 
 async function withTempDirectory(run) {
-  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'systemfabric-dev-setup-'));
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-dev-setup-'));
   try { await run(root); }
   finally { await fs.promises.rm(root, { recursive: true, force: true }); }
 }
@@ -27,7 +27,7 @@ test('development environment update creates exclusively, limits permissions, an
       assert.equal(stats.mode & 0o777, 0o600);
     }
     assert.match(contents, /^APP_MODE=development$/m);
-    assert.match(contents, /^TEST_DATABASE_URL=postgres:\/\/systemfabric:systemfabric_dev@127\.0\.0\.1:5432\/systemfabric_test$/m);
+    assert.match(contents, /^TEST_DATABASE_URL=postgres:\/\/virgoscorpio_hub:virgoscorpio_hub_dev@127\.0\.0\.1:5432\/virgoscorpio_hub_test$/m);
     assert.match(contents, /^MEMGRAPH_TEST_URL=bolt:\/\/127\.0\.0\.1:7687$/m);
 
     const second = updateEnvFile({ target, template });

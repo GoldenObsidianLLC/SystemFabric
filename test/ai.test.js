@@ -24,20 +24,20 @@ test('AI content task uses allow-listed operations', async () => {
   const result = await ai.assistContent({ text: 'Example text', operation: 'make-clearer' });
   assert.equal(result.text, 'Example text');
   assert.equal(result.saved, false);
-  await assert.rejects(() => ai.assistContent({ text: 'x', operation: 'run-shell' }), { code: 'ERR_SYSTEMFABRIC_AI_OPERATION' });
+  await assert.rejects(() => ai.assistContent({ text: 'x', operation: 'run-shell' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_OPERATION' });
 });
 
 test('AI input limits and required fields fail before provider invocation', async () => {
   const ai = createAIService({ env: { AI_PROVIDER: 'mock', AI_MAX_PROMPT_CHARS: '512' }, audit: silentAudit() });
-  await assert.rejects(() => ai.generatePageDraft({ prompt: 'x'.repeat(600) }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
-  await assert.rejects(() => ai.generateSeo({ title: '', content: 'text' }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
-  await assert.rejects(() => ai.translate({ text: 'hi', targetLanguage: '' }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.generatePageDraft({ prompt: 'x'.repeat(600) }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.generateSeo({ title: '', content: 'text' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.translate({ text: 'hi', targetLanguage: '' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
 });
 
 test('unsupported provider and missing API key fail closed', () => {
-  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'not-real' }), { code: 'ERR_SYSTEMFABRIC_AI_PROVIDER_UNKNOWN' });
-  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'openai-responses' }), { code: 'ERR_SYSTEMFABRIC_AI_NOT_CONFIGURED' });
-  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'anthropic' }), { code: 'ERR_SYSTEMFABRIC_AI_NOT_CONFIGURED' });
+  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'not-real' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_PROVIDER_UNKNOWN' });
+  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'openai-responses' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_NOT_CONFIGURED' });
+  assert.throws(() => createAIProviderFromEnv({ AI_PROVIDER: 'anthropic' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_NOT_CONFIGURED' });
 });
 
 test('provider status does not expose keys', () => {
@@ -47,9 +47,9 @@ test('provider status does not expose keys', () => {
 
 test('page-draft requires a real non-empty prompt', async () => {
   const ai = createAIService({ env: { AI_PROVIDER: 'mock' }, audit: silentAudit() });
-  await assert.rejects(() => ai.generatePageDraft({ prompt: '' }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
-  await assert.rejects(() => ai.generatePageDraft({ prompt: '   ' }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
-  await assert.rejects(() => ai.generatePageDraft({ prompt: undefined }), { code: 'ERR_SYSTEMFABRIC_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.generatePageDraft({ prompt: '' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.generatePageDraft({ prompt: '   ' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
+  await assert.rejects(() => ai.generatePageDraft({ prompt: undefined }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_INPUT_LIMIT' });
 });
 
 
@@ -85,13 +85,13 @@ test('AI service propagates caller cancellation and records a safe cancelled out
   controller.abort(new Error('test client disconnected'));
 
   await assert.rejects(pending, {
-    code: 'ERR_SYSTEMFABRIC_AI_CANCELLED',
+    code: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED',
     statusCode: 499
   });
   assert.equal(providerSignal, controller.signal, 'the exact task signal reaches the provider adapter');
   assert.equal(auditEvents.length, 1);
   assert.equal(auditEvents[0].succeeded, false);
-  assert.equal(auditEvents[0].errorCode, 'ERR_SYSTEMFABRIC_AI_CANCELLED');
+  assert.equal(auditEvents[0].errorCode, 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED');
 });
 
 test('pre-cancelled AI requests do not invoke a provider', async () => {
@@ -106,7 +106,7 @@ test('pre-cancelled AI requests do not invoke a provider', async () => {
 
   await assert.rejects(
     ai.assistContent({ text: 'Do not send this.', signal: controller.signal }),
-    { code: 'ERR_SYSTEMFABRIC_AI_CANCELLED', statusCode: 499 }
+    { code: 'ERR_VIRGOSCORPIO_HUB_AI_CANCELLED', statusCode: 499 }
   );
   assert.equal(calls, 0);
 });
@@ -115,7 +115,7 @@ test('external AI processing fails closed until explicitly enabled', async () =>
   let calls = 0;
   const provider = { name: 'anthropic', model: 'unit-test', async generate() { calls += 1; return JSON.stringify({ text: 'result' }); } };
   const disabled = createAIService({ provider, env: { AI_ALLOWED_PROVIDERS: 'anthropic', AI_ALLOW_EXTERNAL_CONTENT: 'false' }, audit: silentAudit() });
-  await assert.rejects(() => disabled.assistContent({ text: 'private content' }), { code: 'ERR_SYSTEMFABRIC_AI_EXTERNAL_CONTENT_DISABLED', statusCode: 403 });
+  await assert.rejects(() => disabled.assistContent({ text: 'private content' }), { code: 'ERR_VIRGOSCORPIO_HUB_AI_EXTERNAL_CONTENT_DISABLED', statusCode: 403 });
   assert.equal(calls, 0);
   const enabled = createAIService({ provider, env: { AI_ALLOWED_PROVIDERS: 'anthropic', AI_ALLOW_EXTERNAL_CONTENT: 'true' }, audit: silentAudit() });
   const result = await enabled.assistContent({ text: 'approved content' });

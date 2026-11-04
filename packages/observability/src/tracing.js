@@ -24,14 +24,14 @@ const {
   runWithTraceContext
 } = require('./trace-context');
 
-const TRACER_NAME = 'systemfabric';
+const TRACER_NAME = 'virgoscorpio_hub';
 const SERVICE_NAME_RE = /^[a-z][a-z0-9._-]{0,63}$/;
 const HEADER_NAME_RE = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,64}$/;
 const TOKEN_RE = /^[A-Za-z0-9_.:-]{1,120}$/;
 const SAFE_ATTRIBUTES = new Set([
-  'systemfabric.component',
-  'systemfabric.operation',
-  'systemfabric.outcome',
+  'virgoscorpio_hub.component',
+  'virgoscorpio_hub.operation',
+  'virgoscorpio_hub.outcome',
   'http.request.method',
   'http.response.status_code',
   'db.system',
@@ -43,8 +43,8 @@ const REDIS_METHODS = Object.freeze([
   'connect', 'eval', 'publish', 'pPublish', 'pSubscribe', 'subscribe',
   'get', 'set', 'del', 'hGet', 'hSet', 'expire', 'quit', 'ping'
 ]);
-const INSTRUMENTED_CLIENT = Symbol.for('systemfabric.observability.otel.instrumented');
-const INSTRUMENTED_POOL = Symbol.for('systemfabric.observability.otel.pool.instrumented');
+const INSTRUMENTED_CLIENT = Symbol.for('virgoscorpio_hub.observability.otel.instrumented');
+const INSTRUMENTED_POOL = Symbol.for('virgoscorpio_hub.observability.otel.pool.instrumented');
 
 let sdkRuntime = null;
 let tracingEnabled = false;
@@ -92,40 +92,40 @@ function parseExporterHeaders(raw) {
   return Object.freeze(headers);
 }
 
-function parseTracingConfig(env = process.env, serviceName = 'systemfabric-api') {
+function parseTracingConfig(env = process.env, serviceName = 'virgoscorpio-hub-api') {
   if (!env || typeof env !== 'object') throw new TypeError('An environment object is required.');
-  const enabled = strictBoolean(env.SYSTEMFABRIC_OTEL_ENABLED, 'SYSTEMFABRIC_OTEL_ENABLED');
-  const allowInsecureHttp = strictBoolean(env.SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP, 'SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP');
-  const endpointValue = env.SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT || '';
-  const headers = parseExporterHeaders(env.SYSTEMFABRIC_OTEL_EXPORTER_HEADERS_JSON);
-  const sampleRaw = env.SYSTEMFABRIC_OTEL_SAMPLE_RATIO === undefined || env.SYSTEMFABRIC_OTEL_SAMPLE_RATIO === ''
+  const enabled = strictBoolean(env.VIRGOSCORPIO_HUB_OTEL_ENABLED, 'VIRGOSCORPIO_HUB_OTEL_ENABLED');
+  const allowInsecureHttp = strictBoolean(env.VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP, 'VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP');
+  const endpointValue = env.VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT || '';
+  const headers = parseExporterHeaders(env.VIRGOSCORPIO_HUB_OTEL_EXPORTER_HEADERS_JSON);
+  const sampleRaw = env.VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO === undefined || env.VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO === ''
     ? '0.1'
-    : String(env.SYSTEMFABRIC_OTEL_SAMPLE_RATIO);
+    : String(env.VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO);
   const sampleRatio = Number(sampleRaw);
   if (!Number.isFinite(sampleRatio) || sampleRatio < 0 || sampleRatio > 1) {
-    throw new RangeError('SYSTEMFABRIC_OTEL_SAMPLE_RATIO must be between 0 and 1.');
+    throw new RangeError('VIRGOSCORPIO_HUB_OTEL_SAMPLE_RATIO must be between 0 and 1.');
   }
-  const timeoutMs = env.SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS === undefined || env.SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS === ''
+  const timeoutMs = env.VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS === undefined || env.VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS === ''
     ? 5000
-    : Number(env.SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS);
+    : Number(env.VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 250 || timeoutMs > 30_000) {
-    throw new RangeError('SYSTEMFABRIC_OTEL_EXPORT_TIMEOUT_MS must be an integer from 250 to 30000.');
+    throw new RangeError('VIRGOSCORPIO_HUB_OTEL_EXPORT_TIMEOUT_MS must be an integer from 250 to 30000.');
   }
   if (!SERVICE_NAME_RE.test(serviceName)) throw new TypeError('The OpenTelemetry service name is invalid.');
 
   let endpoint = null;
   if (enabled) {
     if (typeof endpointValue !== 'string' || endpointValue.length < 1 || endpointValue.length > 2048) {
-      throw new TypeError('SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT is required when OpenTelemetry is enabled.');
+      throw new TypeError('VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT is required when OpenTelemetry is enabled.');
     }
     try { endpoint = new URL(endpointValue); } catch {
-      throw new TypeError('SYSTEMFABRIC_OTEL_EXPORTER_ENDPOINT must be a valid URL.');
+      throw new TypeError('VIRGOSCORPIO_HUB_OTEL_EXPORTER_ENDPOINT must be a valid URL.');
     }
     if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
       throw new TypeError('The OTLP endpoint must not contain credentials, query parameters, or a fragment.');
     }
     if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && allowInsecureHttp)) {
-      throw new TypeError('The OTLP endpoint must use HTTPS unless SYSTEMFABRIC_OTEL_ALLOW_INSECURE_HTTP=true.');
+      throw new TypeError('The OTLP endpoint must use HTTPS unless VIRGOSCORPIO_HUB_OTEL_ALLOW_INSECURE_HTTP=true.');
     }
     if (!endpoint.hostname) throw new TypeError('The OTLP endpoint must include a hostname.');
     if (endpoint.pathname === '/' || endpoint.pathname === '') endpoint.pathname = '/v1/traces';
@@ -137,8 +137,8 @@ function parseTracingConfig(env = process.env, serviceName = 'systemfabric-api')
   const environment = typeof env.NODE_ENV === 'string' && TOKEN_RE.test(env.NODE_ENV)
     ? env.NODE_ENV
     : 'unknown';
-  const version = typeof env.SYSTEMFABRIC_VERSION === 'string' && /^[0-9A-Za-z.+-]{1,40}$/.test(env.SYSTEMFABRIC_VERSION)
-    ? env.SYSTEMFABRIC_VERSION
+  const version = typeof env.VIRGOSCORPIO_HUB_VERSION === 'string' && /^[0-9A-Za-z.+-]{1,40}$/.test(env.VIRGOSCORPIO_HUB_VERSION)
+    ? env.VIRGOSCORPIO_HUB_VERSION
     : '0.5.1';
 
   return Object.freeze({
@@ -181,7 +181,7 @@ function sanitizeAttributes(attributes = {}) {
     if (name === 'error.code') {
       safe[name] = typeof value === 'string' && /^ERR_[A-Z0-9_.-]{1,96}$/.test(value)
         ? value
-        : 'ERR_SYSTEMFABRIC_UNKNOWN';
+        : 'ERR_VIRGOSCORPIO_HUB_UNKNOWN';
       continue;
     }
     if (typeof value === 'string' && TOKEN_RE.test(value)) safe[name] = value;
@@ -202,7 +202,7 @@ function createIdGenerator() {
 
 function initializeTracing({
   env = process.env,
-  serviceName = 'systemfabric-api',
+  serviceName = 'virgoscorpio-hub-api',
   serviceVersion,
   exporter = null
 } = {}) {
@@ -409,8 +409,8 @@ function instrumentPostgresPool(pool) {
       if (!tracingEnabled || !tracer) return originalQuery.apply(this, args);
       const operation = sqlOperation(args[0]);
       const attributes = {
-        'systemfabric.component': 'database',
-        'systemfabric.operation': 'query',
+        'virgoscorpio_hub.component': 'database',
+        'virgoscorpio_hub.operation': 'query',
         'db.system': 'postgresql',
         'db.operation.name': operation
       };
@@ -471,8 +471,8 @@ function instrumentRedisClient(client) {
     try {
       client[method] = function (...args) {
         return withClientSpan(`db.redis.${method.toLowerCase()}`, {
-          'systemfabric.component': 'redis',
-          'systemfabric.operation': method.toLowerCase(),
+          'virgoscorpio_hub.component': 'redis',
+          'virgoscorpio_hub.operation': method.toLowerCase(),
           'db.system': 'redis',
           'db.operation.name': method.toLowerCase()
         }, () => original.apply(this, args));
