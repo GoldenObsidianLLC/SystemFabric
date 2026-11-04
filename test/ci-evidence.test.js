@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 const {
   JOBS,
   WORKFLOW_FILE,
@@ -47,7 +48,7 @@ function createFixtures(t) {
   const readiness = {
     schemaVersion: 1,
     product: 'VirgoScorpio Hub',
-    version: '0.5.2',
+    version: PRODUCT_VERSION,
     sourceRevision: expected.mergeSha,
     sourceTree: { clean: true, changedPaths: [], approvedGeneratedPaths: [], blockingPaths: [] },
     host: { node: 'v22.23.4' },
@@ -58,7 +59,7 @@ function createFixtures(t) {
   const sbom = {
     bomFormat: 'CycloneDX',
     specVersion: '1.6',
-    metadata: { component: { purl: 'pkg:npm/virgoscorpio-hub@0.5.2' } },
+    metadata: { component: { purl: `pkg:npm/virgoscorpio-hub@${PRODUCT_VERSION}` } },
     components: [{ name: 'fixture', version: '1.0.0' }],
     dependencies: [],
   };
@@ -66,7 +67,7 @@ function createFixtures(t) {
     if (file.endsWith('release-readiness.json')) write(root, file, readiness);
     else if (file.endsWith('.cdx.json')) write(root, file, sbom);
     else if (file.endsWith('.md')) write(root, file, '# Candidate readiness\n');
-    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'virgoscorpio-hub', version: '0.5.2', lockfileVersion: 3 });
+    else if (file.endsWith('package-lock.json')) write(root, file, { name: 'virgoscorpio-hub', version: PRODUCT_VERSION, lockfileVersion: 3 });
     else if (file.endsWith('artifact-check.log')) write(root, file, 'VirgoScorpio Hub artifact check passed (157 required paths).\n');
     else if (file.endsWith('unit-tests.tap.log') || file.endsWith('enginex-tests.tap.log')) {
       write(root, file, ['TAP version 13', '# tests 8', '# pass 8', '# fail 0', '# cancelled 0', '# skipped 0', '# todo 0'].join('\n'));

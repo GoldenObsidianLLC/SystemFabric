@@ -1,6 +1,6 @@
 # VirgoScorpio Hub Security and Threat Model
 
-**Scope:** VirgoScorpio Hub 0.5.1 hardening candidate / developer preview. This document describes the implemented controls and the remaining security work. It is not a certification or independent audit.
+**Scope:** VirgoScorpio Hub 0.5.3 hardening candidate / developer preview. This document describes the implemented controls and the remaining security work. It is not a certification or independent audit.
 
 ## Assets to protect
 

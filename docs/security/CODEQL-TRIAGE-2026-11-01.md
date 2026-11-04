@@ -51,3 +51,17 @@ This finding is not being represented as a false positive. Keep the legacy path 
 - VirgoScorpio Hub remains `NOT_PRODUCTION_CERTIFIED`; no production release approval is implied.
 
 No vendor, assessor, contractor, subscription, or paid service was engaged for this work.
+
+## Revalidation on 2026-11-04
+
+**Reviewed repository baseline:** `70335d74fd0ddaeb70eb76aee3a7ad0c5b40ae91` (PR #62 merge).
+
+GitHub Code Scanning was queried on this baseline after PR #62. It still reported five open findings: #30–#33 (High, `js/clear-text-storage-of-sensitive-data`, four auth-cookie writes in `apps/api/src/server.js`) and #14 (Medium, `js/unsafe-code-construction`, the vendored EnginEx legacy renderer). The alerts were open on the exact baseline commit, not dismissed or waived.
+
+The 0.5.3 candidate moves browser auth route handling into `apps/api/src/auth-routes.js` and the cookie parser/serializer/CSRF comparison into `apps/api/src/auth-cookies.js`. The serializer now rejects unsafe cookie names, non-base64url token values, invalid flags/expiry/SameSite settings, insecure `SameSite=None`, and unsafe paths. Existing session and MFA cookies remain opaque bearer tokens by design; this change does not encrypt or replace them, and it does not establish that the High findings are false positives or resolved.
+
+The Medium EnginEx alert is unchanged. The application does not opt into legacy `<?njs ?>` execution; the safe renderer continues to reject it by default. The explicit legacy compatibility adapter remains unsafe and must not receive user-authored or AI-authored templates.
+
+**Branch-scoped CodeQL result:** after the required CodeQL workflow passed for PR #63, GitHub's branch-filtered Code Scanning alert query for `refs/heads/fix/security-hardening-2026-11` reported only the open Medium alert #14. The four High cookie alerts #30–#33 were not present in the branch-scoped result. They remain open on the default `main` baseline analysis (`70335d7`) until a post-merge default-branch analysis confirms the new state. No alert was manually dismissed or suppressed.
+
+**Disposition:** retain #14 pending a maintainer/security-owner decision on the unsafe legacy-template compatibility surface. Verify the default-branch alert state after merge; do not manually dismiss the four High alerts. This source refactor is not an independent security assessment and does not alter the `NOT_PRODUCTION_CERTIFIED` release state.

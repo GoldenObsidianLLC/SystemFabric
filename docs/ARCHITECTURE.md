@@ -32,6 +32,12 @@ Arrows describe conceptual dependencies, not necessarily synchronous calls or a 
 
 Use the source tree and tests as the source of truth; responsibilities can evolve between versions.
 
+## API authentication seam
+
+The API composition module keeps responsibility for request lifecycle, identity lookup, session authentication, and the security checks that must run before a route is invoked. Browser authentication route handling is grouped in `apps/api/src/auth-routes.js`: its public handler covers login, MFA verification, password recovery, bootstrap, invitation acceptance, and SAML/OIDC callbacks; its authenticated handler covers account/session and MFA management routes. It receives explicit dependencies (identity, SSO adapters, bounded body readers, rate limiting, response/error helpers) and returns whether it handled the route.
+
+Cookie protocol details live in `apps/api/src/auth-cookies.js`. This module parses cookie headers, validates/serializes the small set of opaque browser auth tokens, and compares the CSRF double-submit pair in constant time. It does not authenticate a session: the API must still look up and validate the server-side token digest. The API server retains the ordering invariant: cookie authentication and same-origin/CSRF checks happen before authenticated auth handlers run. Keep these responsibilities separate when adding routes.
+
 ## Shared packages
 
 The `packages/` tree separates platform concerns into modules such as AI provider adapters, authentication, billing, commerce, community workflows, persistence, domain schemas, graph projection, library/media storage, notifications, observability, plugins, rendering, security, and widgets. A package's presence is not proof of a deployed integration or an operational service-level objective.
@@ -42,7 +48,8 @@ Use this map to find representative source files and tests for a focused contrib
 
 | Contributor interest | Starting point | Related tests |
 |---|---|---|
-| API behavior | [`apps/api/src/server.js`](../apps/api/src/server.js), [`platform-routes.js`](../apps/api/src/platform-routes.js) | [`test/api.test.js`](../test/api.test.js) |
+| API composition and request lifecycle | [`apps/api/src/server.js`](../apps/api/src/server.js), [`platform-routes.js`](../apps/api/src/platform-routes.js) | [`test/api.test.js`](../test/api.test.js), [`test/tenant-route-capabilities.test.js`](../test/tenant-route-capabilities.test.js) |
+| Browser authentication routes and cookie protocol | [`apps/api/src/auth-routes.js`](../apps/api/src/auth-routes.js), [`apps/api/src/auth-cookies.js`](../apps/api/src/auth-cookies.js), [`packages/auth/src/service.js`](../packages/auth/src/service.js) | [`test/api.test.js`](../test/api.test.js), [`test/auth-security.test.js`](../test/auth-security.test.js), [`test/auth-cookies.test.js`](../test/auth-cookies.test.js) |
 | Admin UI and editor | [`apps/admin/`](../apps/admin/) | [`test/e2e/editor.spec.js`](../test/e2e/editor.spec.js), [`test/e2e/accessibility.spec.js`](../test/e2e/accessibility.spec.js) |
 | Authentication and authorization | [`packages/auth/src/`](../packages/auth/src/), [`apps/api/src/`](../apps/api/src/) | [`test/auth-security.test.js`](../test/auth-security.test.js), [`test/security-boundaries.test.js`](../test/security-boundaries.test.js) |
 | Checkout and billing | [`apps/api/src/platform-routes.js`](../apps/api/src/platform-routes.js), [`packages/billing/src/`](../packages/billing/src/) | [`test/checkout-idempotency.test.js`](../test/checkout-idempotency.test.js), [`test/checkout-reconciliation.test.js`](../test/checkout-reconciliation.test.js) |

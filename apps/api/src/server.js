@@ -10,7 +10,8 @@ const { createPostgresPool, createPostgresStore, extractPageText } = require('..
 const { parseAIContextContentIds, buildAIPageContext, MAX_AI_CONTEXT_CHARS } = require('../../../packages/ai/src/context-assembler');
 const { createAITaskStore } = require('../../../packages/db/src/ai-task-store');
 const { createIdentityService } = require('../../../packages/auth/src/service');
-const { createAuthorizationRequest, exchangeAndVerify, configFromEnv } = require('../../../packages/auth/src/oidc');
+const { createAuthRouteHandlers } = require('./auth-routes');
+const { parseCookies, safeCsrfCookie } = require('./auth-cookies');
 const { createSamlAuthenticator } = require('../../../packages/auth/src/saml');
 const { verifyPluginArtifactSignature, trustedKeysFromEnv, digestForArtifact } = require('../../../packages/plugins/src/provenance');
 const { createRemotePluginRunner } = require('../../../packages/plugins/src/remote-runner');
@@ -74,26 +75,6 @@ function sameSecret(candidate, expected) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 function parseBearer(req) { const header = req.headers.authorization; return typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null; }
-function parseCookies(header = '') {
-  const cookies = Object.create(null);
-  for (const piece of header.split(';')) {
-    const index = piece.indexOf('='); if (index < 0) continue;
-    const key = piece.slice(0, index).trim(); const value = piece.slice(index + 1).trim();
-    if (/^[A-Za-z0-9_-]+$/.test(key)) cookies[key] = value;
-  }
-  return cookies;
-}
-/**
- * Serializes browser authentication protocol cookies. Session and MFA challenge
- * values are high-entropy opaque bearer tokens: the server-side identity store
- * persists only token digests, while the browser must present the original token
- * on subsequent requests. The CSRF cookie is intentionally script-readable for
- * the double-submit pattern and is not an authentication credential. Never pass
- * passwords or personal data to this helper.
- */
-function cookie(name, value, { httpOnly = false, secure = false, maxAge = 43_200, sameSite = 'Lax', path = '/' } = {}) {
-  return `${name}=${value}; Path=${path}; SameSite=${sameSite}; Max-Age=${maxAge}${httpOnly ? '; HttpOnly' : ''}${secure ? '; Secure' : ''}`;
-}
 function normalizeSlug(value) {
   return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180);
 }
@@ -289,6 +270,10 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     allowHttpInternal: env.PLUGIN_RUNNER_ALLOW_HTTP_INTERNAL === 'true'
   });
   const secureCookies = env.NODE_ENV === 'production' || env.SESSION_COOKIE_SECURE === 'true';
+  const authRoutes = createAuthRouteHandlers({
+    identity, samlAuth, env, secureCookies, maxBody, allowRequest,
+    sendJson, fail, readJson, readForm, sameSecret
+  });
   const requestMetrics = createRequestMetrics();
   const realtimeMetrics = injectedRealtimeMetrics || createRealtimeMetrics();
   const realtimeEnabled = env.VIRGOSCORPIO_HUB_REALTIME_ENABLED === 'true';
@@ -421,8 +406,6 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     }
     return null;
   }
-  function safeCsrfCookie(a, b) { return typeof a === 'string' && typeof b === 'string' && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b)); }
-
   async function siteIdFor({ req, url, body, actor, required = true, routeSiteId }) {
     const querySiteIds = url.searchParams.getAll('siteId');
     if (querySiteIds.length > 1) {
@@ -826,153 +809,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         catch { return sendJson(res, 503, { status: 'not-ready', database: 'unreachable', requestId }); }
       }
 
-      // Public account bootstrap and login. Bootstrap is closed automatically after the first active account.
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/login') {
-        const limit = allowRequest(`login:${req.socket.remoteAddress || 'unknown'}`);
-        if (!limit.allowed) { res.setHeader('retry-after', String(limit.retryAfterSeconds)); return sendJson(res, 429, { error: 'Too many requests.', code: 'ERR_VIRGOSCORPIO_HUB_RATE_LIMIT', requestId }); }
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL and applied migrations.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const session = await identity.login({ email: body.email, password: body.password, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
-        if (session.mfaRequired) {
-          /*
-           * The browser must carry this opaque, 256-bit, five-minute MFA
-           * challenge back to the same-origin verification endpoint. It is
-           * HttpOnly, Secure in production, SameSite=Strict and path-scoped;
-           * PostgreSQL stores only its SHA-256 digest.
-           */
-          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.setHeader('set-cookie', cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }));
-          return sendJson(res, 200, { authenticated: false, mfaRequired: true, user: { id: session.user.id, email: session.user.email }, expiresAt: session.expiresAt, requestId });
-        }
-        res.setHeader('set-cookie', [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge: Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000) })]);
-        return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/verify') {
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const expectedOrigin = `${secureCookies ? 'https' : (req.socket.encrypted ? 'https' : 'http')}://${req.headers.host}`;
-        if (typeof req.headers.origin !== 'string' || req.headers.origin !== expectedOrigin) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_CSRF', 'A matching same-origin Origin header is required.');
-        const challenge = parseCookies(req.headers.cookie || '').vsh_mfa_challenge;
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const session = await identity.completeMfaLogin({ challengeToken: challenge, code: body.code, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
-        const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
-        /*
-         * vsh_session is an opaque random bearer token, stored server-side only
-         * as a SHA-256 digest and transported in an HttpOnly cookie. vsh_csrf
-         * is a separate random double-submit token; client JS must read it and
-         * echo it in the request header. Both cookies are Secure in production,
-         * SameSite=Lax, and expire with the session.
-         */
-        // Required browser transport: the opaque random session is digest-stored and HttpOnly; CSRF remains a separate double-submit token.
-        res.setHeader('set-cookie', [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge }), cookie('vsh_mfa_challenge', '', { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 0 })]);
-        return sendJson(res, 200, { authenticated: true, user: session.user, expiresAt: session.expiresAt, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/password-reset/request') {
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.requestPasswordReset({ email: body.email });
-        return sendJson(res, 202, { ...result, message: 'If an active account matches that address, password reset instructions will be sent.', requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/password-reset/complete') {
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.resetPassword({ token: body.token, password: body.password });
-        return sendJson(res, 200, { ...result, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/email-verification/confirm') {
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.verifyEmail({ token: body.token });
-        return sendJson(res, 200, { ...result, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/bootstrap') {
-        const bootstrapLimit = allowRequest(`bootstrap:${req.socket.remoteAddress || 'unknown'}`);
-        if (!bootstrapLimit.allowed) { res.setHeader('retry-after', String(bootstrapLimit.retryAfterSeconds)); return sendJson(res, 429, { error: 'Too many bootstrap attempts.', code: 'ERR_VIRGOSCORPIO_HUB_RATE_LIMIT', requestId }); }
-        if (!identity || !env.VIRGOSCORPIO_HUB_BOOTSTRAP_SECRET || !sameSecret(req.headers['x-virgoscorpio-hub-bootstrap-secret'], env.VIRGOSCORPIO_HUB_BOOTSTRAP_SECRET)) return sendJson(res, 403, { error: 'Bootstrap is disabled or the bootstrap secret is invalid.', code: 'ERR_VIRGOSCORPIO_HUB_BOOTSTRAP_FORBIDDEN', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.bootstrapOwner({ email: body.email, password: body.password, displayName: body.displayName, siteSlug: body.siteSlug || 'main', siteName: body.siteName || 'Main Site' });
-        return sendJson(res, 201, { status: 'created', ...result, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/invitations/accept') {
-        const inviteLimit = allowRequest(`invite-accept:${req.socket.remoteAddress || 'unknown'}`);
-        if (!inviteLimit.allowed) { res.setHeader('retry-after', String(inviteLimit.retryAfterSeconds)); return sendJson(res, 429, { error: 'Too many invitation attempts.', code: 'ERR_VIRGOSCORPIO_HUB_RATE_LIMIT', requestId }); }
-        if (!identity) return sendJson(res, 503, { error: 'Authentication requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.acceptInvitation({ token: body.token, password: body.password, displayName: body.displayName });
-        return sendJson(res, 200, { status: 'accepted', ...result, requestId });
-      }
-
-      if (url.pathname === '/api/v1/auth/saml/metadata' && req.method === 'GET') {
-        if (!samlAuth) throw fail(404, 'ERR_VIRGOSCORPIO_HUB_SAML_DISABLED', 'SAML SSO is not enabled.');
-        const xml = Buffer.from(samlAuth.getMetadata());
-        res.writeHead(200, { 'content-type': 'application/samlmetadata+xml; charset=utf-8', 'content-length': xml.length, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
-        return res.end(xml);
-      }
-      if (url.pathname === '/api/v1/auth/saml/start' && req.method === 'GET') {
-        if (!samlAuth || !identity) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_SAML_DISABLED', 'SAML SSO is not enabled or identity storage is unavailable.');
-        const limitSaml = allowRequest(`saml-start:${req.socket.remoteAddress || 'unknown'}`);
-        if (!limitSaml.allowed) throw fail(429, 'ERR_VIRGOSCORPIO_HUB_RATE_LIMIT', 'Too many SSO attempts.');
-        const state = require('node:crypto').randomBytes(32).toString('base64url');
-        await identity.createOidcState({ state, nonce: 'saml', verifier: 'saml', issuer: samlAuth.externalIssuer() });
-        const redirect = await samlAuth.getAuthorizeUrl(state);
-        const target = new URL(redirect);
-        if (target.protocol !== 'https:' && !(env.NODE_ENV !== 'production' && target.protocol === 'http:')) throw fail(502, 'ERR_VIRGOSCORPIO_HUB_SAML_IDP_URL', 'SAML identity provider redirect must use HTTPS.');
-        res.writeHead(302, { location: target.href, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }); return res.end();
-      }
-      if (url.pathname === '/api/v1/auth/saml/acs' && req.method === 'POST') {
-        if (!samlAuth || !identity) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_SAML_DISABLED', 'SAML SSO is not enabled or identity storage is unavailable.');
-        const form = await readForm(req, Math.min(maxBody, 2 * 1024 * 1024));
-        const saved = await identity.consumeOidcState({ state: form.RelayState });
-        if (saved.issuer !== samlAuth.externalIssuer()) throw fail(401, 'ERR_VIRGOSCORPIO_HUB_SAML_STATE_ISSUER', 'The SAML relay state issuer does not match.');
-        const assertion = await samlAuth.validatePostResponse({ SAMLResponse: form.SAMLResponse });
-        const profile = assertion?.profile;
-        if (!profile || assertion.loggedOut || typeof profile.nameID !== 'string' || !profile.nameID) throw fail(401, 'ERR_VIRGOSCORPIO_HUB_SAML_ASSERTION_INVALID', 'The SAML assertion did not contain an authenticated subject.');
-        const email = samlAuth.extractEmail(profile);
-        if (!email) throw fail(401, 'ERR_VIRGOSCORPIO_HUB_SAML_EMAIL_REQUIRED', 'The SAML assertion must contain a verified email attribute.');
-        const session = await identity.loginFederated({ issuer: samlAuth.externalIssuer(), subject: `${String(profile.nameIDFormat || 'unspecified').slice(0, 200)}:${profile.nameID}`, email, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
-        if (session.mfaRequired) {
-          /*
-           * This one-time, opaque MFA challenge is intentionally held by the
-           * browser for the callback flow; server storage contains only its
-           * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
-           */
-          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) }); return res.end();
-        }
-        const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
-        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge })] }); return res.end();
-      }
-
-      if (req.method === 'GET' && url.pathname === '/api/v1/auth/oidc/start') {
-        if (!identity) return sendJson(res, 503, { error: 'SSO requires PostgreSQL and applied migrations.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const limitOidc = allowRequest(`oidc-start:${req.socket.remoteAddress || 'unknown'}`);
-        if (!limitOidc.allowed) { res.setHeader('retry-after', String(limitOidc.retryAfterSeconds)); return sendJson(res, 429, { error: 'Too many SSO attempts.', code: 'ERR_VIRGOSCORPIO_HUB_RATE_LIMIT', requestId }); }
-        const request = await createAuthorizationRequest(env);
-        await identity.createOidcState(request);
-        res.writeHead(302, { location: request.authorizationUrl, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer' }); return res.end();
-      }
-      if (req.method === 'GET' && url.pathname === '/api/v1/auth/oidc/callback') {
-        if (!identity) return sendJson(res, 503, { error: 'SSO requires PostgreSQL and applied migrations.', code: 'ERR_VIRGOSCORPIO_HUB_IDENTITY_DISABLED', requestId });
-        const code = url.searchParams.get('code'); const state = url.searchParams.get('state');
-        if (url.searchParams.has('error') || !code || !state) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_OIDC_CALLBACK_INVALID', 'The identity provider did not complete sign-in.');
-        const savedState = await identity.consumeOidcState({ state }); const config = configFromEnv(env);
-        if (!config || savedState.issuer !== config.issuer) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_OIDC_STATE_INVALID', 'OIDC state does not match the configured issuer.');
-        const external = await exchangeAndVerify({ code, nonce: savedState.nonce, verifier: savedState.verifier, env });
-        if (external.issuer !== savedState.issuer) throw fail(401, 'ERR_VIRGOSCORPIO_HUB_OIDC_ISSUER_MISMATCH', 'The external identity issuer did not match the sign-in request.');
-        const session = await identity.loginFederated({ issuer: external.issuer, subject: external.subject, email: external.email, ip: req.socket.remoteAddress, userAgent: String(req.headers['user-agent'] || '').slice(0, 500) });
-        if (session.mfaRequired) {
-          /*
-           * This one-time, opaque MFA challenge is intentionally held by the
-           * browser for the callback flow; server storage contains only its
-           * SHA-256 digest and the cookie is HttpOnly/SameSite=Strict.
-           */
-          // Required browser transport: the high-entropy, one-time challenge is digest-stored server-side.
-          res.writeHead(303, { location: '/admin?mfa=required', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': cookie('vsh_mfa_challenge', session.challengeToken, { httpOnly: true, secure: secureCookies, sameSite: 'Strict', path: '/api/v1/auth/mfa', maxAge: 300 }) });
-          return res.end();
-        }
-        const maxAge = Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000);
-        res.writeHead(303, { location: '/admin', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'set-cookie': [cookie('vsh_session', session.token, { httpOnly: true, secure: secureCookies, maxAge }), cookie('vsh_csrf', session.csrf, { secure: secureCookies, maxAge })] });
-        return res.end();
-      }
+      if (await authRoutes.handlePublic({ req, res, url, requestId })) return;
 
       // Per-IP limits cover both successful and failed authentication and all authenticated routes.
       const clientKey = req.socket.remoteAddress || 'unknown'; const limit = allowRequest(clientKey);
@@ -1487,46 +1324,8 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const platformHandled = await handlePlatformRoute({ req, res, url, actor, siteIdFor, requireCapability, readJson, sendJson, fail, requestId, localPool, libraryStore, firewall, env, identity, maxBody, maxLibraryBody, maxOptimizerBytes: maxLibraryFileBytes, store });
       if (platformHandled) return;
 
-      if (req.method === 'GET' && url.pathname === '/api/v1/auth/me') {
-        return sendJson(res, 200, { authenticated: true, user: actor.user, sites: actor.isDeveloper ? (env.VIRGOSCORPIO_HUB_DEFAULT_SITE_ID ? [{ siteId: env.VIRGOSCORPIO_HUB_DEFAULT_SITE_ID, siteSlug: 'local', siteName: 'Local Site', role: 'development', capabilities: ['*'] }] : []) : actor.memberships, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/logout') {
-        if (actor.sessionToken) await identity.logout(actor.sessionToken);
-        res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
-        return sendJson(res, 200, { authenticated: false, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/email-verification/request') {
-        if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Email verification requires a real account.');
-        const result = await identity.requestEmailVerification({ userId: actor.user.id });
-        return sendJson(res, 202, { ...result, requestId });
-      }
-      if (req.method === 'GET' && url.pathname === '/api/v1/auth/sessions') {
-        if (actor.isDeveloper) return sendJson(res, 200, { sessions: [], requestId });
-        return sendJson(res, 200, { sessions: await identity.listSessions({ userId: actor.user.id, currentSessionId: actor.sessionId }), requestId });
-      }
-      const ownSessionMatch = url.pathname.match(/^\/api\/v1\/auth\/sessions\/([0-9a-f-]{36})$/i);
-      if (req.method === 'DELETE' && ownSessionMatch) {
-        if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Session management requires a real account.');
-        const result = await identity.revokeSession({ userId: actor.user.id, sessionId: ownSessionMatch[1] });
-        if (result.revoked && ownSessionMatch[1] === actor.sessionId) res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
-        return sendJson(res, 200, { ...result, requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/enroll') {
-        if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'MFA enrollment requires a real account.');
-        return sendJson(res, 200, { enrollment: await identity.beginMfaEnrollment({ userId: actor.user.id }), requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/confirm') {
-        if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'MFA enrollment requires a real account.');
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        return sendJson(res, 200, { ...await identity.confirmMfaEnrollment({ userId: actor.user.id, code: body.code }), requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/auth/mfa/disable') {
-        if (actor.isDeveloper) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'MFA management requires a real account.');
-        const body = await readJson(req, Math.min(maxBody, 16_384));
-        const result = await identity.disableMfa({ userId: actor.user.id, password: body.password, code: body.code });
-        res.setHeader('set-cookie', [cookie('vsh_session', '', { httpOnly: true, secure: secureCookies, maxAge: 0 }), cookie('vsh_csrf', '', { secure: secureCookies, maxAge: 0 })]);
-        return sendJson(res, 200, { ...result, reauthenticationRequired: true, requestId });
-      }
+      if (await authRoutes.handleAuthenticated({ req, res, url, actor, requestId })) return;
+
       if (req.method === 'GET' && url.pathname === '/api/v1/ai/status') {
         const taskStore = await getAvailableAITaskStore();
         const taskStatusAvailable = Boolean(taskStore);
