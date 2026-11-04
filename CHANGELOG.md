@@ -2,6 +2,15 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
+## 0.5.4 (unreleased patch candidate)
+
+### Authentication architecture and maintainability
+
+- Extract the browser session persistence/lifecycle contract from the identity service into `packages/auth/src/session-service.js`, with explicit pool, clock/TTL, digest, safe-user, and authorization-invalidation dependencies. The identity service composes the extracted `createSession` function privately and retains the same public methods and token behavior.
+- Add focused session-service tests for 256-bit session/CSRF token generation, digest-only database persistence, site membership aggregation, expiry/idle checks, CSRF validation, session listing, and scoped logout/revocation invalidation.
+- Update the architecture map, required-artifact verification, changelog, and release manifest. Full local validation passes: 194 required paths, 205 JavaScript files syntax-checked, 437 tests (434 passed, 0 failed, 3 platform-specific skips), focused session/auth tests 35/35, and zero npm audit vulnerabilities. Hosted integration CI is the remaining candidate gate. No public API or database migration change is intended.
+- Bump the package and lockfile from 0.5.3 to 0.5.4 as a SemVer patch; this is an unreleased candidate, not a published release.
+
 ## 0.5.3 (unreleased patch candidate)
 
 ### Security and API architecture
@@ -9,7 +18,7 @@ All notable project-level changes should be recorded here. This changelog does n
 - Extract browser authentication route families from the API composition module into `apps/api/src/auth-routes.js`, separating unauthenticated login/recovery/SSO routes from authenticated account/session/MFA routes while retaining session authentication, site policy, Origin checks, and CSRF enforcement in the API request pipeline.
 - Centralize authentication cookie parsing, serialization, and CSRF double-submit comparison in `apps/api/src/auth-cookies.js`; validate cookie names, opaque token values, flags, expiry, SameSite, and path attributes before emitting Set-Cookie headers.
 - Add regression coverage for cookie attribute safety and preserve the existing login, MFA, session, and CSRF HTTP behavior.
-- Record the CodeQL re-review: the PR branch analysis reports only the Medium legacy template-code finding as open; the four High auth-cookie findings inherited by default `main` were not reported in the branch-scoped result and await post-merge default-branch confirmation. No alert was manually dismissed or waived.
+- Record the post-merge CodeQL result on `dc4a82d`: High auth-cookie findings #30–#33 changed to `fixed` in the default-branch analysis without dismissal; the Medium unsafe legacy-template finding #14 remains open and requires an explicit compatibility/security-owner decision.
 - Bump the package and lockfile from 0.5.2 to 0.5.3 as a SemVer patch. No public HTTP contract or database migration change is intended; this remains an unreleased developer-preview candidate.
 
 ## 0.5.2 (unreleased patch candidate)
