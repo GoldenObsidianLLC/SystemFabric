@@ -110,7 +110,12 @@ function createContext({
     requestId: 'request-content-types',
     localPool,
     store,
-    identity,
+    contentReadScope: async (subject, siteId) => {
+      if (subject.isDeveloper) return { ownOnly: false };
+      if (await identity.authorizeSite(subject.user.id, siteId, 'content:read')) return { ownOnly: false };
+      if (await identity.authorizeSite(subject.user.id, siteId, 'content:read:own')) return { ownOnly: true };
+      return null;
+    },
     maxBody: 128_000,
     events,
   };

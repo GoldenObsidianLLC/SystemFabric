@@ -67,15 +67,15 @@ function createContentTypeRouteHandler({
     return result.rows[0]?.definition || null;
   }
 
-  async function getContentReadScope({ actor, identity, siteId, fail }) {
-    if (actor.isDeveloper) return { ownOnly: false };
-    if (await identity.authorizeSite(actor.user.id, siteId, 'content:read')) {
-      return { ownOnly: false };
+  async function requireContentRead({ actor, siteId, contentReadScope, fail }) {
+    if (typeof contentReadScope !== 'function') {
+      throw new TypeError('The API composition layer must provide the content-read policy.');
     }
-    if (await identity.authorizeSite(actor.user.id, siteId, 'content:read:own')) {
-      return { ownOnly: true };
+    const scope = await contentReadScope(actor, siteId);
+    if (!scope) {
+      throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Content read permission is required.');
     }
-    throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Content read permission is required.');
+    return scope;
   }
 
   /**
@@ -102,7 +102,7 @@ function createContentTypeRouteHandler({
       requestId,
       localPool,
       store,
-      identity,
+      contentReadScope,
       maxBody,
     } = ctx;
     const method = req.method;
@@ -119,7 +119,7 @@ function createContentTypeRouteHandler({
 
       if (method === 'GET') {
         const siteId = await siteIdFor({ req, url, actor });
-        await getContentReadScope({ actor, identity, siteId, fail });
+        await requireContentRead({ actor, siteId, contentReadScope, fail });
 
         const git = getGitDefinitions();
         const db = await localPool.query(
@@ -197,7 +197,7 @@ function createContentTypeRouteHandler({
       const siteId = await siteIdFor({ req, url, body, actor });
 
       if (method === 'GET') {
-        const readScope = await getContentReadScope({ actor, identity, siteId, fail });
+        const readScope = await requireContentRead({ actor, siteId, contentReadScope, fail });
         const definition = await getContentTypeDefinition({ siteId, slug, localPool, fail });
         if (!definition) {
           return sendJson(res, 404, {
@@ -261,7 +261,7 @@ function createContentTypeRouteHandler({
       }
 
       const siteId = await siteIdFor({ req, url, actor });
-      const readScope = await getContentReadScope({ actor, identity, siteId, fail });
+      const readScope = await requireContentRead({ actor, siteId, contentReadScope, fail });
       const definition = await getContentTypeDefinition({ siteId, slug: recordMatch[1], localPool, fail });
       if (!definition) return sendJson(res, 404, { error: 'Content type not found.', requestId });
 
