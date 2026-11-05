@@ -55,9 +55,9 @@ docker compose config --quiet passed. Compose create created the new named volum
 
 - The restored PostgreSQL 18.6 server started from the new volume, completed crash/WAL recovery, wrote its end-of-recovery checkpoint, and reported that it was ready to accept connections.
 - Docker Compose reports the container healthy based on pg_isready. This is only transport/readiness health, not an application identity check.
-- The restored cluster contains the old systemfabric superuser and systemfabric/systemfabric_test databases. The new Compose defaults expect the virgoscorpio_hub role/database, which do not exist in the restored cluster yet. PostgreSQL logs therefore record failed health probes for role virgoscorpio_hub even though pg_isready is healthy.
-- The legacy systemfabric_test database contains migration records 0001–0014. Current mainline has 18 migrations. The remaining migration sequence and schema upgrade have not yet been applied to the restored test database.
-- The next step is to provision the expected local development role/database on the restored copy, copy the legacy disposable test schema into virgoscorpio_hub_test, then apply and verify the current 18-migration set and its idempotent second pass. Preserve the original systemfabric and systemfabric_test databases in the restored cluster until that comparison is complete.
+- The restored cluster contains the legacy systemfabric superuser and systemfabric/systemfabric_test databases. The new Compose defaults expect a virgoscorpio_hub role/database, which do not exist yet. PostgreSQL logs therefore record failed health probes for role virgoscorpio_hub even though pg_isready is healthy.
+- The legacy systemfabric database has no user tables. The separate systemfabric_test database has 67 public tables and a legacy systemfabric_schema_migrations ledger for versions 0001–0014. Current mainline uses a different migration-ledger name (virgoscorpio_hub_schema_migrations) and its migration runner deliberately refuses to initialize a non-empty database without its own initialized ledger. Copying the old 14-migration test schema directly into the new test database would therefore be the wrong upgrade path and could produce a misleading/blocked migration state.
+- Keep systemfabric_test intact as a legacy comparison/reference database; do not copy it into the new test database. Provision the Compose-compatible local development role with CREATEDB capability (the standard Compose POSTGRES_USER is a local development superuser) and create a fresh virgoscorpio_hub application database. Apply the current 18 migrations to that empty app database. Then set TEST_DATABASE_URL to a local database name ending in _test; scripts/test-integration-live.js will create the missing local test database under the same role, run the live integration suite against the restored PG/Memgraph services, and apply all 18 migrations. scripts/test-fresh-migrations.js will create a separate random disposable database, apply all 18 migrations, verify the exact ledger and idempotent second pass, and drop only that generated database. Keep systemfabric and systemfabric_test unchanged until acceptance is complete.
 
 ### Memgraph restore result
 
@@ -75,9 +75,11 @@ docker compose config --quiet passed. Compose create created the new named volum
 
 ## Remaining validation
 
-- [ ] Create/validate the local virgoscorpio_hub role and virgoscorpio_hub/virgoscorpio_hub_test databases on the restored PostgreSQL copy.
-- [ ] Migrate the legacy 14-migration test schema into virgoscorpio_hub_test; apply migrations 0015–0018 and verify all 18 records plus idempotent second pass.
-- [ ] Validate database objects, migration checksums, representative row counts, and application startup against the new DATABASE_URL.
+- [ ] Provision the local Compose-compatible virgoscorpio_hub role with CREATEDB capability and create a fresh virgoscorpio_hub app database; keep legacy systemfabric/systemfabric_test databases unchanged.
+- [ ] Apply the current 18 migrations to the empty application database via scripts/migrate.js and verify migration checksums/schema objects.
+- [ ] Run scripts/test-integration-live.js with DATABASE_URL and TEST_DATABASE_URL pointing to the restored local server; verify all live PostgreSQL/Memgraph suites without skips.
+- [ ] Run scripts/test-fresh-migrations.js with local TEST_DATABASE_URL; verify 18/18 apply, 18/18 idempotent skips, exact ledger, and drop of only its generated disposable database.
+- [ ] Validate representative object/table state and application startup against the new DATABASE_URL.
 - [ ] Run the live PostgreSQL/Memgraph integration suite against the restored project services, including graph projection rebuild, outage/replay, and canonical rebuild checks.
 - [ ] Verify the API/browser smoke paths that depend on the database.
 - [ ] Record Compose image digests, final service health, exact commands/results, and the rollback decision. Retain the legacy resources through an agreed rollback window.
