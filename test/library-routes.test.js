@@ -247,7 +247,7 @@ test('asset version replacement is audited after the versioned store operation',
   assert.equal(events[4].entry.details.version, 3);
 });
 
-test('library route-level errors retain the existing public error codes', async t => {
+test('library route-level errors use the established Hub error namespace', async t => {
   await t.test('configured storage is required', async () => {
     const ctx = createContext({
       path: `/api/v1/sites/${siteId}/library/items`,
@@ -255,7 +255,7 @@ test('library route-level errors retain the existing public error codes', async 
     });
     await assert.rejects(
       handleLibraryRoute(ctx),
-      error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_LIBRARY_DISABLED',
+      error => error.statusCode === 503 && error.code === 'ERR_VIRGOSCORPIO_HUB_LIBRARY_DISABLED',
     );
   });
 
@@ -266,7 +266,7 @@ test('library route-level errors retain the existing public error codes', async 
     });
     await assert.rejects(
       handleLibraryRoute(ctx),
-      error => error.statusCode === 404 && error.code === 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND',
+      error => error.statusCode === 404 && error.code === 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND',
     );
   });
 });
