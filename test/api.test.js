@@ -632,3 +632,72 @@ test('AI task collection rejects duplicate and invalid query parameters', async 
     assert.equal((await invalidStatus.json()).code, 'ERR_VIRGOSCORPIO_HUB_AI_TASK_STATUS_INVALID');
   }, {}, { aiTaskStore });
 });
+
+
+test('custom content-type routes are composed after bearer authentication with the resolved site context', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const events = [];
+  const pool = {
+    async query(sql, params = []) {
+      const normalized = String(sql).replace(/\s+/g, ' ').trim();
+      events.push({ type: 'pool.query', sql: normalized, params });
+      if (normalized.includes('FROM content_type_definitions')) return { rows: [] };
+      return { rows: [] };
+    },
+    async connect() {
+      throw new Error('the integration scenario must not open a registry write transaction');
+    },
+  };
+  const contentStore = {
+    async listContent(input) {
+      events.push({ type: 'listContent', input });
+      return [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', content_type: 'article', status: 'draft' }];
+    },
+    async saveDraft(input) {
+      events.push({ type: 'saveDraft', input });
+      return { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', version: 1, status: 'draft' };
+    },
+  };
+  const identityService = { async authenticate() { return null; } };
+
+  await withServer(async base => {
+    const headers = {
+      authorization: 'Bearer test-secret-token',
+      'content-type': 'application/json',
+    };
+    const registry = await fetch(base + '/api/v1/content-types?siteId=' + siteId, { headers });
+    const registryBody = await registry.json();
+    assert.equal(registry.status, 200);
+    assert.ok(registryBody.definitions.some(item => item.name === 'article'));
+    assert.deepEqual(registryBody.conflicts, []);
+
+    const listed = await fetch(base + '/api/v1/content-types/article/records?siteId=' + siteId + '&limit=5', { headers });
+    const listedBody = await listed.json();
+    assert.equal(listed.status, 200);
+    assert.equal(listedBody.items[0].content_type, 'article');
+
+    const created = await fetch(base + '/api/v1/content-types/article/records?siteId=' + siteId, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ title: 'Composed route', values: { title: 'Composed route', body: { type: 'doc', children: [] } } }),
+    });
+    const createdBody = await created.json();
+    assert.equal(created.status, 201);
+    assert.equal(createdBody.status, 'draft');
+    assert.equal(createdBody.record.version, 1);
+  }, {}, { pool, contentStore, identityService });
+
+  const registryQuery = events.find(event => event.type === 'pool.query' && event.sql.includes('FROM content_type_definitions'));
+  assert.deepEqual(registryQuery.params, [siteId]);
+  const listing = events.find(event => event.type === 'listContent');
+  assert.equal(listing.input.siteId, siteId);
+  assert.equal(listing.input.contentType, 'article');
+  const creation = events.find(event => event.type === 'saveDraft');
+  assert.equal(creation.input.siteId, siteId);
+  assert.equal(creation.input.contentType, 'article');
+  assert.deepEqual(creation.input.document, {
+    schemaVersion: 1,
+    documentType: 'custom:article',
+    fields: { title: 'Composed route', body: { type: 'doc', children: [] } },
+  });
+});

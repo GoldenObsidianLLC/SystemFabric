@@ -17,7 +17,7 @@ const required = [
   'packages/db/src/postgres-store.js', 'packages/db/src/transaction.js', 'packages/db/src/ai-task-store.js', 'packages/db/src/ai-task-queue.js', 'packages/db/src/outbox-worker.js', 'packages/db/src/outbox-delivery.js', 'packages/db/src/relationship-store.js',
   'packages/realtime/src/index.js', 'packages/realtime/src/event-hub.js', 'packages/realtime/src/presence.js', 'packages/realtime/src/redis-presence.js', 'packages/realtime/src/redis-realtime.js', 'packages/realtime/src/sse-gateway.js', 'packages/realtime/src/event-contract.js',
   'test/migrations.test.js', 'test/domain-identifiers.test.js', 'test/output-encoding.test.js', 'test/db-transaction.test.js', 'test/ai-task-store.test.js', 'test/ai-task-payload.test.js', 'test/ai-task-queue.test.js', 'test/ai-queue-worker.test.js', 'test/realtime.test.js', 'test/realtime-tenant-isolation.test.js', 'test/redis-presence.test.js', 'test/redis-realtime.test.js', 'test/integration/redis-presence.integration.test.js', 'test/outbox-contract.test.js', 'test/outbox-delivery.test.js', 'test/graph-projection-worker.test.js', 'test/memgraph-projector.test.js', 'docs/REALTIME-FOUNDATION-F1.md', 'docs/REALTIME-AI-ARCHITECTURE.md', 'docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md', 'docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md',
-  'packages/graph/src/memgraph-store.js', 'packages/graph/src/rebuild-projection.js', 'apps/api/src/server.js', 'apps/api/src/platform-routes.js', 'apps/api/src/commerce-routes.js', 'apps/api/src/library-routes.js', 'apps/api/src/request-validation.js', 'apps/api/src/auth-routes.js', 'apps/api/src/ai-task-routes.js', 'test/ai-task-routes.test.js', 'apps/api/src/site-membership-routes.js', 'test/site-membership-routes.test.js', 'apps/api/src/auth-cookies.js', 'apps/mcp/src/server.mjs', 'test/auth-cookies.test.js', 'test/commerce-routes.test.js', 'test/library-routes.test.js', 'test/request-validation.test.js',
+  'packages/graph/src/memgraph-store.js', 'packages/graph/src/rebuild-projection.js', 'apps/api/src/server.js', 'apps/api/src/platform-routes.js', 'apps/api/src/commerce-routes.js', 'apps/api/src/library-routes.js', 'apps/api/src/request-validation.js', 'apps/api/src/auth-routes.js', 'apps/api/src/ai-task-routes.js', 'test/ai-task-routes.test.js', 'apps/api/src/site-membership-routes.js', 'test/site-membership-routes.test.js', 'apps/api/src/content-type-routes.js', 'test/content-type-routes.test.js', 'apps/api/src/auth-cookies.js', 'apps/mcp/src/server.mjs', 'test/auth-cookies.test.js', 'test/commerce-routes.test.js', 'test/library-routes.test.js', 'test/request-validation.test.js',
   'apps/admin/index.html', 'apps/admin/platform.html', 'apps/admin/assets/platform.js', 'apps/admin/assets/platform.css', 'vendor/enginex/package.json'
 ];
 const missing = required.filter(file => !fs.existsSync(path.join(root, file)));
@@ -50,7 +50,7 @@ if (packageJson.engines?.node !== vendorJson.engines?.node) throw new Error('Vir
 function walk(dir) {
   const result = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'vendor' || entry.name === 'node_modules' || entry.name === '.git') continue;
+    if (entry.name === 'vendor' || entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.worktrees') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) result.push(...walk(full));
     else if (/\.(?:js|mjs)$/.test(entry.name)) result.push(full);
