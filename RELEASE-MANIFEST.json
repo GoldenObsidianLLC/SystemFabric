@@ -437,8 +437,8 @@
       "unitTests": {
         "status": "PASS",
         "command": "npm run check",
-        "tests": 469,
-        "passed": 466,
+        "tests": 476,
+        "passed": 473,
         "failed": 0,
         "skipped": 3,
         "skipNotes": [
@@ -471,12 +471,12 @@
         "status": "PASS",
         "command": "npm audit --audit-level=high",
         "vulnerabilities": 0,
-        "date": "2026-11-04"
+        "date": "2026-11-05"
       }
     },
-    "hostedCi": "PASS on both PR #68 run 41976111045 (#260) and push run 41976023520 (#259); all six jobs succeeded. PR #68 remains OPEN and UNMERGED pending human review.",
+    "hostedCi": "PASS on both PR #68 run #270 and push run #269 for final source 8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3; all six jobs succeeded in each. PR #68 remains OPEN and UNMERGED pending review/merge.",
     "productionCertified": false,
-    "localValidationSummary": "PASS: fresh npm ci; 206 required paths; 213 JavaScript files syntax-checked; 469 root tests (466 passed, 0 failed, 3 Windows/platform-specific skips); focused suite 49/49; EnginEx 94 (91 passed, 0 failed, 3 platform-specific skips); high-severity npm audit reports zero vulnerabilities.",
+    "localValidationSummary": "PASS: fresh npm ci; 206 required paths; 213 JavaScript files syntax-checked; 476 root tests (473 passed, 0 failed, 3 Windows/platform-specific skips); focused API/library/commerce/platform/request-validation suite 49/49; EnginEx 94 (91 passed, 0 failed, 3 platform-specific skips); high-severity npm audit reports zero vulnerabilities.",
     "hostedCiEvidence": {
       "pullRequest": {
         "number": 68,
@@ -1005,38 +1005,43 @@
     "reviewedAt": "2026-11-05",
     "version": "0.6.2",
     "branch": "refactor/api-library-routes-2026-11",
-    "headCommit": "5f900faf3b92307977d3858e1bb0897ab12abe66",
-    "mergeRefCommit": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+    "headCommit": "8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3",
+    "mergeRefCommit": "e39cd5c33f940762ed9fa88b27aad8f8d3070947",
     "pullRequest": {
       "number": 68,
       "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
       "state": "open",
       "merged": false,
-      "head": "5f900faf3b92307977d3858e1bb0897ab12abe66",
+      "head": "8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3",
       "base": "489325585d57fe95f961c36a597faa7065848c7f",
-      "mergeRef": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+      "mergeRef": "e39cd5c33f940762ed9fa88b27aad8f8d3070947",
       "reviewCount": 0
     },
     "ci": {
       "pullRequestRun": {
-        "id": 42015046006,
-        "number": 264,
+        "id": 42026945926,
+        "number": 270,
         "event": "pull_request",
         "conclusion": "success"
       },
+      "pushRun": {
+        "id": 42026938931,
+        "number": 269,
+        "event": "push",
+        "conclusion": "success"
+      },
       "jobsPerRun": 6,
-      "completedJobs": 6,
       "status": "PASS",
       "workflowStatus": "completed"
     },
     "tests": {
       "node22Hub": {
-        "passed": 473,
+        "passed": 476,
         "failed": 0,
         "skipped": 0
       },
       "node24Hub": {
-        "passed": 473,
+        "passed": 476,
         "failed": 0,
         "skipped": 0
       },
@@ -1055,6 +1060,9 @@
         "secondPassSkipped": 18,
         "disposableDatabaseDropped": true
       },
+      "supportedUpgradeFixture": "v0008-to-v0009 PASS",
+      "memgraphOutageReplay": "PASS",
+      "canonicalGraphRebuild": "PASS",
       "playwrightSmoke": {
         "passed": 9,
         "failed": 0,
@@ -1070,15 +1078,15 @@
       "npm": "11.19.1",
       "node22Components": 177,
       "node22Dependencies": 178,
-      "node22SbomSha256": "5c20eeb89b1f475562e06db066bf008146e033a3f8db8c567f9aaff97eac6dd9",
+      "node22SbomSha256": "42a5c2d974265888baeadecac8e6af3745edd1eb35c0b7131447aef89a309f17",
       "node24Components": 177,
       "node24Dependencies": 178,
-      "node24SbomSha256": "80c1874ead1c037ed0305843c4db822a65ac8580d0f0b3bd4b01ec495e0dea7f",
+      "node24SbomSha256": "40259a3c0b6b772885e34d69c172d59a56627722ae6f1885d22d42101d126af0",
       "normalizedComponentAndDependencyGraphParity": "PASS",
       "disposition": "IDENTICAL_NORMALIZED_INVENTORY"
     },
     "formalReadiness": {
-      "sourceRevision": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+      "sourceRevision": "e39cd5c33f940762ed9fa88b27aad8f8d3070947",
       "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
       "readyForProduction": false,
       "pass": 7,
@@ -1087,6 +1095,12 @@
       "missingEvidence": 14,
       "notRun": 0,
       "productionCertification": "BLOCKED"
+    },
+    "supersededRun": {
+      "runNumber": 268,
+      "conclusion": "failure",
+      "disposition": "corrected",
+      "summary": "The intermediate library-route compatibility patch returned the stale ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND code. The final candidate restores the canonical ERR_VIRGOSCORPIO_HUB_* namespace; run #270 passes live tenant-isolation tests."
     },
     "status": "HOSTED_CI_PASS_PRODUCTION_NO_GO"
   },
@@ -1105,26 +1119,32 @@
       "node": "v26.12.1",
       "requiredPaths": 206,
       "javascriptSyntaxChecked": 213,
-      "rootTests": 473,
-      "passed": 470,
+      "rootTests": 476,
+      "passed": 473,
       "failed": 0,
       "skipped": 3,
       "npmAuditHighOrCriticalVulnerabilities": 0,
       "gitDiffCheck": "PASS"
     },
     "hostedCi": {
-      "runId": 42015046006,
-      "runNumber": 264,
-      "event": "pull_request",
-      "conclusion": "success",
-      "jobs": 6,
+      "pullRequestRun": {
+        "runId": 42026945926,
+        "runNumber": 270,
+        "conclusion": "success"
+      },
+      "pushRun": {
+        "runId": 42026938931,
+        "runNumber": 269,
+        "conclusion": "success"
+      },
+      "jobsPerRun": 6,
       "ciStatus": "PASS"
     },
     "productionCertified": false,
-    "sourceRevision": "5f900faf3b92307977d3858e1bb0897ab12abe66",
-    "mergeRef": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+    "sourceRevision": "8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3",
+    "mergeRef": "e39cd5c33f940762ed9fa88b27aad8f8d3070947",
     "formalReadiness": {
-      "sourceRevision": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+      "sourceRevision": "e39cd5c33f940762ed9fa88b27aad8f8d3070947",
       "pass": 7,
       "partial": 2,
       "blocked": 1,
@@ -1137,15 +1157,16 @@
     "sbomParity": {
       "status": "PASS",
       "npm": "11.19.1",
+      "lockfileSha256": "f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce",
       "node22": {
         "components": 177,
         "dependencies": 178,
-        "sha256": "5c20eeb89b1f475562e06db066bf008146e033a3f8db8c567f9aaff97eac6dd9"
+        "sha256": "42a5c2d974265888baeadecac8e6af3745edd1eb35c0b7131447aef89a309f17"
       },
       "node24": {
         "components": 177,
         "dependencies": 178,
-        "sha256": "80c1874ead1c037ed0305843c4db822a65ac8580d0f0b3bd4b01ec495e0dea7f"
+        "sha256": "40259a3c0b6b772885e34d69c172d59a56627722ae6f1885d22d42101d126af0"
       }
     }
   }
