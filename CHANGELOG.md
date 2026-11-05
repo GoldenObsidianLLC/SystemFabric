@@ -2,6 +2,22 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
+## 0.6.2 (unreleased patch candidate)
+
+### API architecture and maintainability
+- Extract the site-scoped library and media HTTP routes into `apps/api/src/library-routes.js`; retain request authentication, site resolution, capability enforcement, request lifecycle and centralized errors in the API composition pipeline.
+- Preserve library upload limits, metadata and optimistic-version operations, audit events, private-download headers, optional optimization status handling, and tenant-scoped store operations. Keep PostgreSQL/object-storage compensation and reconciliation explicit; no distributed transaction or database migration is introduced.
+- Add focused tests for unmatched dispatch, site/capability ordering, cross-site rejection before store access, upload audit minimization, private-download hardening, version replacement and unsupported optimization behavior.
+- Update required-artifact verification and architecture/route ownership documentation. No public HTTP contract change is intended.
+- Bump VirgoScorpio Hub from 0.6.1 to 0.6.2 as a SemVer patch for a compatible internal route-family extraction. This is an unreleased candidate; no tag or package publication is implied.
+
+### Validation
+- Fresh `npm ci --no-audit --no-fund` completed in the isolated candidate worktree on Windows / Node.js 26.12.1.
+- `npm run check` passed: 205 required paths, 213 JavaScript files syntax-checked, 469 tests (466 passed, 0 failed, 3 platform-specific skips).
+- Focused API/library/commerce/platform/request-validation regression suites passed 49/49 with zero skips.
+- Vendored EnginEx 7.0.0 tests passed 94 cases (91 passed, 0 failed, 3 Windows/platform-specific skips); `npm audit --audit-level=high` reported 0 vulnerabilities. Supported-runtime and hosted integration/browser/CodeQL evidence remain required on the candidate PR.
+- The default-branch 0.6.1 release-gate report remains NO-GO: 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. A green local suite does not close production certification gates.
+
 ## 0.6.1 (unreleased patch candidate)
 
 ### API architecture and maintainability

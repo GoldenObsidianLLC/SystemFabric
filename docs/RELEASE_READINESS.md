@@ -2,13 +2,21 @@
 
 > **Current status: NOT_PRODUCTION_CERTIFIED.** The readiness report is an engineering evidence snapshot, not production approval.
 
-## Post-snapshot repository changes — 4 November 2026
+## Current mainline snapshot — 4 November 2026
+
+The current default branch was reviewed at commit `489325585d57fe95f961c36a597faa7065848c7f` (`refactor(api): extract AI task route family`, PR #67). Hosted CI run [#258 / 41949722725](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41949722725) completed all six checks successfully: Node.js 22.23.4, Node.js 24.22.1, dedicated PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL, and consolidated revision-bound evidence. Both runtime jobs passed 461/461 Hub tests and 94/94 EnginEx tests; the live database job passed 65/65 tests and applied all 18 migrations with an idempotent second pass; browser smoke passed 9/9.
+
+The formal readiness evaluator on this revision remains **NO-GO**: 8 PASS, 2 PARTIAL, 0 BLOCKED, 14 MISSING_EVIDENCE and 0 NOT_RUN; `readyForProduction` is false. The outstanding items include independent tenant-isolation/security reviews, live identity/scanner/cloud/Stripe provider verification, full accessibility and product acceptance, signed plugin isolation, SBOM/license/provenance review, load/backup/restore, production observability, operations and release-owner approval. Green CI is engineering evidence, not production certification.
+
+The complete revision-bound assessment is in the [4 November 2026 VirgoScorpio Hub 0.6.1 Release Gate Report](reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md). The report preserves the distinction between the 0.6.1 mainline candidate and the follow-on 0.6.2 local development branch. No release tag or GitHub Release was published at review time.
+
+## Historical pre-PR #65 assessment — 4 November 2026 (superseded)
 
 PR [#59](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/59) completed the identity cutover. PR #61 added the encrypted durable AI queue foundation; PR #62 centralized transaction/version infrastructure; PR #63 extracted browser auth routes/cookie handling; and PR #64 separated session persistence/lifecycle from identity orchestration. These PRs are merged to `main` at the latest pre-candidate commit `aa361ab` (4 November 2026). They are code changes, not release-certification events. The detailed candidate evidence below was generated on 1 November and is historical, not current-commit evidence.
 
 The post-PR #63 CodeQL analysis on `dc4a82d` marked High auth-cookie alerts #30–#33 fixed without manual dismissal. Medium alert #14 (`js/unsafe-code-construction`) remains open on the `aa361ab` baseline, at the now-removed vendor legacy renderer. PR #65 is the 0.6.0 / EnginEx 7.0.0 compatibility/security candidate that removes that legacy execution adapter; its CodeQL and other hosted checks must pass before the alert can be recorded as fixed. No finding is manually dismissed or suppressed.
 
-**Current release state remains NOT_PRODUCTION_CERTIFIED / NO-GO.** The 0.6.0 candidate's local tests and static checks do not replace current supported-runtime, hosted integration, security, provider, accessibility, operational, independent-review and named release-owner evidence.
+**Historical disposition for the pre-PR #65 snapshot:** NOT_PRODUCTION_CERTIFIED / NO-GO. This section records the then-current 0.6.0 candidate and is retained for audit continuity; use the current mainline snapshot above and the linked 4 November report for the latest evidence.
 
 ## Historical candidate snapshot — 1 November 2026
 

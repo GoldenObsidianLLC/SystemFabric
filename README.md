@@ -14,7 +14,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.0 is an unreleased security/compatibility candidate on the 0.5.x developer-preview lineage. It upgrades the renderer to EnginEx 7.0.0 and removes arbitrary-JavaScript legacy template execution. The platform remains **NOT_PRODUCTION_CERTIFIED**; passing local/hosted CI does not replace provider-specific verification, operational rehearsals, an independent security review, or release approval. See [release readiness](docs/RELEASE_READINESS.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and the [0.6.0 changelog](CHANGELOG.md).
+> **Project status:** VirgoScorpio Hub 0.6.1 is the current unreleased mainline patch candidate, including the EnginEx 7.0.0 security/compatibility upgrade and internal commerce/AI route-family extractions. The follow-on 0.6.2 candidate adds the site-scoped library/media route-family seam. The platform remains **NOT_PRODUCTION_CERTIFIED**: current main CI is green, but the formal release gate remains NO-GO with 14 required evidence items missing. See [release readiness](docs/RELEASE_READINESS.md), the [4 November 2026 release-gate report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
 
 ## Table of contents
 

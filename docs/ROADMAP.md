@@ -26,8 +26,9 @@ Apply these checks to every AI-enabled product track:
 ### Reliability and release process
 
 - [x] Remove the legacy EnginEx arbitrary-JavaScript renderer and fail closed on the retired compatibility flags. Review [EnginEx 7.0 Migration](ENGINEX-7-MIGRATION.md); this breaking renderer upgrade merged as Hub 0.6.0 / EnginEx 7.0.0. It does not constitute release approval.
-- [x] Extract commerce and membership HTTP route handling into `apps/api/src/commerce-routes.js`, preserve the API server's authentication/site/capability dispatch, and reuse bounded JSON-object and canonical UUID helpers. The internal route-seam refactor is tracked as the unreleased 0.6.1 patch candidate.
-- [ ] Make CI green across the supported Node.js matrix, live PostgreSQL/Memgraph job, browser smoke tests, and CodeQL upload.
+- [x] Extract commerce and membership HTTP route handling into `apps/api/src/commerce-routes.js`, preserve the API server's authentication/site/capability dispatch, and reuse bounded JSON-object and canonical UUID helpers. This internal route-seam refactor merged in the unreleased 0.6.1 mainline.
+- [x] Extract site-scoped library/media HTTP handling into `apps/api/src/library-routes.js` on the follow-on local 0.6.2 candidate. Preserve authentication, site resolution, capability checks, upload bounds, metadata/version semantics, audit events, private-download headers, optimization status and explicit object-storage reconciliation. Focused and full local checks pass; hosted supported-runtime/integration CI remains a PR gate.
+- [x] Make CI green across the supported Node.js matrix, live PostgreSQL/Memgraph job, browser smoke tests, and CodeQL upload. Verified on main commit `489325585d57fe95f961c36a597faa7065848c7f` by hosted run [#258](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41949722725): six checks passed, including 65/65 live integration tests and 9/9 browser smoke. This is engineering CI evidence only; the [production release gate](reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md) remains NO-GO.
 - [ ] Add fresh-database migration and supported upgrade-path evidence.
 - [ ] Exercise concurrent writes, outbox retry/recovery, and failure recovery under representative load.
 - [ ] Perform backup/restore drills and document RPO/RTO results.

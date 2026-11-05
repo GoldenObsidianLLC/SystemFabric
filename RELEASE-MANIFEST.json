@@ -1,8 +1,8 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.6.1",
-  "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; 0.6.1 internal API modularity candidate, not production-certified.",
+  "version": "0.6.2",
+  "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; 0.6.2 internal library/media API modularity candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
     "nodeMinimum": ">=22.23.4",
@@ -12,9 +12,9 @@
     "packageLock": {
       "included": true,
       "trackedInGit": true,
-      "cleanNpmCiValidated": false,
+      "cleanNpmCiValidated": true,
       "reviewedByMaintainer": false,
-      "reason": "The 0.6.1 AI task route candidate reuses the shared dependency cache for local checks; a fresh clean npm ci in hosted CI is required before merge or release. PR #66 clean-install CI passed; PR #67 must pass its own clean-install workflow."
+      "reason": "A fresh npm ci --no-audit --no-fund completed successfully in the isolated 0.6.2 candidate worktree on Windows / Node.js 26.12.1. Explicit maintainer dependency/lockfile and license review remains open; hosted supported-runtime CI is still required on the candidate PR."
     }
   },
   "renderer": {
@@ -95,7 +95,7 @@
       "Playwright browser/accessibility job definition",
       "CodeQL static-analysis job definition",
       "dependency audit and SBOM steps in CI workflow",
-      "Hosted CI executed on current main commit fc95ea3628c88c9bc1eb29e5d07e36edb07fb31a: all five jobs passed, including Node 22.23.4 and 24.22.1 checks, PostgreSQL/Memgraph integration, browser/accessibility smoke and CodeQL; test evidence only, not production certification.",
+      "Hosted CI executed on main commit 489325585d57fe95f961c36a597faa7065848c7f (workflow run 41949722725): all six checks passed, including Node.js 22.23.4 and 24.22.1 (461/461 Hub tests and 94/94 EnginEx tests per runtime), dedicated PostgreSQL/Memgraph integration (65/65), fresh migrations 18/18 plus idempotent re-entry, browser/accessibility smoke (9/9), CodeQL execution and consolidated revision-bound evidence. The current formal production gate remains NO-GO with 14 missing evidence items.",
       "release-readiness JSON/Markdown report and fail-closed readiness command",
       "VS Code Dev Container, preflight checks, strict live integration test runner and blocker-to-test instructions are included in this candidate workspace"
     ]
@@ -142,7 +142,7 @@
   },
   "productionGates": [
     "supported Node.js runtime, reviewed committed lockfile, clean npm ci and repeatable installation",
-    "apply and validate migrations 0001–0008 on fresh PostgreSQL and supported upgrade fixtures",
+    "apply and validate migrations 0001–0018 on fresh PostgreSQL and supported upgrade fixtures",
     "live PostgreSQL concurrency, rollback, outbox replay/dead-letter, Memgraph outage and reconciliation tests",
     "comprehensive tenant isolation and independent identity/authorization review",
     "real OIDC/SAML/email provider integration and account recovery validation",
@@ -241,6 +241,13 @@
       "status": "unreleased-candidate",
       "date": "2026-11-04",
       "summary": "Internal commerce and AI task API route-family extraction with bounded request validation and canonical identifier reuse; no intended HTTP or schema contract change."
+    },
+    {
+      "version": "0.6.2",
+      "changeType": "patch",
+      "status": "unreleased-candidate",
+      "date": "2026-11-04",
+      "summary": "Extract site-scoped library/media HTTP route handling into a dedicated API module with route-family tests; no intended public HTTP or schema contract change."
     }
   ],
   "historicalValidation": {
@@ -394,18 +401,20 @@
   },
   "candidateValidation": {
     "reviewedAt": "2026-11-04",
-    "branch": "refactor/api-route-family-2026-11",
+    "baselineCommit": "489325585d57fe95f961c36a597faa7065848c7f",
+    "branch": "refactor/api-library-routes-2026-11",
     "semver": {
-      "previousVersion": "0.6.0",
-      "candidateVersion": "0.6.1",
+      "previousVersion": "0.6.1",
+      "candidateVersion": "0.6.2",
       "changeType": "patch",
       "released": false,
-      "reason": "Compatible internal API route-family modularity improvements with no intended HTTP contract or database schema change."
+      "reason": "Compatible internal library/media API route-family extraction with no intended HTTP contract or database schema change."
     },
     "includedChanges": [
-      "Commerce products/orders/refunds/checkout/membership route-family extraction (PR #66).",
-      "Authenticated AI task status/history/detail read-route extraction (this candidate).",
-      "Bounded request JSON validation and canonical UUID reuse (PR #66)."
+      "Extract site-scoped library/media HTTP handling into apps/api/src/library-routes.js.",
+      "Keep API authentication, selected-site resolution, capability checks and central error handling in the composition pipeline.",
+      "Add route-family and platform-composition regression tests; require the new source/test in scripts/verify.js.",
+      "Update architecture, roadmap, release evidence, changelog and repository report links."
     ],
     "localValidation": {
       "status": "PASS",
@@ -414,37 +423,59 @@
         "platform": "win32",
         "arch": "x64"
       },
+      "cleanNpmCi": {
+        "status": "PASS",
+        "command": "npm ci --no-audit --no-fund",
+        "result": "180 packages installed; postinstall generated KaTeX assets."
+      },
       "artifactCheck": {
         "status": "PASS",
-        "requiredPaths": 202,
-        "javascriptFilesSyntaxChecked": 211
+        "requiredPaths": 205,
+        "javascriptFilesSyntaxChecked": 213
       },
       "unitTests": {
         "status": "PASS",
-        "tests": 461,
-        "passed": 458,
+        "command": "npm run check",
+        "tests": 469,
+        "passed": 466,
+        "failed": 0,
+        "skipped": 3,
+        "skipNotes": [
+          "Open-file rename semantics differ on Windows.",
+          "O_NOFOLLOW is not exposed on this platform."
+        ]
+      },
+      "focusedTests": {
+        "status": "PASS",
+        "tests": 49,
+        "passed": 49,
+        "failed": 0,
+        "skipped": 0,
+        "suites": [
+          "test/library-routes.test.js",
+          "test/commerce-routes.test.js",
+          "test/request-validation.test.js",
+          "test/platform-features.test.js",
+          "test/api.test.js"
+        ]
+      },
+      "enginexTests": {
+        "status": "PASS_WITH_PLATFORM_SKIPS",
+        "tests": 94,
+        "passed": 91,
         "failed": 0,
         "skipped": 3
       },
-      "focusedAiRouteTests": {
-        "status": "PASS",
-        "tests": 45,
-        "passed": 45,
-        "failed": 0,
-        "skipped": 0
-      },
       "npmAuditHigh": {
         "status": "PASS",
-        "command": "npm audit --package-lock-only --audit-level=high",
+        "command": "npm audit --audit-level=high",
         "vulnerabilities": 0,
         "date": "2026-11-04"
-      },
-      "dependencyInstall": "Shared dependency cache reused with explicit EnginEx 7.0.0 preload; clean npm ci not run in this worktree."
+      }
     },
-    "hostedCi": "PENDING_PR_67; requires fresh clean npm ci, Node 22/24 matrix, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL, and consolidated evidence.",
-    "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; hosted PR CI is the clean-install gate.",
+    "hostedCi": "PENDING_PULL_REQUEST; require Node.js 22.23.4/24.22.1, PostgreSQL/Memgraph live integration, browser/accessibility smoke, CodeQL and consolidated revision-bound evidence on the candidate commit.",
     "productionCertified": false,
-    "localValidationSummary": "PASS: 202 required paths, 211 JavaScript files syntax-checked; 461 unit tests (458 passed, 0 failed, 3 Windows/platform-specific skips); focused AI route/API/context suites 45/45; package-lock audit 0 vulnerabilities."
+    "localValidationSummary": "PASS: fresh npm ci; 205 required paths; 213 JavaScript files syntax-checked; 469 root tests (466 passed, 0 failed, 3 Windows/platform-specific skips); focused suite 49/49; EnginEx 94 (91 passed, 0 failed, 3 platform-specific skips); high-severity npm audit reports zero vulnerabilities."
   },
   "postMergeCodeScanning": {
     "analyzedAt": "2026-11-04T21:18:28Z",
@@ -509,16 +540,16 @@
   },
   "semverChange": {
     "hub": {
-      "from": "0.5.4",
-      "to": "0.6.0",
-      "type": "minor",
-      "reason": "Pre-1.0 compatibility change removing the unsafe legacy renderer surface."
+      "from": "0.6.1",
+      "to": "0.6.2",
+      "type": "patch",
+      "reason": "Compatible internal library/media route-family extraction; no intended public HTTP contract or database schema change."
     },
     "enginex": {
-      "from": "6.2.0",
+      "from": "7.0.0",
       "to": "7.0.0",
-      "type": "major",
-      "reason": "Removal of allowUnsafeCode/engine.unsafe execution capability."
+      "type": "unchanged",
+      "reason": "The library/media route refactor does not change the vendored renderer."
     }
   },
   "routeFamilyRefactor": {
@@ -684,7 +715,178 @@
       "skipped": 0
     },
     "fullRepositoryValidation": "PASS locally: 202 required paths, 211 JavaScript files syntax-checked; 461 tests (458 passed, 0 failed, 3 platform-specific skips).",
-    "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; local checks reuse the shared dependency cache with EnginEx 7.0.0 preload. Hosted PR CI must prove fresh installation.",
-    "hostedCi": "PENDING_PR_67"
+    "cleanNpmCi": "PASS in PR #67 hosted CI; fresh dependency installation is also confirmed for the follow-on 0.6.2 candidate worktree.",
+    "hostedCi": "PASS on PR #67: merged to main commit 489325585d57fe95f961c36a597faa7065848c7f; hosted run 41949722725 passed both supported Node.js jobs, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL and consolidated evidence.",
+    "pullRequest": {
+      "number": 67,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/67",
+      "mergedAt": "2026-11-05T01:37:02Z",
+      "mergeCommit": "489325585d57fe95f961c36a597faa7065848c7f",
+      "status": "MERGED"
+    }
+  },
+  "historicalCandidateValidation": {
+    "reviewedAt": "2026-11-04",
+    "branch": "refactor/api-route-family-2026-11",
+    "semver": {
+      "previousVersion": "0.6.0",
+      "candidateVersion": "0.6.1",
+      "changeType": "patch",
+      "released": false,
+      "reason": "Compatible internal API route-family modularity improvements with no intended HTTP contract or database schema change."
+    },
+    "includedChanges": [
+      "Commerce products/orders/refunds/checkout/membership route-family extraction (PR #66).",
+      "Authenticated AI task status/history/detail read-route extraction (this candidate).",
+      "Bounded request JSON validation and canonical UUID reuse (PR #66)."
+    ],
+    "localValidation": {
+      "status": "PASS",
+      "runtime": {
+        "node": "26.12.1",
+        "platform": "win32",
+        "arch": "x64"
+      },
+      "artifactCheck": {
+        "status": "PASS",
+        "requiredPaths": 202,
+        "javascriptFilesSyntaxChecked": 211
+      },
+      "unitTests": {
+        "status": "PASS",
+        "tests": 461,
+        "passed": 458,
+        "failed": 0,
+        "skipped": 3
+      },
+      "focusedAiRouteTests": {
+        "status": "PASS",
+        "tests": 45,
+        "passed": 45,
+        "failed": 0,
+        "skipped": 0
+      },
+      "npmAuditHigh": {
+        "status": "PASS",
+        "command": "npm audit --package-lock-only --audit-level=high",
+        "vulnerabilities": 0,
+        "date": "2026-11-04"
+      },
+      "dependencyInstall": "Shared dependency cache reused with explicit EnginEx 7.0.0 preload; clean npm ci not run in this worktree."
+    },
+    "hostedCi": "PENDING_PR_67; requires fresh clean npm ci, Node 22/24 matrix, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL, and consolidated evidence.",
+    "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; hosted PR CI is the clean-install gate.",
+    "productionCertified": false,
+    "localValidationSummary": "PASS: 202 required paths, 211 JavaScript files syntax-checked; 461 unit tests (458 passed, 0 failed, 3 Windows/platform-specific skips); focused AI route/API/context suites 45/45; package-lock audit 0 vulnerabilities."
+  },
+  "latestMainEvidence": {
+    "reviewedAt": "2026-11-04",
+    "version": "0.6.1",
+    "commit": "489325585d57fe95f961c36a597faa7065848c7f",
+    "pullRequest": {
+      "number": 67,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/67",
+      "mergedAt": "2026-11-05T01:37:02Z",
+      "mergeCommit": "489325585d57fe95f961c36a597faa7065848c7f"
+    },
+    "workflow": {
+      "runId": 41949722725,
+      "runNumber": 258,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41949722725",
+      "completedChecks": 6,
+      "successfulChecks": 6
+    },
+    "results": {
+      "node22HubTests": {
+        "passed": 461,
+        "failed": 0,
+        "skipped": 0
+      },
+      "node24HubTests": {
+        "passed": 461,
+        "failed": 0,
+        "skipped": 0
+      },
+      "enginexTestsPerRuntime": {
+        "passed": 94,
+        "failed": 0,
+        "skipped": 0
+      },
+      "livePostgresMemgraph": {
+        "passed": 65,
+        "failed": 0,
+        "skipped": 0
+      },
+      "migrations": {
+        "applied": 18,
+        "idempotentSecondPass": 18
+      },
+      "playwrightSmoke": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      },
+      "codeql": "workflow passed; PR #67 reports no open alerts on latest main analysis",
+      "dependencyAudit": {
+        "highOrCriticalVulnerabilities": 0
+      },
+      "sbom": {
+        "node22Components": 179,
+        "node22Dependencies": 180,
+        "node24Components": 177,
+        "node24Dependencies": 178,
+        "sameLockfileDifferentInventory": true,
+        "disposition": "Reconcile npm-major component differences and complete LGPL notice/distribution review."
+      }
+    },
+    "readiness": {
+      "classification": "NOT_PRODUCTION_CERTIFIED",
+      "readyForProduction": false,
+      "pass": 8,
+      "partial": 2,
+      "blocked": 0,
+      "missingEvidence": 14,
+      "notRun": 0,
+      "decision": "NO_GO"
+    },
+    "release": {
+      "gitHubReleasePublished": false,
+      "releaseTagFound": false,
+      "mainBranchProtected": false
+    }
+  },
+  "libraryRouteRefactor": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "489325585d57fe95f961c36a597faa7065848c7f",
+    "branch": "refactor/api-library-routes-2026-11",
+    "semver": {
+      "previousVersion": "0.6.1",
+      "candidateVersion": "0.6.2",
+      "changeType": "patch",
+      "released": false
+    },
+    "module": "apps/api/src/library-routes.js",
+    "composition": "apps/api/src/platform-routes.js",
+    "test": "test/library-routes.test.js",
+    "responsibilities": [
+      "Site-scoped library item list and upload.",
+      "Asset metadata patch and optimistic version replacement.",
+      "Asset version history and private downloads.",
+      "Optional image/video optimization and explicit optimization state transitions."
+    ],
+    "preserves": [
+      "Authentication, selected-site resolution and capability enforcement remain in the API request pipeline.",
+      "Site scope is validated before tenant library storage access.",
+      "Upload body bounds and optimizer byte ceilings are injected explicitly.",
+      "Audit records contain metadata/digests and never raw uploaded payload bytes.",
+      "Private downloads retain private, no-store, nosniff and sandbox CSP headers.",
+      "Optimistic version checks and existing store semantics are unchanged.",
+      "PostgreSQL/object storage are not treated as one transaction; compensation and reconciliation remain explicit."
+    ],
+    "publicHttpContractChanged": false,
+    "databaseMigrationsAdded": false,
+    "localValidation": "PASS: clean npm ci; 205 required paths; 213 JavaScript syntax checks; npm run check 469 tests (466 pass, 0 fail, 3 Windows skips); focused tests 49/49; EnginEx 94 (91 pass, 3 platform skips); npm audit high 0.",
+    "hostedCi": "PENDING_PULL_REQUEST",
+    "productionCertified": false
   }
 }

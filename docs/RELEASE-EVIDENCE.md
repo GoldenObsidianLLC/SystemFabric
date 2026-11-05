@@ -2,6 +2,12 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
+## Current mainline evidence snapshot — 4 November 2026
+
+The reviewed 0.6.1 mainline revision is `489325585d57fe95f961c36a597faa7065848c7f`; hosted workflow [run #258](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41949722725) completed all six checks. The Node.js 22.23.4 and 24.22.1 jobs each passed 461/461 Hub tests and 94/94 EnginEx tests; the dedicated PostgreSQL/Memgraph job passed 65/65 tests and verified 18 migrations plus idempotent re-entry; browser smoke passed 9/9; CodeQL and consolidated CI evidence jobs completed successfully.
+
+The formal production gate on this exact revision remains **NO-GO** (8 PASS, 2 PARTIAL, 14 MISSING_EVIDENCE; `readyForProduction: false`). Read the [4 November 2026 full release gate report](reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md) for evidence detail, all missing external/independent gates, supply-chain observations, and required next steps. The subsequent local 0.6.2 worktree is a separate engineering candidate; its local results do not change or supersede this mainline evidence snapshot.
+
 ## Run the report
 
 ```bash
