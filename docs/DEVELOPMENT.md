@@ -37,6 +37,18 @@ Use `npm ci` for a clean installation from the committed lockfile. If a script o
 
 Do not assume an optional integration is ready merely because an environment variable exists. Run the integration test and document its scope.
 
+## Local database services
+
+The repository `compose.yaml` declares local-only PostgreSQL 18 and Memgraph 3.13 services. Start both from the repository root with:
+
+```powershell
+docker compose up -d postgres memgraph
+docker compose ps
+docker compose logs --tail=100 postgres memgraph
+```
+
+The Compose project name and primary database volume names are explicit and independent of the checkout folder. PostgreSQL data persists in `virgoscorpio-hub-postgres`; Memgraph data persists in `virgoscorpio-hub-memgraph`. Do not use `docker compose down -v` for routine shutdown: `docker compose down` preserves named volumes, while `down -v` removes them. Back up and verify any existing database before changing volume names or mounts. See [Operations](OPERATIONS.md) for release backup/restore gates.
+
 ## Useful commands
 
 ```powershell

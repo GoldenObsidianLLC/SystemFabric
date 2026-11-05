@@ -16,7 +16,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.2 is the current mainline (unreleased developer-preview patch). PR [#68](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68) (library/media route extraction) and PR [#69](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/69) (site-membership administration and invitations route extraction) are merged; `main` is at `d50e56801ea77a811ec809be1574e769917fff78`. Mainline CI run [#278](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42067882403) remains **BLOCKED** at the evidence-aggregation gate. Attempt 1 did not expose the required PostgreSQL/Memgraph job; attempt 2 passed all five producer jobs (both Node.js matrices, live database integration, browser smoke, and CodeQL) but exposed a stale prior-attempt failure in the workflow-run API status. A narrowly scoped, fail-closed rerun-state correction and regression test are under review; hosted validation is pending. The formal release gate remains **NO-GO / NOT_PRODUCTION_CERTIFIED** (7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE). See [release readiness](docs/RELEASE_READINESS.md), the [5 November 2026 0.6.2 release-gate report](docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md), the [4 November 0.6.1 baseline report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
+> **Project status:** VirgoScorpio Hub 0.6.2 is the current mainline (unreleased developer-preview patch) at `54b62e233e519aa0afa6c4170578def9c02e15fc`. PRs [#68](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68) (library/media routes), [#69](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/69) (site-membership administration/invitations), [#70](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/70) (CI rerun evidence), and [#71](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/71) (custom content-type routes) are merged. Post-merge mainline workflow [run #292](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42120302005) passed all six hosted jobs: Node.js 22/24, PostgreSQL/Memgraph integration, browser smoke, CodeQL, and consolidated CI evidence. The formal release gate remains **NO-GO / NOT_PRODUCTION_CERTIFIED** (7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE); passing CI does not close the independent/provider/operations gates. No release tag, GitHub Release, package publication, or production deployment is authorized. See [release readiness](docs/RELEASE_READINESS.md), the [5 November 2026 0.6.2 release-gate report](docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md), the [4 November 0.6.1 baseline report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
 
 ## Table of contents
 
@@ -108,6 +108,10 @@ The authoritative dependency declarations and exact scripts are `package.json`, 
 git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
 Set-Location VirgoScorpio-Hub
 npm ci
+
+# Optional local PostgreSQL and Memgraph services for integration work
+docker compose up -d postgres memgraph
+
 npm run check
 ```
 
@@ -170,6 +174,7 @@ Start at **[the documentation index](docs/README.md)**.
 | [Observability deployment contract](docs/OBSERVABILITY-DEPLOYMENT.md) | Vendor-neutral production OTLP deployment evidence and fail-closed validation. |
 | [Contributor quickstart](docs/CONTRIBUTOR-QUICKSTART.md) | First clone, dependency install, basic checks, and service requirements. |
 | [Development](docs/DEVELOPMENT.md) | Local setup, configuration, and contributor workflow. |
+| [Local Docker resource migration report](docs/reports/2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md) | Backup checksums, isolated Compose restore, current blockers, and rollback-preservation state. |
 | [Testing](docs/TESTING.md) | Test commands, prerequisites, scope, and validation caveats. |
 | [Security](docs/SECURITY.md) | Threat assumptions, secret handling, and security-sensitive controls. |
 | [Governance](GOVERNANCE.md) | Project stewardship, decision-making, and funding transparency. |

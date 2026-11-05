@@ -4,6 +4,13 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ## 0.6.2 (unreleased patch candidate)
 
+### Current mainline disposition — 5 November 2026
+- PRs #68 (library/media routes), #69 (site-membership routes), #70 (CI rerun evidence correction), and #71 (custom content-type routes) are merged. Main is `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge push workflow [#292](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42120302005) passed all six hosted jobs. PR #70's mainline run [#289](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42112860410) also passed all six jobs.
+- Pre-merge candidate notes below preserve their original run/branch context; statements that a PR remained open or hosted validation was pending are historical and superseded by this current disposition.
+
+### Local development environment
+- Give the Compose project a stable `virgoscorpio-hub` identity and assign explicit physical names to PostgreSQL, Memgraph, MinIO, and ClamAV data volumes so local state does not depend on the checkout directory. Document local startup and volume-retention behavior; this is development infrastructure, not production deployment configuration.
+
 ### API architecture and maintainability
 - Extract site membership administration and invitation creation into `apps/api/src/site-membership-routes.js`. Preserve the existing `site:manage` authorization guard, bounded request bodies, audit ordering, invitation-token response, and metadata-only audit behavior; keep authentication and tenant authorization in the API composition pipeline. Add focused route-family tests while retaining the live tenant-isolation integration suite.
 - Extract the site-scoped library and media HTTP routes into `apps/api/src/library-routes.js`; retain request authentication, site resolution, capability enforcement, request lifecycle and centralized errors in the API composition pipeline.

@@ -4,7 +4,7 @@
 
 1. Use Node.js `>=22.23.4`.
 2. Copy `.env.example` to `.env`; replace all example secrets.
-3. Start PostgreSQL: `docker compose up -d postgres`. Optional local Memgraph: `docker compose --profile graph up -d memgraph`.
+3. Start the local databases with `docker compose up -d postgres memgraph`. The root Compose project identity is `virgoscorpio-hub`; the PostgreSQL and Memgraph data volumes have explicit stable names (`virgoscorpio-hub-postgres` and `virgoscorpio-hub-memgraph`) and persist across checkout-directory changes. These services are local-development fixtures, not a production topology. Do not run `docker compose down -v` unless you intentionally want to delete all project-managed data volumes.
 4. Run `npm ci` to install the exact reviewed dependency graph in the tracked `package-lock.json`. Use `npm install` only when intentionally changing dependencies, then review the lockfile diff and run the full check suite.
 5. Run `npm run migrate`.
 6. Set `VIRGOSCORPIO_HUB_ADMIN_EMAIL`, `VIRGOSCORPIO_HUB_ADMIN_PASSWORD`, and the site name/slug; run `npm run bootstrap:owner` once.
