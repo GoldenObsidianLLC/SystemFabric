@@ -50,7 +50,7 @@ if (packageJson.engines?.node !== vendorJson.engines?.node) throw new Error('Vir
 function walk(dir) {
   const result = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === 'vendor' || entry.name === 'node_modules' || entry.name === '.git') continue;
+    if (entry.name === 'vendor' || entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.worktrees') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) result.push(...walk(full));
     else if (/\.(?:js|mjs)$/.test(entry.name)) result.push(full);

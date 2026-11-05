@@ -1,3 +1,6 @@
+# Keep generated container and network names stable regardless of the checkout directory.
+name: virgoscorpio-hub
+
 # LOCAL DEVELOPMENT / TEST SERVICES ONLY. Do not deploy this file as production.
 services:
   postgres:
