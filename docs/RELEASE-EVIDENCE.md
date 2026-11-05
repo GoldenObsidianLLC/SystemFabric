@@ -2,6 +2,16 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
+## Latest candidate evidence snapshot — 5 November 2026
+
+PR #68 candidate source `5f900faf3b92307977d3858e1bb0897ab12abe66` passed pull-request workflow [run #264](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42015046006), merge ref `7b20c5685288aa47bcc21b0b3e299546c2a1be36`. All six hosted jobs completed successfully. Node 22.23.4 and 24.22.1 each passed 473/473 Hub tests and 94/94 EnginEx tests, with zero failures/skips; both passed 206 required artifact checks and 213 JavaScript syntax checks. Both audits reported zero vulnerabilities.
+
+The candidate pins npm CLI 11.19.1. Both CycloneDX 1.5 SBOMs report 177 components and 178 dependency records from the same lockfile SHA-256 `f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce`; the evidence aggregator confirmed parity of normalized component identities and dependency edges. SBOM generation hashes differ because document metadata/host fields differ; the normalized dependency inventory is identical. License and distribution obligations, including LGPL terms, still require human review.
+
+The dedicated PostgreSQL/Memgraph job passed 65/65 tests with zero skips, fresh-applied 18 migrations, verified 18 idempotent second-pass skips, and dropped only its disposable database. The browser/editor smoke suite passed 9/9; CodeQL and consolidated revision-bound evidence jobs passed. The service-less integration matrix retains 29 skips and remains PARTIAL, not a substitute for the dedicated live service job.
+
+Exact source-bound formal readiness remains **NO-GO** (7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE; `readyForProduction: false`). The blocked formal PostgreSQL/Memgraph evidence record lacks current schema/product/version/source SHA identity even though the dedicated CI producer artifact passes; the old local supplemental migration JSON is likewise rejected as stale. Fourteen independent/provider/security/product/operations evidence gates remain missing. PR #68 is open and unmerged; no release is authorized.
+
 ## Previous hosted candidate evidence snapshot — 5 November 2026
 
 Hub 0.6.2 PR #68 head `31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9` was tested by GitHub Actions PR run [#260](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976111045) and push run [#259](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976023520). All six checks in each run completed successfully. The PR merge-ref was `16d9852126da4aa5c3e15d42460375a2e0ad0cd7`. Node 22.23.4 and 24.22.1 each passed 469/469 Hub tests, 94/94 EnginEx tests, 205 required artifact checks and 213 JavaScript syntax checks. Live PostgreSQL/Memgraph passed 65/65; 18 migrations applied and were skipped on the idempotent second pass; browser smoke passed 9/9; dependency audit reported zero vulnerabilities; CodeQL and consolidated evidence jobs passed.

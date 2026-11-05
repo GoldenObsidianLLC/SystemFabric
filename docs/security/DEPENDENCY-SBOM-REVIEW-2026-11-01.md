@@ -75,4 +75,10 @@ The stale-log defect is closed for this reviewed run. The exact cause of differi
 - **Provenance/attestation:** not established by an SBOM alone; still open.
 - **Independent review and production certification:** not addressed by this inventory and remain open.
 
+## Follow-up — 5 November 2026: pinned CI SBOM parity
+
+The unreleased 0.6.2 candidate pins npm CLI `11.19.1` in `package.json` and `RELEASE-MANIFEST.json`, and both supported Node.js CI jobs install and assert that exact CLI before dependency installation, audit and CycloneDX generation. PR workflow [#264](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42015046006) confirms both CycloneDX 1.5 documents identify npm 11.19.1 and share the same lockfile SHA-256 `f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce`. Each contains 177 components and 178 dependency records, and the revision-bound aggregator confirms identical normalized package identities and dependency edges across Node.js 22.23.4 and 24.22.1. The raw SBOM hashes differ because platform/generation metadata differ; this is not a package-inventory delta.
+
+This resolves the prior cross-runtime inventory parity signal under a pinned npm toolchain, but it does not retroactively prove the exact root cause of the earlier npm 10-versus-11 variance. Retain the human review of license expressions, notices and distribution obligations. The current SBOM still identifies LGPL-3.0-or-later Sharp/libvips components; their applicable source/notice obligations require maintainer/legal review before distribution. Provenance and independent security review remain open; CI parity alone is not certification.
+
 No dependency was purchased, no paid service or external reviewer was engaged, and no funding or liquid reserve is assumed.

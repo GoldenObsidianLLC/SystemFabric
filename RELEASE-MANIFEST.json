@@ -564,7 +564,7 @@
     "supplementalEvidenceDiscrepancy": {
       "status": "STALE_EVIDENCE_IDENTIFIED",
       "summary": "The local retained fresh-migrations.json was a tracked historical 0.5.1 artifact for 14 migrations; it was not current 0.6.2 evidence. The dedicated live integration producer independently emitted a run-bound PASS artifact proving 18/18 applied, 18/18 idempotent skips, and disposable database cleanup.",
-      "action": "Bind formal and supplemental evidence to schemaVersion, product, package version and exact Git sourceRevision. This is implemented in the 0.6.2 follow-up and requires hosted revalidation; do not alter migration execution checks or reuse historical JSON."
+      "action": "Bind formal and supplemental evidence to schemaVersion, product, package version and exact Git sourceRevision. This is implemented in the 0.6.2 follow-up and passed hosted PR run #264; the formal PostgreSQL/Memgraph evidence remains separately blocked until an exact-source evidence record is supplied. Do not alter migration execution checks or reuse historical JSON."
     },
     "pullRequest": {
       "number": 68,
@@ -1005,41 +1005,38 @@
     "reviewedAt": "2026-11-05",
     "version": "0.6.2",
     "branch": "refactor/api-library-routes-2026-11",
-    "headCommit": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
-    "mergeRefCommit": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+    "headCommit": "5f900faf3b92307977d3858e1bb0897ab12abe66",
+    "mergeRefCommit": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
     "pullRequest": {
       "number": 68,
       "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
       "state": "open",
       "merged": false,
-      "head": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+      "head": "5f900faf3b92307977d3858e1bb0897ab12abe66",
       "base": "489325585d57fe95f961c36a597faa7065848c7f",
-      "mergeRef": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
-      "reviewCount": 0,
-      "issueCommentCount": 0
+      "mergeRef": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+      "reviewCount": 0
     },
     "ci": {
       "pullRequestRun": {
-        "id": 41976111045,
-        "number": 260,
-        "conclusion": "success"
-      },
-      "pushRun": {
-        "id": 41976023520,
-        "number": 259,
+        "id": 42015046006,
+        "number": 264,
+        "event": "pull_request",
         "conclusion": "success"
       },
       "jobsPerRun": 6,
-      "status": "PASS"
+      "completedJobs": 6,
+      "status": "PASS",
+      "workflowStatus": "completed"
     },
     "tests": {
       "node22Hub": {
-        "passed": 469,
+        "passed": 473,
         "failed": 0,
         "skipped": 0
       },
       "node24Hub": {
-        "passed": 469,
+        "passed": 473,
         "failed": 0,
         "skipped": 0
       },
@@ -1055,55 +1052,48 @@
       },
       "migrations": {
         "applied": 18,
-        "secondPassSkipped": 18
+        "secondPassSkipped": 18,
+        "disposableDatabaseDropped": true
       },
       "playwrightSmoke": {
         "passed": 9,
         "failed": 0,
         "skipped": 0
       },
-      "requiredPaths": 205,
+      "requiredPaths": 206,
       "javascriptSyntaxChecked": 213,
       "npmAuditVulnerabilities": 0
     },
     "sbom": {
       "cyclonedx": "1.5",
       "lockfileSha256": "f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce",
-      "node22Npm": "10.9.9",
-      "node22Components": 179,
-      "node22Dependencies": 180,
-      "node22SbomSha256": "ac54c55c22594ec1e94fc3e832702e78fb89300cd87c0118c0b000cd679aa68a",
-      "node24Npm": "11.19.1",
+      "npm": "11.19.1",
+      "node22Components": 177,
+      "node22Dependencies": 178,
+      "node22SbomSha256": "5c20eeb89b1f475562e06db066bf008146e033a3f8db8c567f9aaff97eac6dd9",
       "node24Components": 177,
       "node24Dependencies": 178,
-      "node24SbomSha256": "a87e8dfa31c62381cd7da071a17dc138dce7c65caefe9b4e015b6a423d21f3ac",
-      "mismatchComponents": {
-        "node22Only": [
-          "@emnapi/runtime@1.11.3",
-          "@img/sharp-wasm32@0.35.5"
-        ],
-        "node24Only": [
-          "tslib@2.8.1"
-        ]
-      },
-      "disposition": "OPEN_RECONCILIATION"
+      "node24SbomSha256": "80c1874ead1c037ed0305843c4db822a65ac8580d0f0b3bd4b01ec495e0dea7f",
+      "normalizedComponentAndDependencyGraphParity": "PASS",
+      "disposition": "IDENTICAL_NORMALIZED_INVENTORY"
     },
     "formalReadiness": {
-      "sourceRevision": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "sourceRevision": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
       "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
       "readyForProduction": false,
-      "pass": 8,
+      "pass": 7,
       "partial": 2,
-      "blocked": 0,
+      "blocked": 1,
       "missingEvidence": 14,
       "notRun": 0,
       "productionCertification": "BLOCKED"
-    }
+    },
+    "status": "HOSTED_CI_PASS_PRODUCTION_NO_GO"
   },
   "releaseEvidenceHardeningFollowUp": {
     "reviewedAt": "2026-11-05",
     "candidateVersion": "0.6.2",
-    "status": "LOCAL_VALIDATION_PASS_HOSTED_CI_PENDING",
+    "status": "HOSTED_CI_PASS_PRODUCTION_NO_GO",
     "packageManager": "npm@11.19.1",
     "changes": [
       "Require schemaVersion 1, product identity, exact candidate version, and full Git sourceRevision for formal release evidence.",
@@ -1122,7 +1112,41 @@
       "npmAuditHighOrCriticalVulnerabilities": 0,
       "gitDiffCheck": "PASS"
     },
-    "hostedCi": "PENDING_ON_UPDATED_PR_HEAD",
-    "productionCertified": false
+    "hostedCi": {
+      "runId": 42015046006,
+      "runNumber": 264,
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": 6,
+      "ciStatus": "PASS"
+    },
+    "productionCertified": false,
+    "sourceRevision": "5f900faf3b92307977d3858e1bb0897ab12abe66",
+    "mergeRef": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+    "formalReadiness": {
+      "sourceRevision": "7b20c5685288aa47bcc21b0b3e299546c2a1be36",
+      "pass": 7,
+      "partial": 2,
+      "blocked": 1,
+      "missingEvidence": 14,
+      "notRun": 0,
+      "readyForProduction": false,
+      "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
+      "productionCertification": "BLOCKED"
+    },
+    "sbomParity": {
+      "status": "PASS",
+      "npm": "11.19.1",
+      "node22": {
+        "components": 177,
+        "dependencies": 178,
+        "sha256": "5c20eeb89b1f475562e06db066bf008146e033a3f8db8c567f9aaff97eac6dd9"
+      },
+      "node24": {
+        "components": 177,
+        "dependencies": 178,
+        "sha256": "80c1874ead1c037ed0305843c4db822a65ac8580d0f0b3bd4b01ec495e0dea7f"
+      }
+    }
   }
 }

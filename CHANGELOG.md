@@ -13,11 +13,11 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ### Validation and release evidence hardening
 - Fresh `npm ci --no-audit --no-fund` completed in the isolated candidate worktree on Windows / Node.js 26.12.1.
-- `npm run check` passes: 206 required paths, 213 JavaScript files syntax-checked, 472 tests (469 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence and CycloneDX regression suites pass; `npm audit --audit-level=high` reports zero vulnerabilities.
+- `npm run check` passes: 206 required paths, 213 JavaScript files syntax-checked, 473 tests (470 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence and CycloneDX regression suites pass; `npm audit --audit-level=high` reports zero vulnerabilities.
 - Pin npm CLI `11.19.1` in `package.json` and `RELEASE-MANIFEST.json`; the Node 22/24 CI matrix installs and verifies the same CLI before `npm ci`, audits and SBOM generation. The CI evidence aggregator verifies the SBOM tool identity and compares normalized package identities/dependency edges across runtimes, blocking real inventory drift.
 - Bind formal and supplemental release evidence to schema version, product, exact candidate version and full Git source revision. The fresh-migration harness records that revision; old or unversioned retained evidence is rejected rather than treated as current. Dedicated CI migration artifacts remain independently run- and checksum-bound.
 - Focused API/library/commerce/platform/request-validation regression suites passed 49/49 with zero skips.
-- Vendored EnginEx 7.0.0 tests passed 94 cases (91 passed, 0 failed, 3 Windows/platform-specific skips); `npm audit --audit-level=high` reported 0 vulnerabilities. The previously hosted candidate head passed push run #259 and PR run #260; the evidence/toolchain follow-up recorded here is a later source change and awaits its own hosted revalidation. Formal production readiness remains NO-GO with 14 external evidence requirements open.
+- Hosted PR workflow #264 passed all six jobs on the evidence/toolchain follow-up commit: Node.js 22.23.4 and 24.22.1 each passed 473/473 Hub tests and 94/94 EnginEx tests; dedicated PostgreSQL/Memgraph passed 65/65; fresh migrations applied 18/18 and skipped 18/18 on rerun; browser smoke passed 9/9; CodeQL and consolidated evidence passed. Both SBOMs identify npm 11.19.1 and match at 177 components / 178 dependency records with identical normalized dependency graphs. Audit reported zero vulnerabilities. Strict formal readiness is still NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE.
 
 
 ## 0.6.1 (unreleased patch candidate)
