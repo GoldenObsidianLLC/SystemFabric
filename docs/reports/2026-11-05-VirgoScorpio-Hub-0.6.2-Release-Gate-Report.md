@@ -444,4 +444,33 @@ The final candidate revision `8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3` passed b
 
 Both npm 11.19.1 CycloneDX 1.5 SBOMs contain 177 components and 178 dependency records from the same lockfile SHA and passed normalized package/dependency graph parity. The raw SBOM hashes differ because platform/generation metadata differs; the normalized inventory is identical. Human license/provenance review remains open, including LGPL-3.0-or-later distribution obligations.
 
-The exact formal production gate remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE. The blocked formal PostgreSQL/Memgraph record still lacks current schema/product/version/source SHA identity even though the separate run-bound live integration artifact proves the current 65-test/18-migration result. Fourteen independent, provider, product-acceptance, security and operations requirements remain missing. At the time of this historical candidate addendum, PR #68 remained open/unmerged; it subsequently merged as `be1441e216c20358e8506389915a676209808e37`, followed by PR #69 as `d50e56801ea77a811ec809be1574e769917fff78`. No release tag, GitHub Release or production deployment is authorized.
+The exact formal production gate remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE. The blocked formal PostgreSQL/Memgraph record still lacks current schema/product/version/source SHA identity even though the separate run-bound live integration artifact proves the current 65-test/18-migration result. Fourteen independent, provider, product-acceptance, security and operations requirements remain missing. PR #68 remains open and unmerged at this report revision; no release tag, GitHub Release or production deployment is authorized.
+
+## Addendum — 5 November 2026: custom content-type route follow-up (PR #71)
+
+The current main release decision above is unchanged: the mainline is d50e56801ea77a811ec809be1574e769917fff78, run #278 is a failed/incomplete workflow attempt, and production readiness remains NO-GO. The following is a distinct follow-on candidate assessment, not merged mainline evidence.
+
+PR #71 (https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/71) proposes the next bounded API route-family extraction into apps/api/src/content-type-routes.js. Candidate head 7c8549382faa7e39445e8f443f1006d63a1488bc (branch refactor/api-content-type-routes-2026-11) preserves API-composition authentication/site selection/capability authorization, Git-managed definition precedence, PostgreSQL advisory-lock version ordering, bounded definition/record validation, site-scoped store calls and SQL-enforced content:read:own ownership. It introduces no migration or intended public HTTP contract change.
+
+### Hosted candidate CI — PASS on both push and pull-request events
+
+The first checks on the initial extraction commit d56b7c0d017040150ed212ec29ec686ba37468ae caught a real regression: removing the custom route helpers also removed hasContentRead, which is still used by the legacy page-revision read routes. The PostgreSQL/Memgraph isolation suite returned 500 instead of the expected 404 for a missing page revision. The shared helper was restored in the API composition module, and a bearer-authenticated HTTP regression test now exercises the page-revision route after extraction.
+
+The corrected exact candidate head 7c8549382faa7e39445e8f443f1006d63a1488bc passed all six jobs in both hosted workflows:
+
+| Workflow event | Run | Result |
+|---|---:|---|
+| Push | [#42107807577](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42107807577) | PASS — all six jobs |
+| Pull request #71 | [#42107815045](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42107815045) | PASS — all six jobs |
+
+Producer evidence for the final candidate:
+- Node.js 22.23.4 and 24.22.1 each completed clean npm ci, npm run check (210 required paths / 217 JavaScript files), and 507/507 tests with zero failures.
+- Both npm 11.19.1 dependency audits reported zero vulnerabilities; both CycloneDX SBOMs were generated and the consolidated evidence aggregator passed.
+- Dedicated PostgreSQL/Memgraph integration passed 65/65 tests, zero skips; fresh migration validation applied 18/18 migrations and skipped 18/18 on the idempotent second pass; Memgraph outage/replay and canonical graph rebuild passed.
+- Browser smoke passed 9/9; CodeQL passed; the consolidated run-bound CI evidence gate reported CI EVIDENCE: PASS.
+
+The formal readiness report produced by the matrix remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE. The blocked formal PostgreSQL/Memgraph record still expects the separately versioned, exact-source evidence contract; the dedicated run-bound producer result is not silently substituted. Independent/provider/product-acceptance/security/supply-chain/operations evidence remains outstanding.
+
+PR #71 remains open and has no submitted human review recorded at this assessment. The candidate has passed hosted CI but is not merged. PR #70 (https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/70), which fixes the separate workflow-rerun aggregation race, also has all six hosted checks green but remains open awaiting human review. Consequently, this successful PR #71 candidate does not repair main's historical run #278 check state or authorize a release.
+
+Disposition: retain Hub 0.6.2 as an unreleased developer-preview patch. Merge neither follow-up without human review and the final green checks on the exact revisions. Do not create a tag, GitHub Release, package publication or production deployment. NOT_PRODUCTION_CERTIFIED remains in force.

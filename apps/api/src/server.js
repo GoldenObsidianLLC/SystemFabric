@@ -12,6 +12,7 @@ const { createAITaskStore } = require('../../../packages/db/src/ai-task-store');
 const { createIdentityService } = require('../../../packages/auth/src/service');
 const { createAuthRouteHandlers } = require('./auth-routes');
 const { handleSiteMembershipRoute } = require('./site-membership-routes');
+const { createContentTypeRouteHandler } = require('./content-type-routes');
 const { createAITaskRouteHandlers } = require('./ai-task-routes');
 const { parseCookies, safeCsrfCookie } = require('./auth-cookies');
 const { createSamlAuthenticator } = require('../../../packages/auth/src/saml');
@@ -31,7 +32,6 @@ const { createWidgetRegistry } = require('../../../packages/widgets/src/registry
 const { validatePageDocument } = require('../../../packages/domain/src/page-document');
 const { validateDesignTokens } = require('../../../packages/domain/src/design-system');
 const { validateMenuItems } = require('../../../packages/domain/src/navigation');
-const { validateContentTypeDefinition, validateRecordValues, NAME_RE: CONTENT_TYPE_NAME_RE } = require('../../../packages/domain/src/content-types');
 const { renderPageDocument, rendererInfo } = require('../../../packages/render/src');
 const { createRequestMetrics, createRealtimeMetrics } = require('../../../packages/observability/src/metrics');
 const { createTraceContext } = require('../../../packages/observability/src/trace-context');
@@ -237,6 +237,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     identity, samlAuth, env, secureCookies, maxBody, allowRequest,
     sendJson, fail, readJson, readForm, sameSecret
   });
+  const contentTypeRouteHandler = createContentTypeRouteHandler({ normalizeSlug });
   const requestMetrics = createRequestMetrics();
   const realtimeMetrics = injectedRealtimeMetrics || createRealtimeMetrics();
   const realtimeEnabled = env.VIRGOSCORPIO_HUB_REALTIME_ENABLED === 'true';
@@ -678,26 +679,18 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     const result = await localPool.query('SELECT * FROM plugin_installs WHERE site_id=$1 AND id=$2', [siteId, pluginId]);
     return result.rows[0] || null;
   }
-  function gitContentTypeDefinitions() {
-    const directory = path.resolve(__dirname, '../../../config/cpt');
-    if (!fs.existsSync(directory)) return [];
-    return fs.readdirSync(directory).filter(file => /^[a-z0-9_-]+\.json$/i.test(file)).map(file => {
-      try { return JSON.parse(fs.readFileSync(path.join(directory, file), 'utf8')); } catch { throw new Error(`Invalid Git-managed content type definition: ${file}`); }
-    });
-  }
-  async function getContentTypeDefinition(siteId, slug) {
-    if (!CONTENT_TYPE_NAME_RE.test(slug)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_CONTENT_TYPE_INVALID', 'Content type slug is invalid.');
-    const git = gitContentTypeDefinitions().find(item => item.name === slug);
-    if (git) { const validation = validateContentTypeDefinition(git); if (!validation.valid) throw new Error(`Git-managed content type ${slug} is invalid: ${validation.errors.join('; ')}`); return git; }
-    if (!localPool) return null;
-    const result = await localPool.query(`SELECT definition FROM content_type_definitions WHERE site_id=$1 AND slug=$2 AND active=true ORDER BY version DESC LIMIT 1`, [siteId, slug]);
-    return result.rows[0]?.definition || null;
+  // Shared by legacy page/revision/workflow read handlers that still live in
+  // the API composition module. The extracted custom content-type route family
+  // keeps its own equivalent policy helper behind its explicit context.
+  async function getContentReadScope(actor, siteId) {
+    if (actor.isDeveloper) return { ownOnly: false };
+    if (await identity.authorizeSite(actor.user.id, siteId, 'content:read')) return { ownOnly: false };
+    if (await identity.authorizeSite(actor.user.id, siteId, 'content:read:own')) return { ownOnly: true };
+    return null;
   }
   async function hasContentRead(actor, siteId) {
-    if (actor.isDeveloper) return true;
-    return (await identity.authorizeSite(actor.user.id, siteId, 'content:read')) || (await identity.authorizeSite(actor.user.id, siteId, 'content:read:own'));
+    return (await getContentReadScope(actor, siteId)) !== null;
   }
-
   async function handler(req, res) {
     const requestId = typeof req.headers['x-request-id'] === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(req.headers['x-request-id']) ? req.headers['x-request-id'] : randomUUID();
     const traceContext = createTraceContext({
@@ -1589,51 +1582,12 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         return sendHtml(res, 200, html, htmlCspPreview());
       }
 
-      // Developer-managed and dashboard-managed content types resolve into one validated registry.
-      if (req.method === 'GET' && url.pathname === '/api/v1/content-types') {
-        if (!localPool) return sendJson(res, 503, { error: 'Content type registry requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = await siteIdFor({ req, url, actor }); if (!(await hasContentRead(actor, siteId))) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Content read permission is required.');
-        const git = gitContentTypeDefinitions(); const db = await localPool.query('SELECT slug,label,version,definition,source,updated_at FROM content_type_definitions WHERE site_id=$1 AND active=true ORDER BY slug,version DESC', [siteId]);
-        const gitNames = new Set(git.map(item => item.name));
-        const admin = db.rows.filter(row => !gitNames.has(row.slug)).map(row => ({ ...row.definition, source: row.source, updatedAt: row.updated_at }));
-        const conflicts = db.rows.filter(row => gitNames.has(row.slug)).map(row => row.slug);
-        return sendJson(res, 200, { definitions: [...git, ...admin], conflicts: [...new Set(conflicts)], precedence: 'Git-managed definitions are authoritative; name conflicts are rejected.', requestId });
-      }
-      if (req.method === 'POST' && url.pathname === '/api/v1/content-types') {
-        if (!localPool) return sendJson(res, 503, { error: 'Content type registry requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const body = await readJson(req, Math.min(maxBody, 256_000)); const siteId = await siteIdFor({ req, url, body, actor }); await requireCapability(actor, siteId, 'site:manage');
-        const definition = { ...body.definition, source: 'admin', apiVersion: 1 }; const validation = validateContentTypeDefinition(definition);
-        if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_CONTENT_TYPE_INVALID', 'Content type definition failed validation.', validation.errors);
-        if (gitContentTypeDefinitions().some(item => item.name === definition.name)) throw fail(409, 'ERR_VIRGOSCORPIO_HUB_CONTENT_TYPE_CONFLICT', 'A Git-managed definition already owns this slug. Rename one definition rather than silently overriding it.');
-        const client = await localPool.connect();
-        let row; try { await client.query('BEGIN'); await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [siteId, definition.name]); const old = await client.query('SELECT COALESCE(max(version),0)::integer AS version FROM content_type_definitions WHERE site_id=$1 AND slug=$2', [siteId, definition.name]); definition.version = old.rows[0].version + 1;
-          await client.query('UPDATE content_type_definitions SET active=false,updated_at=now() WHERE site_id=$1 AND slug=$2 AND active=true', [siteId, definition.name]);
-          const result = await client.query(`INSERT INTO content_type_definitions(site_id,slug,label,version,source,active,definition) VALUES($1,$2,$3,$4,'admin',true,$5::jsonb) RETURNING id,slug,label,version,source,active`, [siteId, definition.name, definition.label, definition.version, JSON.stringify(definition)]); row = result.rows[0]; await client.query('COMMIT');
-        } catch(error) { await client.query('ROLLBACK').catch(()=>{}); throw error; } finally { client.release(); }
-        return sendJson(res, 201, { definition: { ...definition, id: row.id }, requestId });
-      }
-      const cptRecordsMatch = url.pathname.match(/^\/api\/v1\/content-types\/([a-z][a-z0-9_-]{0,62})\/records$/i);
-      if ((req.method === 'GET' || req.method === 'POST') && cptRecordsMatch) {
-        if (!store) return sendJson(res, 503, { error: 'Content storage requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const slug = cptRecordsMatch[1]; let body = {}; if (req.method === 'POST') body = await readJson(req, maxBody);
-        const siteId = await siteIdFor({ req, url, body, actor }); const definition = await getContentTypeDefinition(siteId, slug);
-        if (!definition) return sendJson(res, 404, { error: 'Content type not found.', code: 'ERR_VIRGOSCORPIO_HUB_CONTENT_TYPE_NOT_FOUND', requestId });
-        if (req.method === 'GET') { if (!(await hasContentRead(actor, siteId))) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Content read permission is required.'); return sendJson(res, 200, { items: await store.listContent({ siteId, contentType: slug, status: url.searchParams.get('status'), limit: url.searchParams.get('limit') || 50, offset: url.searchParams.get('offset') || 0 }), requestId }); }
-        await requireCapability(actor, siteId, 'content:create'); const validation = validateRecordValues(definition, body.values); if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_CONTENT_VALUES_INVALID', 'Record values failed schema validation.', validation.errors);
-        const title = String(body.title || body.values.title || body.values.name || slug).slice(0, 500); const recordSlug = normalizeSlug(body.slug || title); if (!recordSlug) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SLUG', 'A valid record slug is required.');
-        const record = { schemaVersion: 1, documentType: `custom:${slug}`, fields: body.values };
-        const saved = await store.saveDraft({ siteId, title, slug: recordSlug, locale: typeof body.locale === 'string' ? body.locale : 'en', contentType: slug, document: record, authorId: actor.user.id, correlationId: requestId });
-        return sendJson(res, 201, { status: 'draft', record: saved, requestId });
-      }
-      const cptRecordMatch = url.pathname.match(/^\/api\/v1\/content-types\/([a-z][a-z0-9_-]{0,62})\/records\/([0-9a-f-]{36})$/i);
-      if (req.method === 'GET' && cptRecordMatch) {
-        if (!store) return sendJson(res, 503, { error: 'Content storage requires PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = await siteIdFor({ req, url, actor }); const definition = await getContentTypeDefinition(siteId, cptRecordMatch[1]);
-        if (!definition) return sendJson(res, 404, { error: 'Content type not found.', requestId });
-        if (!(await hasContentRead(actor, siteId))) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN', 'Content read permission is required.');
-        const record = await store.getById({ siteId, id: cptRecordMatch[2] }); if (!record || record.content_type !== cptRecordMatch[1]) return sendJson(res, 404, { error: 'Record not found.', requestId });
-        return sendJson(res, 200, { record, definition, requestId });
-      }
+      const contentTypeHandled = await contentTypeRouteHandler({
+        req, res, url, actor, siteIdFor, requireCapability, readJson,
+        sendJson, fail, requestId, localPool, store, maxBody,
+        contentReadScope: getContentReadScope,
+      });
+      if (contentTypeHandled) return;
 
       // Asset uploads are image-only, MIME-sniffed, path-safe, and stored outside the web root.
       if (req.method === 'GET' && url.pathname === '/api/v1/media') {

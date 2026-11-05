@@ -40,10 +40,13 @@
 
 ## Custom content types
 
-- `GET /api/v1/content-types?siteId=...` — list resolved Git/admin definitions.
-- `POST /api/v1/content-types` — persist a validated admin definition. Git-managed definitions are not overwritten by admin definitions of the same name.
-- `GET|POST /api/v1/content-types/{slug}/records` — list/create records after field validation.
-- `GET /api/v1/content-types/{slug}/records/{id}` — retrieve a record with permission scope.
+- `GET /api/v1/content-types?siteId=...` — list resolved Git/admin definitions; requires `content:read` or `content:read:own`. Git-managed definitions are authoritative; same-name admin rows are reported as conflicts and are not selected.
+- `POST /api/v1/content-types` — persist a schema-validated admin definition; requires `site:manage`. Each new version is allocated under a site/slug PostgreSQL advisory transaction lock, and the prior active version is deactivated in the same transaction. A Git-managed definition cannot be overridden by an admin definition with the same name.
+- `GET /api/v1/content-types/{slug}/records` — list records using the resolved site scope; requires `content:read` or `content:read:own`. The own-only capability is enforced in the store query by the authenticated actor ID.
+- `POST /api/v1/content-types/{slug}/records` — create a draft record after schema validation; requires `content:create`.
+- `GET /api/v1/content-types/{slug}/records/{id}` — retrieve a record with `content:read` or `content:read:own` policy and site-scoped storage lookup. For own-only access the record's `created_by` must match the authenticated actor. A record whose stored content type differs from the requested slug is not disclosed.
+
+These routes preserve the existing HTTP paths and database schema. Definition validation is shared with `packages/domain/src/content-types.js`; transaction/client lifecycle uses `packages/db/src/transaction.js`.
 
 ## Media
 
