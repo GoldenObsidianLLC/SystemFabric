@@ -1,7 +1,7 @@
 {
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
@@ -490,5 +490,116 @@
       "type": "major",
       "reason": "Removal of allowUnsafeCode/engine.unsafe execution capability."
     }
+  },
+  "routeFamilyRefactor": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "e26417e5215bfdf11bcf1216db23d0b2f94d7cf3",
+    "branch": "refactor/api-route-contracts-2026-11",
+    "semver": {
+      "previousVersion": "0.6.0",
+      "candidateVersion": "0.6.1",
+      "changeType": "patch",
+      "released": false,
+      "reason": "Internal API route-family extraction with no intended HTTP contract or schema change."
+    },
+    "extractedRouteFamilies": [
+      "Products",
+      "Orders",
+      "Refunds",
+      "Checkout and idempotent checkout recovery",
+      "Membership plans, checkout, and membership reads"
+    ],
+    "modules": {
+      "routeFamily": "apps/api/src/commerce-routes.js",
+      "requestValidation": "apps/api/src/request-validation.js",
+      "composition": "apps/api/src/platform-routes.js"
+    },
+    "guaranteesPreserved": [
+      "API server retains request authentication, site resolution, and capability checks.",
+      "Commerce route queries remain site-scoped.",
+      "Existing database transactions, Stripe idempotency/recovery, and inventory reservation flows remain in their original implementations.",
+      "Route handlers return false only for routes outside the commerce/membership route family.",
+      "Bounded JSON object checks fail closed on byte-limit violations and serialization errors.",
+      "UUID syntax reuses the canonical domain identifier contract."
+    ],
+    "publicHttpContractChanged": false,
+    "databaseMigrationsAdded": false,
+    "productionCertified": false,
+    "localFocusedValidation": {
+      "status": "PASS",
+      "suites": [
+        "test/commerce-routes.test.js",
+        "test/request-validation.test.js",
+        "test/api.test.js",
+        "test/platform-features.test.js"
+      ],
+      "tests": 41,
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullCleanInstallAndHostedCi": "PENDING_PR_66; require fresh install, Node 22/24 matrix, PostgreSQL/Memgraph, browser/accessibility, CodeQL, and consolidated evidence jobs before merge.",
+    "localValidation": {
+      "runtime": {
+        "node": "26.12.1",
+        "platform": "win32",
+        "arch": "x64"
+      },
+      "artifactCheck": {
+        "status": "PASS",
+        "requiredPaths": 200,
+        "javascriptFilesSyntaxChecked": 209
+      },
+      "focusedTests": {
+        "status": "PASS",
+        "tests": 41,
+        "passed": 41,
+        "failed": 0,
+        "skipped": 0
+      },
+      "unitTests": {
+        "status": "PASS",
+        "tests": 445,
+        "passed": 442,
+        "failed": 0,
+        "skipped": 3,
+        "skipNotes": [
+          "Open-file rename semantics differ on Windows.",
+          "O_NOFOLLOW is not exposed on this Windows platform."
+        ]
+      },
+      "dependencySource": "Existing shared dependency cache was reused with the candidate vendored EnginEx 7.0.0 selected explicitly; this is not a clean npm ci.",
+      "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; hosted CI must prove a clean install before merge.",
+      "npmAuditHigh": {
+        "status": "PASS",
+        "command": "npm audit --package-lock-only --audit-level=high",
+        "vulnerabilities": 0,
+        "date": "2026-11-04"
+      },
+      "fullCheck": {
+        "status": "PASS",
+        "command": "npm run check",
+        "artifactPaths": 200,
+        "javascriptFilesSyntaxChecked": 209,
+        "tests": 445,
+        "passed": 442,
+        "failed": 0,
+        "skipped": 3
+      }
+    }
+  },
+  "postRendererRemovalCodeScanning": {
+    "analyzedAt": "2026-11-04T23:31:37Z",
+    "commit": "e26417e5215bfdf11bcf1216db23d0b2f94d7cf3",
+    "branch": "refs/heads/main",
+    "openAlerts": [],
+    "fixedWithoutDismissal": [
+      14,
+      30,
+      31,
+      32,
+      33
+    ],
+    "dismissedAlerts": []
   }
 }

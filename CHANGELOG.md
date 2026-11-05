@@ -2,7 +2,18 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
-## 0.6.0 (unreleased security and compatibility candidate)
+## 0.6.1 (unreleased patch candidate)
+
+### API architecture and maintainability
+
+- Extract product, order, refund, checkout, and membership route handling from `apps/api/src/platform-routes.js` into `apps/api/src/commerce-routes.js`, using a narrow request-scoped dependency context. The API composition layer retains authentication, site resolution, and capability dispatch; SQL predicates and existing transaction, inventory, idempotency, and Stripe behavior are preserved.
+- Add `apps/api/src/request-validation.js` for bounded JSON-object validation with UTF-8 byte ceilings and fail-closed serialization handling; reuse the canonical UUID validator from `packages/domain/src/identifiers.js`.
+- Add route regression tests for unmatched-route behavior, site/capability ordering, site-filtered reads, invalid product writes with no database side effect, rejected cross-site access, and preservation of the previous platform-module productInput export; add request validation tests for UTF-8 bounds and serialization failures.
+- Local validation on Node.js 26.12.1: artifact check passes (200 required paths, 209 JavaScript files syntax-checked); full unit suite passes (445 tests, 442 passed, 0 failed, 3 Windows/platform-specific skips); `npm audit --package-lock-only --audit-level=high` reports 0 vulnerabilities. The full suite used the existing shared dependency cache with the candidate's vendored EnginEx 7.0.0; a clean npm ci and hosted CI remain merge gates.
+- Update the architecture map, contributor guide, roadmap, required-artifact verification, and release manifest. No database migration or public HTTP contract change is intended.
+- Bump VirgoScorpio Hub from 0.6.0 to 0.6.1 as a SemVer patch for an internal, behavior-preserving refactor. This is an unreleased candidate; no tag or package publication is implied.
+
+## 0.6.0 (merged to main, unreleased security and compatibility candidate)
 
 ### Security and renderer compatibility
 

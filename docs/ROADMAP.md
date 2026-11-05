@@ -21,11 +21,12 @@ Apply these checks to every AI-enabled product track:
 
 **Exit condition:** each AI-enabled feature has documented user control, data-use boundaries, delegated permissions, action-risk classification, recourse and validation criteria. High-impact actions cannot bypass required approval or audit controls.
 
-## Track A — Stabilize the 0.5.x platform baseline (P0)
+## Track A — Stabilize the pre-1.0 platform baseline (P0)
 
 ### Reliability and release process
 
-- [x] Remove the legacy EnginEx arbitrary-JavaScript renderer and fail closed on the retired compatibility flags. Review [EnginEx 7.0 Migration](ENGINEX-7-MIGRATION.md); this breaking renderer upgrade is an unreleased 0.6.0 candidate, not release approval.
+- [x] Remove the legacy EnginEx arbitrary-JavaScript renderer and fail closed on the retired compatibility flags. Review [EnginEx 7.0 Migration](ENGINEX-7-MIGRATION.md); this breaking renderer upgrade merged as Hub 0.6.0 / EnginEx 7.0.0. It does not constitute release approval.
+- [x] Extract commerce and membership HTTP route handling into `apps/api/src/commerce-routes.js`, preserve the API server's authentication/site/capability dispatch, and reuse bounded JSON-object and canonical UUID helpers. The internal route-seam refactor is tracked as the unreleased 0.6.1 patch candidate.
 - [ ] Make CI green across the supported Node.js matrix, live PostgreSQL/Memgraph job, browser smoke tests, and CodeQL upload.
 - [ ] Add fresh-database migration and supported upgrade-path evidence.
 - [ ] Exercise concurrent writes, outbox retry/recovery, and failure recovery under representative load.

@@ -109,7 +109,7 @@ Version is advanced from **0.5.1 to 0.5.2**, a patch increment under Semantic Ve
 
 ## Follow-up — 4 November 2026: renderer security and compatibility boundary
 
-PR #65 candidate (Hub 0.6.0 / EnginEx 7.0.0) addresses the remaining Medium CodeQL sink by removing the explicit legacy arbitrary-JavaScript template renderer instead of suppressing or waiving the finding. The earlier 0.5.2 architecture review and validation counts above are historical snapshots; the 0.6.0 candidate validation is summarized here.
+PR #65 merged Hub 0.6.0 / EnginEx 7.0.0 and removed the explicit legacy arbitrary-JavaScript template renderer instead of suppressing or waiving the finding. The default-branch CodeQL analysis marked alert #14 fixed at `2026-11-04T23:31:37Z`; it was not dismissed. The four High authentication findings #30–#33 were also fixed by the earlier auth route/cookie extraction without manual dismissals. The earlier 0.5.2 architecture review and validation counts above are historical snapshots; the 0.6.0 candidate validation is summarized here.
 
 - Deleted `vendor/enginex/engine-legacy.js`; no application call sites were found in `apps/`, `packages/`, `scripts/`, or `test/`.
 - Removed `allowUnsafeRequire`; calls with `allowUnsafeCode: true` or `engine.unsafe()` now fail closed with `ERR_ENGINEX_UNSAFE_API`.
@@ -120,4 +120,15 @@ PR #65 candidate (Hub 0.6.0 / EnginEx 7.0.0) addresses the remaining Medium Code
 
 **Compatibility/versioning:** EnginEx 6.2.0 → 7.0.0 is a major version change because arbitrary-JavaScript template execution was removed. VirgoScorpio Hub 0.5.4 → 0.6.0 is a minor pre-1.0 increment under SemVer's pre-1.0 compatibility convention. This candidate is not yet released or production-certified.
 
-**Security disposition:** alert #14 was open on baseline `aa361ab`. Do not record it as fixed until the PR's branch-scoped CodeQL job and post-merge default-branch analysis confirm that the sink is no longer reported. No finding is manually dismissed or suppressed.
+**Security disposition:** alert #14 was open on baseline `aa361ab` and is now fixed in the default-branch CodeQL record after PR #65; no dismissal or suppression was used. The four High auth alerts #30–#33 are likewise fixed without manual dismissal.
+
+## Follow-up — 4 November 2026: commerce route-family extraction
+
+PR #66 candidate extracts the products, orders, refunds, checkout, and membership route family from apps/api/src/platform-routes.js into apps/api/src/commerce-routes.js. The composition module now coordinates the existing community and commerce route families plus remaining platform routes; it no longer owns the 436-line commerce/membership block. The new commerce module receives a bounded request-scoped context containing the actor, site/capability guards, body reader, response/error functions, database pool, runtime environment, and identity audit dependency.
+
+- The API composition layer retains request authentication, site resolution, authorization dispatch, observability, and central errors. The commerce module does not independently authenticate the actor or infer the site.
+- Existing site predicates, Stripe idempotency/recovery, refund locking and provider behavior, inventory reservation transitions, and membership persistence are moved intact rather than reimplemented.
+- apps/api/src/request-validation.js centralizes bounded JSON-object checks (UTF-8 byte ceiling; serialization errors fail closed). Platform route UUID validation now reuses packages/domain/src/identifiers.js.
+- Added focused tests for route decline/no side effects, site/capability/read order, malformed product writes, cross-site denial, and request object byte/serialization limits. The focused API/commerce/platform test group passes 41/41 using the candidate's vendored EnginEx 7.0.0 and the existing shared dependency cache; this includes a compatibility test preserving the former platform router productInput export.
+- Local full validation on Node.js 26.12.1: 200 required artifacts, 209 JavaScript files syntax-checked, and 445 tests (442 passed, 0 failed, 3 Windows/platform-specific skips). The full test run used the existing shared dependency cache; a clean npm ci in this worktree was not performed because workstation memory limits previously exhausted npm. Hosted CI must verify a fresh clean install and the supported Node matrix before merge.
+- No schema migration or intended public HTTP contract change. Hub 0.6.0 to 0.6.1 is a SemVer patch for internal modularity and unchanged route behavior; 0.6.1 remains an unreleased candidate pending hosted CI verification.
