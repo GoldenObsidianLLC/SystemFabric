@@ -701,3 +701,36 @@ test('custom content-type routes are composed after bearer authentication with t
     fields: { title: 'Composed route', body: { type: 'doc', children: [] } },
   });
 });
+
+
+test('legacy page revision reads retain the shared content-read policy after content-type route extraction', async () => {
+  const siteId = '11111111-1111-4111-8111-111111111111';
+  const contentId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const lookups = [];
+  const pool = {
+    async query() { return { rows: [] }; },
+    async connect() { throw new Error('unexpected transaction'); },
+  };
+  const contentStore = {
+    async getById(input) {
+      lookups.push(input);
+      return null;
+    },
+    async listRevisions() {
+      throw new Error('missing foreign content must not enumerate revisions');
+    },
+  };
+  const identityService = { async authenticate() { return null; } };
+
+  await withServer(async base => {
+    const response = await fetch(
+      base + '/api/v1/pages/' + contentId + '/revisions?siteId=' + siteId,
+      { headers: { authorization: 'Bearer test-secret-token' } },
+    );
+    const payload = await response.json();
+    assert.equal(response.status, 404);
+    assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_CONTENT_NOT_FOUND');
+  }, {}, { pool, contentStore, identityService });
+
+  assert.deepEqual(lookups, [{ siteId, id: contentId }]);
+});

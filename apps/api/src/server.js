@@ -679,6 +679,14 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     const result = await localPool.query('SELECT * FROM plugin_installs WHERE site_id=$1 AND id=$2', [siteId, pluginId]);
     return result.rows[0] || null;
   }
+  // Shared by legacy page/revision/workflow read handlers that still live in
+  // the API composition module. The extracted custom content-type route family
+  // keeps its own equivalent policy helper behind its explicit context.
+  async function hasContentRead(actor, siteId) {
+    if (actor.isDeveloper) return true;
+    return (await identity.authorizeSite(actor.user.id, siteId, 'content:read'))
+      || (await identity.authorizeSite(actor.user.id, siteId, 'content:read:own'));
+  }
   async function handler(req, res) {
     const requestId = typeof req.headers['x-request-id'] === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(req.headers['x-request-id']) ? req.headers['x-request-id'] : randomUUID();
     const traceContext = createTraceContext({
