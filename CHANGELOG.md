@@ -13,7 +13,7 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ### Validation and release evidence hardening
 - Fresh `npm ci --no-audit --no-fund` completed in the isolated candidate worktree on Windows / Node.js 26.12.1.
-- `npm run check` passes: 206 required paths, 213 JavaScript files syntax-checked, 473 tests (470 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence and CycloneDX regression suites pass; `npm audit --audit-level=high` reports zero vulnerabilities.
+- `npm run check` passes after the final route-compatibility regression additions: 206 required paths, 213 JavaScript files syntax-checked, 476 tests (473 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence, CycloneDX and library-route suites pass. `npm audit --audit-level=high` reports zero vulnerabilities. Library route-level disabled/not-found responses retain their established public error codes.
 - Pin npm CLI `11.19.1` in `package.json` and `RELEASE-MANIFEST.json`; the Node 22/24 CI matrix installs and verifies the same CLI before `npm ci`, audits and SBOM generation. The CI evidence aggregator verifies the SBOM tool identity and compares normalized package identities/dependency edges across runtimes, blocking real inventory drift.
 - Bind formal and supplemental release evidence to schema version, product, exact candidate version and full Git source revision. The fresh-migration harness records that revision; old or unversioned retained evidence is rejected rather than treated as current. Dedicated CI migration artifacts remain independently run- and checksum-bound.
 - Focused API/library/commerce/platform/request-validation regression suites passed 49/49 with zero skips.

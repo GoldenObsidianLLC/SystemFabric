@@ -247,6 +247,30 @@ test('asset version replacement is audited after the versioned store operation',
   assert.equal(events[4].entry.details.version, 3);
 });
 
+test('library route-level errors retain the existing public error codes', async t => {
+  await t.test('configured storage is required', async () => {
+    const ctx = createContext({
+      path: `/api/v1/sites/${siteId}/library/items`,
+      libraryStore: null,
+    });
+    await assert.rejects(
+      handleLibraryRoute(ctx),
+      error => error.statusCode === 503 && error.code === 'ERR_SYSTEMFABRIC_LIBRARY_DISABLED',
+    );
+  });
+
+  await t.test('missing private asset preserves its established error code', async () => {
+    const ctx = createContext({
+      path: `/api/v1/sites/${siteId}/library/items/${assetId}/download`,
+      libraryStore: { async getBufferById() { return null; } },
+    });
+    await assert.rejects(
+      handleLibraryRoute(ctx),
+      error => error.statusCode === 404 && error.code === 'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND',
+    );
+  });
+});
+
 test('unsupported optimization is recorded as skipped without invoking a media provider', async () => {
   const events = [];
   const statuses = [];

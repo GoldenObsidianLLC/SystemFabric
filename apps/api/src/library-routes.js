@@ -22,7 +22,7 @@ async function handleLibraryRoute(ctx) {
   const libraryCollection=pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/library\/items$/i);
   const libraryItem=pathName.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/library\/items\/([0-9a-f-]{36})(?:\/(versions|optimize|download))?$/i);
   if ((libraryCollection&&['GET','POST'].includes(method))||(libraryItem&&['GET','PATCH','DELETE','POST','PUT'].includes(method))) {
-    if(!libraryStore||!localPool) throw fail(503,'ERR_VIRGOSCORPIO_HUB_LIBRARY_DISABLED','File and document libraries require PostgreSQL and configured storage.');
+    if(!libraryStore||!localPool) throw fail(503,'ERR_SYSTEMFABRIC_LIBRARY_DISABLED','File and document libraries require PostgreSQL and configured storage.');
     const siteId=libraryCollection?.[1]||libraryItem[1]; const body=['POST','PATCH','PUT','DELETE'].includes(method)&&libraryItem?.[3]!=='download'?await readJson(req,maxLibraryBody||maxBody):{};
     await siteIdFor({ req, url, body, actor, routeSiteId: siteId }); await requireCapability(actor,siteId,method==='GET'?'library:manage':'library:manage');
     if(libraryCollection){
@@ -33,11 +33,11 @@ async function handleLibraryRoute(ctx) {
       return sendJson(res,201,{item:asset,url:asset.is_public?`/library/public/${asset.id}`:null,requestId});
     }
     const id=libraryItem[2], action=libraryItem[3];
-    if(method==='GET'&&action==='download'){const value=await libraryStore.getBufferById({siteId,id});if(!value)throw fail(404,'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND','Library asset not found.');const safeName=String(value.asset.original_name||'download').replace(/[\r\n\"\\]/g,'_').slice(0,240);res.writeHead(200,{'content-type':value.asset.mime_type,'content-length':value.data.length,'content-disposition':`attachment; filename="${safeName}"`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"});res.end(value.data);return true;}
+    if(method==='GET'&&action==='download'){const value=await libraryStore.getBufferById({siteId,id});if(!value)throw fail(404,'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND','Library asset not found.');const safeName=String(value.asset.original_name||'download').replace(/[\r\n\"\\]/g,'_').slice(0,240);res.writeHead(200,{'content-type':value.asset.mime_type,'content-length':value.data.length,'content-disposition':`attachment; filename="${safeName}"`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"});res.end(value.data);return true;}
     if(method==='PUT'&&!action){const item=await libraryStore.replaceVersion({siteId,id,actorId:actor.user.id,expectedVersion:body.expectedVersion,dataBase64:body.dataBase64,mimeType:body.mimeType,fileName:body.fileName});await identity?.audit({siteId,actorId:actor.user.id,action:'library.asset_version_replaced',targetType:'library-asset',targetId:id,requestId,details:{version:item.version,mimeType:item.mime_type,sha256:item.sha256}});return sendJson(res,200,{item,requestId});}
-    if(method==='GET'&&action==='versions'){const history=await libraryStore.history({siteId,id});if(!history)throw fail(404,'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND','Library asset not found.');return sendJson(res,200,{versions:history,requestId});}
+    if(method==='GET'&&action==='versions'){const history=await libraryStore.history({siteId,id});if(!history)throw fail(404,'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND','Library asset not found.');return sendJson(res,200,{versions:history,requestId});}
     if(method==='POST'&&action==='optimize'){
-      const value=await libraryStore.getBufferById({siteId,id});if(!value)throw fail(404,'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND','Library asset not found.');
+      const value=await libraryStore.getBufferById({siteId,id});if(!value)throw fail(404,'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND','Library asset not found.');
       await libraryStore.markOptimization({siteId,id,status:'processing',details:{requestedAt:new Date().toISOString()}});
       try {
         let result;
@@ -50,7 +50,7 @@ async function handleLibraryRoute(ctx) {
         return sendJson(res,200,{optimization:{status:'optimized',variant,bytesSaved:result.bytesSaved},requestId});
       } catch(error){await libraryStore.markOptimization({siteId,id,status:error.code==='ERR_VIRGOSCORPIO_HUB_OPTIMIZER_UNAVAILABLE'?'skipped':'failed',details:{optimizationReason:error.code||'optimizer-failed'}});if(error.statusCode)throw error;return sendJson(res,200,{optimization:{status:error.code==='ERR_VIRGOSCORPIO_HUB_OPTIMIZER_UNAVAILABLE'?'skipped':'failed',reason:error.code||'optimizer-failed'},requestId});}
     }
-    if(method==='GET'){const item=await libraryStore.get({siteId,id});if(!item)throw fail(404,'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND','Library asset not found.');return sendJson(res,200,{item,versions:await libraryStore.history({siteId,id}),requestId});}
+    if(method==='GET'){const item=await libraryStore.get({siteId,id});if(!item)throw fail(404,'ERR_SYSTEMFABRIC_LIBRARY_NOT_FOUND','Library asset not found.');return sendJson(res,200,{item,versions:await libraryStore.history({siteId,id}),requestId});}
     if(method==='PATCH'){const item=await libraryStore.updateMetadata({siteId,id,actorId:actor.user.id,expectedVersion:body.expectedVersion,patch:body.patch});return sendJson(res,200,{item,requestId});}
     if(method==='DELETE'){const deleted=await libraryStore.delete({siteId,id,expectedVersion:body.expectedVersion});return sendJson(res,200,{deleted:true,...deleted,requestId});}
   }
