@@ -53,11 +53,12 @@ Apply these checks to every AI-enabled product track:
 ### Documentation and developer experience
 
 - [x] Centralize PostgreSQL transaction lifecycle handling and adopt it in the community workflow and Stripe checkout reconciliation modules. Keep adoption incremental; auth, content persistence, API routes, and cross-system object-storage workflows still require separate contract review.
+- [x] Extract the authenticated AI task status/history/detail read routes into a dedicated handler while retaining authentication, site selection, and `ai:use` enforcement in the API composition pipeline.
 - [ ] Keep feature descriptions and badges aligned with CI evidence.
 - [ ] Keep setup commands, environment examples, and module responsibilities synchronized with the source.
 - [ ] Track recurring onboarding friction from contributor feedback and simplify the most common paths.
 
-**Exit condition:** the applicable 0.5.x release gates have current evidence for the exact target commit. A green unit suite or configured CI workflow alone is insufficient.
+**Exit condition:** the applicable 0.6.x release gates have current evidence for the exact target commit. A green unit suite or configured CI workflow alone is insufficient.
 
 ## Track B — Build the real-time platform foundation (P1)
 

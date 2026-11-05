@@ -2,7 +2,7 @@
   "name": "VirgoScorpio Hub",
   "packageName": "virgoscorpio-hub",
   "version": "0.6.1",
-  "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; hardening candidate, not production-certified.",
+  "description": "AI-integrated headless CMS, visual builder, publishing runtime, libraries, commerce/community workflows and cloud-integrated services for Node.js; 0.6.1 internal API modularity candidate, not production-certified.",
   "releaseState": "EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED",
   "runtime": {
     "nodeMinimum": ">=22.23.4",
@@ -14,7 +14,7 @@
       "trackedInGit": true,
       "cleanNpmCiValidated": false,
       "reviewedByMaintainer": false,
-      "reason": "The current 0.6.0 / EnginEx 7.0.0 candidate requires fresh clean npm ci evidence. A local repeat on 2026-11-04 exhausted Node.js heap under workstation memory pressure; hosted CI must verify clean installation and lockfile identity before merge or release."
+      "reason": "The 0.6.1 AI task route candidate reuses the shared dependency cache for local checks; a fresh clean npm ci in hosted CI is required before merge or release. PR #66 clean-install CI passed; PR #67 must pass its own clean-install workflow."
     }
   },
   "renderer": {
@@ -234,6 +234,13 @@
       "status": "unreleased-candidate",
       "date": "2026-11-04",
       "summary": "Upgrade EnginEx to 7.0.0, remove the arbitrary-JavaScript legacy template renderer, and fail closed on legacy opt-in APIs."
+    },
+    {
+      "version": "0.6.1",
+      "changeType": "patch",
+      "status": "unreleased-candidate",
+      "date": "2026-11-04",
+      "summary": "Internal commerce and AI task API route-family extraction with bounded request validation and canonical identifier reuse; no intended HTTP or schema contract change."
     }
   ],
   "historicalValidation": {
@@ -332,89 +339,112 @@
       },
       "mergedCommit": "dc4a82dafd7abe30da0c9e3b5ec87d9a21c467fd",
       "hostedCi": "PASS (Node 22/24, PostgreSQL/Memgraph, browser/accessibility, CodeQL, evidence consolidation)."
+    },
+    "0.6.0": {
+      "semver": {
+        "previousVersion": "0.5.4",
+        "candidateVersion": "0.6.0",
+        "changeType": "minor",
+        "released": false
+      },
+      "breakingChanges": [
+        "EnginEx dependency upgraded from 6.2.0 to 7.0.0.",
+        "Legacy <?njs ?> execution and engine-legacy.js were removed.",
+        "allowUnsafeCode: true and engine.unsafe() fail with ERR_ENGINEX_UNSAFE_API."
+      ],
+      "localValidation": "PASS",
+      "localEnginex": {
+        "version": "7.0.0",
+        "status": "PASS",
+        "syntaxFilesChecked": 22,
+        "tests": 94,
+        "passed": 91,
+        "failed": 0,
+        "skipped": 3,
+        "packageIntegrityCheck": {
+          "status": "PASS",
+          "files": 31
+        },
+        "testConcurrency": 1
+      },
+      "npmAuditHigh": {
+        "status": "PASS",
+        "vulnerabilities": 0
+      },
+      "latestNpmCiAttempt": {
+        "date": "2026-11-04",
+        "status": "BLOCKED_BY_LOCAL_RESOURCE_LIMIT",
+        "detail": "A subsequent npm ci attempt after the successful local test run terminated with Node.js heap out of memory on the Windows workstation. The attempt left npm ls reporting invalid/extraneous installed-package entries. No package or lockfile content was changed by the attempt. The previous clean-install evidence is retained as historical; hosted PR CI must validate a fresh clean install for this candidate."
+      },
+      "postRendererRemovalCodeScanning": {
+        "analyzedAt": "2026-11-04T23:31:37Z",
+        "commit": "e26417e5215bfdf11bcf1216db23d0b2f94d7cf3",
+        "branch": "refs/heads/main",
+        "openAlerts": [],
+        "fixedWithoutDismissal": [
+          14,
+          30,
+          31,
+          32,
+          33
+        ],
+        "dismissedAlerts": []
+      }
     }
   },
   "candidateValidation": {
     "reviewedAt": "2026-11-04",
-    "branch": "fix/remove-unsafe-legacy-renderer-2026-11",
+    "branch": "refactor/api-route-family-2026-11",
     "semver": {
-      "previousVersion": "0.5.4",
-      "candidateVersion": "0.6.0",
-      "changeType": "minor",
-      "released": false
+      "previousVersion": "0.6.0",
+      "candidateVersion": "0.6.1",
+      "changeType": "patch",
+      "released": false,
+      "reason": "Compatible internal API route-family modularity improvements with no intended HTTP contract or database schema change."
     },
-    "breakingChanges": [
-      "EnginEx dependency upgraded from 6.2.0 to 7.0.0.",
-      "Legacy <?njs ?> execution and engine-legacy.js were removed.",
-      "allowUnsafeCode: true and engine.unsafe() fail with ERR_ENGINEX_UNSAFE_API."
+    "includedChanges": [
+      "Commerce products/orders/refunds/checkout/membership route-family extraction (PR #66).",
+      "Authenticated AI task status/history/detail read-route extraction (this candidate).",
+      "Bounded request JSON validation and canonical UUID reuse (PR #66)."
     ],
-    "localValidation": "PASS",
-    "hostedCi": "PENDING_PULL_REQUEST",
-    "remainingCodeScanning": [
-      14
-    ],
-    "productionCertified": false,
-    "localEnginex": {
-      "version": "7.0.0",
+    "localValidation": {
       "status": "PASS",
-      "syntaxFilesChecked": 22,
-      "tests": 94,
-      "passed": 91,
-      "failed": 0,
-      "skipped": 3,
-      "packageIntegrityCheck": {
-        "status": "PASS",
-        "files": 31
+      "runtime": {
+        "node": "26.12.1",
+        "platform": "win32",
+        "arch": "x64"
       },
-      "testConcurrency": 1
+      "artifactCheck": {
+        "status": "PASS",
+        "requiredPaths": 202,
+        "javascriptFilesSyntaxChecked": 211
+      },
+      "unitTests": {
+        "status": "PASS",
+        "tests": 461,
+        "passed": 458,
+        "failed": 0,
+        "skipped": 3
+      },
+      "focusedAiRouteTests": {
+        "status": "PASS",
+        "tests": 45,
+        "passed": 45,
+        "failed": 0,
+        "skipped": 0
+      },
+      "npmAuditHigh": {
+        "status": "PASS",
+        "command": "npm audit --package-lock-only --audit-level=high",
+        "vulnerabilities": 0,
+        "date": "2026-11-04"
+      },
+      "dependencyInstall": "Shared dependency cache reused with explicit EnginEx 7.0.0 preload; clean npm ci not run in this worktree."
     },
-    "codeScanning": {
-      "baselineCommit": "aa361ab",
-      "baselineOpenAlerts": [
-        14
-      ],
-      "expectedCandidateBehavior": "Removing engine-legacy.js removes the only CodeQL js/unsafe-code-construction sink identified by alert #14. Confirm through the PR CodeQL analysis; do not pre-mark fixed."
-    },
-    "npmCi": {
-      "status": "LOCAL_REPEAT_FAILED_OUT_OF_MEMORY",
-      "historicalAttempt": "180 packages installed and reported PASS in the pre-existing candidate record.",
-      "latestAttempt": "npm ci --no-audit --no-fund exited 1 after Node.js heap exhaustion on this Windows workstation; the pre-existing node_modules tree also showed extraneous/invalid packages when inspected with npm ls.",
-      "externalDependencyVersionsChanged": false,
-      "releaseGate": "A fresh clean npm ci in hosted CI is required before merge; do not treat the prior local install record as current-candidate proof."
-    },
-    "artifactCheck": {
-      "status": "PASS",
-      "requiredPaths": 195,
-      "javascriptFilesSyntaxChecked": 205
-    },
-    "unitTests": {
-      "status": "PASS",
-      "tests": 437,
-      "passed": 434,
-      "failed": 0,
-      "skipped": 3,
-      "skipNotes": [
-        "Open-file rename semantics differ on Windows.",
-        "O_NOFOLLOW is not exposed on this Windows platform."
-      ]
-    },
-    "npmAuditHigh": {
-      "status": "PASS",
-      "vulnerabilities": 0
-    },
-    "migrationGuide": "docs/ENGINEX-7-MIGRATION.md",
-    "testConcurrency": 1,
-    "latestNpmCiAttempt": {
-      "date": "2026-11-04",
-      "status": "BLOCKED_BY_LOCAL_RESOURCE_LIMIT",
-      "detail": "A subsequent npm ci attempt after the successful local test run terminated with Node.js heap out of memory on the Windows workstation. The attempt left npm ls reporting invalid/extraneous installed-package entries. No package or lockfile content was changed by the attempt. The previous clean-install evidence is retained as historical; hosted PR CI must validate a fresh clean install for this candidate."
-    },
-    "latestNpmAudit": {
-      "status": "PASS",
-      "command": "npm audit --audit-level=high",
-      "vulnerabilities": 0,
-      "date": "2026-11-04"
-    }
+    "hostedCi": "PENDING_PR_67; requires fresh clean npm ci, Node 22/24 matrix, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL, and consolidated evidence.",
+    "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; hosted PR CI is the clean-install gate.",
+    "productionCertified": false,
+    "localValidationSummary": "PASS: 202 required paths, 211 JavaScript files syntax-checked; 461 unit tests (458 passed, 0 failed, 3 Windows/platform-specific skips); focused AI route/API/context suites 45/45; package-lock audit 0 vulnerabilities."
   },
   "postMergeCodeScanning": {
     "analyzedAt": "2026-11-04T21:18:28Z",
@@ -538,7 +568,7 @@
       "failed": 0,
       "skipped": 0
     },
-    "fullCleanInstallAndHostedCi": "PENDING_PR_66; require fresh install, Node 22/24 matrix, PostgreSQL/Memgraph, browser/accessibility, CodeQL, and consolidated evidence jobs before merge.",
+    "fullCleanInstallAndHostedCi": "PASS on PR #66: both push and pull-request workflows passed clean dependency installation, Node.js 22.23.4 and 24.22.1 unit/security/dependency checks, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL, and consolidated CI evidence.",
     "localValidation": {
       "runtime": {
         "node": "26.12.1",
@@ -586,6 +616,13 @@
         "failed": 0,
         "skipped": 3
       }
+    },
+    "pullRequest": {
+      "number": 66,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/66",
+      "mergedAt": "2026-11-05T00:46:57Z",
+      "mergeCommit": "6ef53d75e10d1e4cc6a2ef60a63f5b84df30493c",
+      "status": "MERGED"
     }
   },
   "postRendererRemovalCodeScanning": {
@@ -601,5 +638,53 @@
       33
     ],
     "dismissedAlerts": []
+  },
+  "aiTaskRouteRefactor": {
+    "reviewedAt": "2026-11-04",
+    "baselineCommit": "6ef53d75e10d1e4cc6a2ef60a63f5b84df30493c",
+    "branch": "refactor/api-route-family-2026-11",
+    "semver": {
+      "previousVersion": "0.6.1",
+      "candidateVersion": "0.6.1",
+      "changeType": "same-unreleased-patch-candidate",
+      "released": false,
+      "reason": "Additional internal route-family extraction is included in the existing unreleased 0.6.1 patch candidate."
+    },
+    "module": "apps/api/src/ai-task-routes.js",
+    "routes": [
+      "GET /api/v1/ai/status",
+      "GET /api/v1/ai/tasks",
+      "GET /api/v1/ai/tasks/:id"
+    ],
+    "responsibilities": [
+      "Provider and durable task capability status.",
+      "Actor/site-scoped history with bounded filters and keyset pagination.",
+      "Actor/site-scoped task detail lookup."
+    ],
+    "preserves": [
+      "Authentication remains in the API request pipeline before handler dispatch.",
+      "Site resolution and ai:use enforcement remain in the API composition module.",
+      "Pagination cursors bind site, actor, status, task type, creation timestamp, and task ID.",
+      "Existing routes, response shapes, status codes, list bounds, and task-store scope are retained.",
+      "Provider generation, policy mutation, task enqueue, and worker lifecycle remain outside this read-side route module."
+    ],
+    "publicHttpContractChanged": false,
+    "databaseMigrationsAdded": false,
+    "productionCertified": false,
+    "localFocusedValidation": {
+      "status": "PASS",
+      "suites": [
+        "test/ai-task-routes.test.js",
+        "test/api.test.js",
+        "test/ai-context-api.test.js"
+      ],
+      "tests": 45,
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0
+    },
+    "fullRepositoryValidation": "PASS locally: 202 required paths, 211 JavaScript files syntax-checked; 461 tests (458 passed, 0 failed, 3 platform-specific skips).",
+    "cleanNpmCi": "NOT_RUN_IN_THIS_WORKTREE; local checks reuse the shared dependency cache with EnginEx 7.0.0 preload. Hosted PR CI must prove fresh installation.",
+    "hostedCi": "PENDING_PR_67"
   }
 }
