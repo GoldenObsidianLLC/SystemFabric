@@ -31,6 +31,16 @@ const packageLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.jso
 if (packageJson.version !== PRODUCT_VERSION || releaseManifest.version !== PRODUCT_VERSION || packageLock.version !== PRODUCT_VERSION || packageLock.packages?.['']?.version !== PRODUCT_VERSION) {
   throw new Error('Package, lockfile, release manifest, and shared product version must match.');
 }
+const packageManagerParts = typeof packageJson.packageManager === 'string' ? packageJson.packageManager.split('@') : [];
+const npmVersionParts = packageManagerParts[1]?.split('.') || [];
+const isNumericVersionPart = part => part.length > 0 && [...part].every(character => character >= '0' && character <= '9');
+const packageManagerVersion = packageManagerParts.length === 2 && packageManagerParts[0] === 'npm' &&
+  npmVersionParts.length === 3 && npmVersionParts.every(isNumericVersionPart)
+  ? packageJson.packageManager
+  : null;
+if (!packageManagerVersion || releaseManifest.runtime?.packageManager !== packageManagerVersion) {
+  throw new Error('package.json and RELEASE-MANIFEST.json must declare the same exact npm package-manager version.');
+}
 const vendorJson = JSON.parse(fs.readFileSync(path.join(root, 'vendor/enginex/package.json'), 'utf8'));
 if (vendorJson.version !== '7.0.0') throw new Error(`Expected vendored EnginEx 7.0.0, got ${vendorJson.version}`);
 if (packageLock.packages?.['vendor/enginex']?.version !== vendorJson.version) throw new Error('Vendored EnginEx package version does not match the package lockfile.');

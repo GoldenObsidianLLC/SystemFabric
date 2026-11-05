@@ -10,9 +10,11 @@ const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 
 const root = path.resolve(__dirname, '..');
 const evidenceDir = path.join(root, 'artifacts', 'evidence');
+const revisionResult = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true });
+const sourceRevision = revisionResult.status === 0 ? revisionResult.stdout.trim() : null;
 const logLines = [];
 const evidence = {
-  schemaVersion: 1, product: 'VirgoScorpio Hub', version: PRODUCT_VERSION,
+  schemaVersion: 1, product: 'VirgoScorpio Hub', version: PRODUCT_VERSION, sourceRevision,
   gate: 'fresh-migrations', generatedAt: new Date().toISOString(),
   status: 'BLOCKED',
   environment: { node: process.version, platform: process.platform, arch: process.arch },
@@ -36,6 +38,9 @@ function runMigrations(databaseUrl, label) {
 }
 
 async function main() {
+  if (!/^[0-9a-f]{40}$/i.test(sourceRevision || '')) {
+    throw new Error('Could not bind migration evidence to an exact Git HEAD revision.');
+  }
   loadEnvFile(path.join(root, '.env'));
   const testDatabaseUrl = process.env.TEST_DATABASE_URL;
   if (!testDatabaseUrl) throw new Error('TEST_DATABASE_URL is required; refusing to use DATABASE_URL.');

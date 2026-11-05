@@ -2,11 +2,11 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
-## Current candidate evidence snapshot — 5 November 2026
+## Previous hosted candidate evidence snapshot — 5 November 2026
 
 Hub 0.6.2 PR #68 head `31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9` was tested by GitHub Actions PR run [#260](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976111045) and push run [#259](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976023520). All six checks in each run completed successfully. The PR merge-ref was `16d9852126da4aa5c3e15d42460375a2e0ad0cd7`. Node 22.23.4 and 24.22.1 each passed 469/469 Hub tests, 94/94 EnginEx tests, 205 required artifact checks and 213 JavaScript syntax checks. Live PostgreSQL/Memgraph passed 65/65; 18 migrations applied and were skipped on the idempotent second pass; browser smoke passed 9/9; dependency audit reported zero vulnerabilities; CodeQL and consolidated evidence jobs passed.
 
-The exact candidate readiness result remains **NO-GO**: `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. The formal evidence aggregator marks production certification BLOCKED until independent, provider, supply-chain, accessibility, operations and release-owner evidence is supplied. The per-runtime supplemental fresh-migration marker discrepancy, while dedicated live migration evidence is PASS, must be corrected. See the [5 November 2026 full 0.6.2 release gate report](reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md). This candidate is not merged or released.
+The exact candidate readiness result on that earlier revision remains **NO-GO**: `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. The CI artifact bundle proved the dedicated live migrations passed; a separate local readiness snapshot consumed tracked 0.5.1 migration evidence and marked the supplemental check BLOCKED because it did not describe the 0.6.2 inventory. This was stale, unversioned evidence—not a failed live migration marker. The follow-up implementation below binds formal and supplemental evidence to schema version, product version and exact Git source revision. PR #68 remains unmerged and no release is authorized.
 
 ## Historical mainline evidence snapshot — 4 November 2026
 
@@ -44,9 +44,11 @@ Each bundle contains a strict `manifest.json` and an explicit file inventory. Th
 
 Before the source-tree check, Git's cached stat data is refreshed after deterministic postinstall copies. This does not stage files or rewrite content; it only avoids treating a byte-identical file with a changed timestamp as a source edit. The source-tree check then uses Git's NUL-delimited porcelain status, includes untracked files and submodules, and explicitly lists changed paths. Only the exact generated reports/logs enumerated in `scripts/release-readiness-validation.js` are non-blocking. Unknown files, untracked source, tracked source changes, renames, and line-ending-only changes continue to block a clean-source-tree result. There is no blanket exemption for `artifacts/` or other generated-output directories.
 
-The service-less integration sweep recorded by the Node matrix remains a separate PASS/PARTIAL signal; skipped tests stay PARTIAL and are not promoted to a live integration pass. The dedicated PostgreSQL/Memgraph job is independently checked for positive, zero-skip live test counts, fresh 14-migration application plus idempotent rerun, graph outage/recovery, and canonical rebuild evidence. Browser results require at least one passed test and zero failures/skips. Both npm audit logs must contain a valid summary with no high or critical findings, and the SBOM must be CycloneDX and match the project version/lockfile identity.
+The service-less integration sweep recorded by the Node matrix remains a separate PASS/PARTIAL signal; skipped tests stay PARTIAL and are not promoted to a live integration pass. The dedicated PostgreSQL/Memgraph job is independently checked for positive, zero-skip live test counts, fresh migration application for the current 18-file inventory plus idempotent rerun, graph outage/recovery, and canonical rebuild evidence. Browser results require at least one passed test and zero failures/skips. Both npm audit logs must contain a valid summary with no high or critical findings. The SBOM must be CycloneDX, match the product/lockfile identity, identify the pinned npm CLI, and have an identical normalized component and dependency graph across the supported Node matrix.
 
 The aggregate CI status is not the production release decision. `readyForProduction` deliberately remains `false` and `releaseClassification` remains `NOT_PRODUCTION_CERTIFIED`; independent security review, tenant isolation, live provider acceptance, deployment/operations, legal/licensing, and release-owner approval remain separate gates. A report cannot prove external services or human approvals merely because a CI job succeeded.
+
+The 0.6.2 candidate pins the CLI as `npm@11.19.1` in `package.json` and the release manifest. Both supported Node.js matrix jobs install and verify that exact CLI before `npm ci`, audit and SBOM generation. The aggregator checks the npm tool version embedded in each SBOM and compares the normalized CycloneDX component identities and dependency edges across runtimes. Timestamp and generator metadata differences are ignored; package or dependency graph differences block CI parity. This removes the prior uncontrolled npm-major variable without rewriting or filtering package inventory content.
 
 ## External evidence file format
 
@@ -54,8 +56,12 @@ Evidence belongs under `artifacts/evidence/` using the filenames referenced by `
 
 ```json
 {
+  "schemaVersion": 1,
+  "product": "VirgoScorpio Hub",
+  "version": "0.6.2",
+  "sourceRevision": "<exact 40-character Git HEAD SHA>",
   "status": "passed",
-  "executedAt": "2026-10-27T23:00:00.000Z",
+  "executedAt": "2026-11-05T00:00:00.000Z",
   "command": "the exact command or workflow that was run",
   "environment": "runtime, database/provider versions, deployment topology, and relevant configuration (no secrets)",
   "artifacts": [
@@ -64,13 +70,15 @@ Evidence belongs under `artifacts/evidence/` using the filenames referenced by `
 }
 ```
 
+Every formal external evidence record must identify `schemaVersion: 1`, `product: "VirgoScorpio Hub"`, the exact candidate `version`, and `sourceRevision` equal to the full Git HEAD SHA being assessed. The readiness evaluator rejects missing, legacy, stale-version and stale-revision records. Regenerate the evidence after any source commit; do not copy forward an older JSON file or edit its revision field manually. The dedicated CI producer manifests separately bind their artifacts to the workflow run, head SHA and merge SHA.
+
 Every path under `artifacts` must be relative to the repository root and point to an existing retained artifact. Do not claim `passed` when a test skipped, a provider was mocked, credentials were absent, or an audit is only planned. Preserve the unredacted original logs in access-controlled CI storage if they may contain sensitive data; the public artifact should use scrubbed logs and must never contain tokens, passwords, connection strings, personal data, or provider secrets.
 
 ## Required external gates
 
 | Evidence file | Required proof |
 |---|---|
-| `postgres-memgraph-live.json` | Migrations 0001–0014 on a fresh database and the supported v0008 upgrade fixture through the latest schema; transaction rollback; concurrency; outbox replay/dead-letter; graph outage/rebuild/reconciliation. |
+| `postgres-memgraph-live.json` | Migrations 0001–0018 on a fresh database and the supported v0008 upgrade fixture through the latest schema; transaction rollback; concurrency; outbox replay/dead-letter; graph outage/rebuild/reconciliation. |
 | `tenant-isolation-review.json` | Role/capability matrix and adversarial cross-site tests, with independent authorization review. |
 | `identity-provider-e2e.json` | Real isolated OIDC/SAML/email/MFA recovery flows, replay/rotation/logout/outage handling. |
 | `clamav-corpus.json` | Live scanner behavior including known test signatures, timeout/unavailable states, false positives and legacy asset quarantine. |

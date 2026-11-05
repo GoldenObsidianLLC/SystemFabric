@@ -20,9 +20,22 @@ const APPROVED_GENERATED_OUTPUTS = new Set([
   'artifacts/release-readiness.md',
 ]);
 
-function isFreshMigrationEvidence(value, expectedMigrationCount) {
+function isCurrentReleaseEvidence(value, expectedVersion, expectedRevision) {
+  if (typeof expectedVersion !== 'string' || !expectedVersion.trim()) return false;
+  if (typeof expectedRevision !== 'string' || !/^[0-9a-f]{40}$/i.test(expectedRevision)) return false;
+  return value?.schemaVersion === 1
+    && value.product === 'VirgoScorpio Hub'
+    && value.version === expectedVersion
+    && typeof value.sourceRevision === 'string'
+    && /^[0-9a-f]{40}$/i.test(value.sourceRevision)
+    && value.sourceRevision.toLowerCase() === expectedRevision.toLowerCase();
+}
+
+function isFreshMigrationEvidence(value, expectedMigrationCount, expectedVersion, expectedRevision) {
   if (!Number.isInteger(expectedMigrationCount) || expectedMigrationCount < 1) return false;
-  return value?.status === 'PASS'
+  return isCurrentReleaseEvidence(value, expectedVersion, expectedRevision)
+    && value.gate === 'fresh-migrations'
+    && value.status === 'PASS'
     && value.migrationCount === expectedMigrationCount
     && value.firstPass === expectedMigrationCount + '/' + expectedMigrationCount + ' migrations applied'
     && value.secondPass === expectedMigrationCount + '/' + expectedMigrationCount + ' migrations skipped as already applied'
@@ -127,6 +140,7 @@ module.exports = {
   assessSourceTreeStatus,
   hasNoHighAuditFindings,
   hasSuccessfulPlaywrightSummary,
+  isCurrentReleaseEvidence,
   isFreshMigrationEvidence,
   parseGitPorcelainStatus,
   parseTapSummary,

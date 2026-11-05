@@ -11,12 +11,14 @@ All notable project-level changes should be recorded here. This changelog does n
 - Update required-artifact verification and architecture/route ownership documentation. No public HTTP contract change is intended.
 - Bump VirgoScorpio Hub from 0.6.1 to 0.6.2 as a SemVer patch for a compatible internal route-family extraction. This is an unreleased candidate; no tag or package publication is implied.
 
-### Validation
+### Validation and release evidence hardening
 - Fresh `npm ci --no-audit --no-fund` completed in the isolated candidate worktree on Windows / Node.js 26.12.1.
-- `npm run check` passed: 206 required paths, 213 JavaScript files syntax-checked, 469 tests (466 passed, 0 failed, 3 platform-specific skips).
+- `npm run check` passes: 206 required paths, 213 JavaScript files syntax-checked, 472 tests (469 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence and CycloneDX regression suites pass; `npm audit --audit-level=high` reports zero vulnerabilities.
+- Pin npm CLI `11.19.1` in `package.json` and `RELEASE-MANIFEST.json`; the Node 22/24 CI matrix installs and verifies the same CLI before `npm ci`, audits and SBOM generation. The CI evidence aggregator verifies the SBOM tool identity and compares normalized package identities/dependency edges across runtimes, blocking real inventory drift.
+- Bind formal and supplemental release evidence to schema version, product, exact candidate version and full Git source revision. The fresh-migration harness records that revision; old or unversioned retained evidence is rejected rather than treated as current. Dedicated CI migration artifacts remain independently run- and checksum-bound.
 - Focused API/library/commerce/platform/request-validation regression suites passed 49/49 with zero skips.
-- Vendored EnginEx 7.0.0 tests passed 94 cases (91 passed, 0 failed, 3 Windows/platform-specific skips); `npm audit --audit-level=high` reported 0 vulnerabilities. PR #68 and push run #259 have passed the supported-runtime, live integration, browser smoke, CodeQL and consolidated evidence jobs; formal production readiness remains NO-GO with 14 missing evidence items.
-- The candidate 0.6.2 release-gate report remains NO-GO: 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. Green local and hosted CI does not close production certification gates; see docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md.
+- Vendored EnginEx 7.0.0 tests passed 94 cases (91 passed, 0 failed, 3 Windows/platform-specific skips); `npm audit --audit-level=high` reported 0 vulnerabilities. The previously hosted candidate head passed push run #259 and PR run #260; the evidence/toolchain follow-up recorded here is a later source change and awaits its own hosted revalidation. Formal production readiness remains NO-GO with 14 external evidence requirements open.
+
 
 ## 0.6.1 (unreleased patch candidate)
 

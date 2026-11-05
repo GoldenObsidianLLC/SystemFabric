@@ -117,7 +117,7 @@ The dedicated live integration producer job completed successfully on Node.js 22
 
 The live integration artifact identifies the dedicated test database as virgoscorpio_hub_test and the graph endpoint as 127.0.0.1:7687. The fresh migration artifact identifies a disposable database and records successful cleanup. The Memgraph outage/replay evidence records lease release while unavailable, replay after recovery and no duplicate delivery.
 
-**Evidence discrepancy to resolve:** the per-runtime release-readiness JSON marks its supplemental fresh-migration check BLOCKED because the retained local output did not contain the parser's expected success marker. In the same workflow, the dedicated integration producer emitted a schema-valid fresh-migrations.json with status PASS, 18/18 applied and 18/18 skipped on the second pass; the evidence aggregator accepted the producer artifact and the live integration job passed. Treat the dedicated live migration artifact as the authoritative execution result, but repair the supplemental marker/parser contract so future reports do not show contradictory migration statuses.
+**Evidence freshness issue in this snapshot:** the per-runtime release-readiness JSON marks its supplemental fresh-migration check BLOCKED because the retained local file is a tracked historical 0.5.1 artifact for 14 migrations, not versioned evidence for the 0.6.2 18-migration inventory. In the same workflow, the dedicated integration producer emitted a schema-valid fresh-migrations.json with status PASS, 18/18 applied and 18/18 skipped on the second pass; the evidence aggregator accepted the producer artifact and the live integration job passed. Treat the dedicated live migration artifact as the authoritative execution result for that run. The readiness validator must reject stale evidence by product version and exact source SHA rather than weakening migration execution checks or attempting to infer freshness from log text.
 
 ### 3.3 Browser and collaboration smoke
 
@@ -270,7 +270,7 @@ The original worktree branch fix/serialize-live-integration-tests and its untrac
 3. Keep production certification separate from engineering CI. The release readiness evaluator must pass in strict mode after all 14 evidence artifacts are accepted and reviewed.
 4. Bind every evidence artifact to the exact final source SHA, environment and reviewer/date. The PR merge-ref and head SHAs are both recorded in CI producer manifests.
 5. Reconcile the 2-component SBOM delta and document LGPL license/notice obligations.
-6. Correct the supplemental fresh-migration marker/parser mismatch described in section 3.2.
+6. Require schema/product/version/source-revision identity for formal and supplemental migration evidence; regenerate evidence for the exact commit being reviewed.
 7. Publish only from an approved immutable revision with verified provenance/signature, release notes, a signed tag and explicit release-owner approval.
 8. Keep the manifest status EXPANDED_DEVELOPER_PREVIEW_NOT_PRODUCTION_CERTIFIED until the evidence gate and strict assertion pass.
 
@@ -292,10 +292,9 @@ No GitHub Release was published at assessment time. No production release tag wa
 ### P1 — Candidate PR and engineering quality
 
 1. Obtain human review and merge PR #68 only after the final checks are green.
-2. Fix the fresh-migration supplemental evidence parser/marker mismatch without weakening the dedicated integration evidence contract.
-3. Document the SBOM component delta by package/version and runtime; avoid normalizing away real optional dependency differences.
-4. Add a regression test for the supplemental migration evidence parser so artifact formatting changes cannot silently report BLOCKED when the structured live evidence is PASS.
-5. Keep the route-family dependency context narrow; do not introduce a second authentication or tenant-authorization implementation.
+2. Bind every formal and supplemental external evidence artifact to schema version, product, package version and exact Git HEAD; regenerate evidence after each source revision.
+3. Pin a common npm CLI version across the supported Node.js matrix and require exact normalized SBOM component/dependency graph parity; never erase real optional dependency differences.
+4. Keep the route-family dependency context narrow; do not introduce a second authentication or tenant-authorization implementation.
 
 ## 10. Limitations and evidence boundary
 
@@ -319,3 +318,13 @@ A successful CI workflow means the configured engineering checks passed. It does
 - Codebase optimization review: ../CODEBASE-OPTIMIZATION-REVIEW-2026-11-04.md
 - Dependency license/package inspection: ../security/DEPENDENCY-LICENSE-PACKAGE-INSPECTION-2026-11-01.md
 - Dependency SBOM review: ../security/DEPENDENCY-SBOM-REVIEW-2026-11-01.md
+
+## Addendum — 5 November 2026: evidence identity and SBOM toolchain hardening
+
+This report's findings above are the snapshot for candidate head `31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9` and CI runs #259/#260. A follow-up implementation is being added to PR #68; its hosted CI must be assessed separately and does not retroactively rewrite that earlier snapshot.
+
+The migration discrepancy was diagnosed more precisely: the local `artifacts/evidence/fresh-migrations.json` was a tracked 0.5.1 artifact for 14 migrations. The dedicated PostgreSQL/Memgraph producer in the candidate CI run generated a run-bound 0.6.2 result for all 18 current migrations, proved the idempotent second pass, and dropped its disposable database. The supplemental readiness validator had accepted generic status/timestamp evidence without requiring a product/version/source identity. The fix now requires schemaVersion 1, product `VirgoScorpio Hub`, version `0.6.2`, and an exact 40-character Git `sourceRevision` matching HEAD for formal and supplemental evidence. The fresh-migration runner records this revision. Stale historical JSON is rejected; the SQL migration, ledger, idempotency and cleanup assertions remain unchanged.
+
+The second supply-chain issue was a toolchain mismatch: both CI jobs used the same lockfile bytes but different npm major versions. The candidate now declares `npm@11.19.1` in `package.json` and `RELEASE-MANIFEST.json`; both supported Node.js matrix jobs install and assert that exact CLI version before `npm ci`, audit and SBOM generation. The revision-bound aggregator verifies the npm CLI identity inside each CycloneDX document and compares canonical component identities plus dependency edges across the two SBOMs. It ignores timestamps and generator metadata only; any package or graph difference blocks parity. It does not rewrite the inventory or filter optional dependencies.
+
+Local Windows / Node.js 26.12.1 validation of the follow-up passed `npm run check`: 206 required paths, 213 JavaScript files syntax-checked, and 472 Hub tests (469 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence and SBOM tests passed; `npm audit --audit-level=high` reported zero vulnerabilities. These results are local evidence only. Supported-runtime CI revalidation, fresh run-bound DB evidence and formal readiness snapshots for the new source revision remain pending. Production remains NO-GO; all independent/provider/operations gates remain separate.

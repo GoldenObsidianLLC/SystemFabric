@@ -15,7 +15,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { loadEnvFile } = require('./load-env');
 const { configureReleaseRedisIntegrationEnv } = require('./release-integration-env');
-const { assessSourceTreeStatus, hasSuccessfulPlaywrightSummary, isFreshMigrationEvidence } = require('./release-readiness-validation');
+const { assessSourceTreeStatus, hasSuccessfulPlaywrightSummary, isCurrentReleaseEvidence, isFreshMigrationEvidence } = require('./release-readiness-validation');
 const { validateObservabilityDeploymentManifest } = require('../packages/observability/src/deployment-contract');
 const { readRegularFile } = require('./configure-otel-dev');
 
@@ -91,7 +91,9 @@ function evidenceFileStatus(id, title, evidenceFile) {
         const resolved = path.resolve(root, artifact);
         return (resolved === root || resolved.startsWith(`${root}${path.sep}`)) && fs.existsSync(resolved);
       });
-      const complete = value.status === 'passed'
+      const revisionBound = isCurrentReleaseEvidence(value, pkg.version, gitHead);
+      const complete = revisionBound
+        && value.status === 'passed'
         && typeof value.executedAt === 'string'
         && !Number.isNaN(Date.parse(value.executedAt))
         && typeof value.command === 'string' && value.command.trim()
@@ -99,13 +101,11 @@ function evidenceFileStatus(id, title, evidenceFile) {
         && artifacts.length > 0 && artifactFilesValid;
       status = complete ? 'PASS' : 'BLOCKED';
       details = complete
-        ? `Evidence validated; ${artifacts.length} referenced artifact(s).`
-        : 'Evidence exists but does not satisfy the required schema, status, or artifact-path checks.';
-      const recordedRevision = `${value.commit || ''} ${value.environment || ''}`.match(/(?:^|[^0-9a-f])([0-9a-f]{40})(?:[^0-9a-f]|$)/i)?.[1]?.toLowerCase();
-      if (status === 'PASS' && recordedRevision && gitHead && recordedRevision !== gitHead.toLowerCase()) {
-        status = 'BLOCKED';
-        details = `Evidence targets ${recordedRevision}, but current HEAD is ${gitHead}; rerun against the exact release revision.`;
-      } else if (status === 'PASS' && !sourceTreeClean) {
+        ? `Evidence validated for ${pkg.version} at exact source revision ${gitHead}; ${artifacts.length} referenced artifact(s).`
+        : !revisionBound
+          ? `Evidence must include schemaVersion 1, product VirgoScorpio Hub, version ${pkg.version}, and sourceRevision matching exact HEAD ${gitHead || '(unavailable)'}.`
+          : 'Evidence exists but does not satisfy the required status, timestamp, command, environment, or artifact-path checks.';
+      if (status === 'PASS' && !sourceTreeClean) {
         status = 'BLOCKED';
         details = 'Evidence is not accepted while the release source tree contains uncommitted changes.';
       }
@@ -316,7 +316,7 @@ const supplemental = [];
 function supplementalFile(id, title, filename, validator, successDetails) {
   const absolute = path.join(evidenceDir, filename);
   if (!fs.existsSync(absolute)) {
-    supplemental.push({ id, title, status: 'MISSING', evidencePath: `artifacts/evidence/${filename}`, details: 'No retained local execution log.' });
+    supplemental.push({ id, title, status: 'MISSING', evidencePath: `artifacts/evidence/${filename}`, details: 'No current-run local execution evidence was retained.' });
     return;
   }
   try {
@@ -326,7 +326,7 @@ function supplementalFile(id, title, filename, validator, successDetails) {
       id, title,
       status: result ? 'PASS' : 'BLOCKED',
       evidencePath: `artifacts/evidence/${filename}`,
-      details: result ? successDetails : 'Retained output did not satisfy the expected success marker.'
+      details: result ? successDetails : 'Retained evidence is stale or does not satisfy the versioned success contract.'
     });
   } catch (error) {
     supplemental.push({ id, title, status: 'BLOCKED', evidencePath: `artifacts/evidence/${filename}`, details: `Could not validate retained evidence: ${error.message}` });
@@ -335,7 +335,7 @@ function supplementalFile(id, title, filename, validator, successDetails) {
 supplementalFile('clean-npm-ci', 'Fresh clean npm ci installation', 'clean-npm-ci.json',
   raw => { const value = JSON.parse(raw); return value.status === 'passed' && value.result?.exitCode === 0 && value.result?.packagesAdded === 167 && value.environment?.node === 'v26.12.1'; },
   'Fresh isolated npm ci completed on Windows x64 / Node.js 26.12.1, installed 167 packages and ran the KaTeX postinstall; maintainer review and CI matrix evidence remain open.');
-supplementalFile('fresh-migrations', 'Fresh PostgreSQL migrations and idempotency', 'fresh-migrations.json', raw => isFreshMigrationEvidence(JSON.parse(raw), requiredMigrations.length), `All ${requiredMigrations.length} migrations applied to a disposable fresh local PostgreSQL database, all ${requiredMigrations.length} skipped on a second pass, then only that disposable database was dropped.`);
+supplementalFile('fresh-migrations', 'Fresh PostgreSQL migrations and idempotency', 'fresh-migrations.json', raw => isFreshMigrationEvidence(JSON.parse(raw), requiredMigrations.length, pkg.version, gitHead), `All ${requiredMigrations.length} migrations applied to a disposable fresh local PostgreSQL database, all ${requiredMigrations.length} skipped on a second pass, then only that disposable database was dropped.`);
 supplementalFile('playwright-smoke', 'Playwright Chromium smoke tests (not full accessibility acceptance)', 'browser-smoke.log',
   raw => hasSuccessfulPlaywrightSummary(raw),
   'The configured Chromium Playwright suite passed with zero failed tests; manual screen-reader and broader WCAG review remain open.');
