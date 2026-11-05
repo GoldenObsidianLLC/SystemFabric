@@ -1,6 +1,7 @@
 {
   "name": "virgoscorpio-hub",
-  "version": "0.6.1",
+  "version": "0.6.2",
+  "packageManager": "npm@11.19.1",
   "private": true,
   "description": "AI-integrated headless CMS, visual page builder, media and document library, commerce, memberships, community, and rendering runtime for Node.js",
   "type": "commonjs",

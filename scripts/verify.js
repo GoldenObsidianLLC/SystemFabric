@@ -16,8 +16,8 @@ const required = [
   'packages/ai/src/service.js', 'packages/ai/src/provider-factory.js', 'packages/ai/src/config.js', 'packages/ai/src/queue-worker.js', 'packages/auth/src/session-service.js', 'test/session-service.test.js',
   'packages/db/src/postgres-store.js', 'packages/db/src/transaction.js', 'packages/db/src/ai-task-store.js', 'packages/db/src/ai-task-queue.js', 'packages/db/src/outbox-worker.js', 'packages/db/src/outbox-delivery.js', 'packages/db/src/relationship-store.js',
   'packages/realtime/src/index.js', 'packages/realtime/src/event-hub.js', 'packages/realtime/src/presence.js', 'packages/realtime/src/redis-presence.js', 'packages/realtime/src/redis-realtime.js', 'packages/realtime/src/sse-gateway.js', 'packages/realtime/src/event-contract.js',
-  'test/migrations.test.js', 'test/domain-identifiers.test.js', 'test/output-encoding.test.js', 'test/db-transaction.test.js', 'test/ai-task-store.test.js', 'test/ai-task-payload.test.js', 'test/ai-task-queue.test.js', 'test/ai-queue-worker.test.js', 'test/realtime.test.js', 'test/realtime-tenant-isolation.test.js', 'test/redis-presence.test.js', 'test/redis-realtime.test.js', 'test/integration/redis-presence.integration.test.js', 'test/outbox-contract.test.js', 'test/outbox-delivery.test.js', 'test/graph-projection-worker.test.js', 'test/memgraph-projector.test.js', 'docs/REALTIME-FOUNDATION-F1.md', 'docs/REALTIME-AI-ARCHITECTURE.md',
-  'packages/graph/src/memgraph-store.js', 'packages/graph/src/rebuild-projection.js', 'apps/api/src/server.js', 'apps/api/src/platform-routes.js', 'apps/api/src/commerce-routes.js', 'apps/api/src/request-validation.js', 'apps/api/src/auth-routes.js', 'apps/api/src/ai-task-routes.js', 'test/ai-task-routes.test.js', 'apps/api/src/auth-cookies.js', 'apps/mcp/src/server.mjs', 'test/auth-cookies.test.js', 'test/commerce-routes.test.js', 'test/request-validation.test.js',
+  'test/migrations.test.js', 'test/domain-identifiers.test.js', 'test/output-encoding.test.js', 'test/db-transaction.test.js', 'test/ai-task-store.test.js', 'test/ai-task-payload.test.js', 'test/ai-task-queue.test.js', 'test/ai-queue-worker.test.js', 'test/realtime.test.js', 'test/realtime-tenant-isolation.test.js', 'test/redis-presence.test.js', 'test/redis-realtime.test.js', 'test/integration/redis-presence.integration.test.js', 'test/outbox-contract.test.js', 'test/outbox-delivery.test.js', 'test/graph-projection-worker.test.js', 'test/memgraph-projector.test.js', 'docs/REALTIME-FOUNDATION-F1.md', 'docs/REALTIME-AI-ARCHITECTURE.md', 'docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md', 'docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md',
+  'packages/graph/src/memgraph-store.js', 'packages/graph/src/rebuild-projection.js', 'apps/api/src/server.js', 'apps/api/src/platform-routes.js', 'apps/api/src/commerce-routes.js', 'apps/api/src/library-routes.js', 'apps/api/src/request-validation.js', 'apps/api/src/auth-routes.js', 'apps/api/src/ai-task-routes.js', 'test/ai-task-routes.test.js', 'apps/api/src/auth-cookies.js', 'apps/mcp/src/server.mjs', 'test/auth-cookies.test.js', 'test/commerce-routes.test.js', 'test/library-routes.test.js', 'test/request-validation.test.js',
   'apps/admin/index.html', 'apps/admin/platform.html', 'apps/admin/assets/platform.js', 'apps/admin/assets/platform.css', 'vendor/enginex/package.json'
 ];
 const missing = required.filter(file => !fs.existsSync(path.join(root, file)));
@@ -30,6 +30,16 @@ const releaseManifest = JSON.parse(fs.readFileSync(path.join(root, 'RELEASE-MANI
 const packageLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
 if (packageJson.version !== PRODUCT_VERSION || releaseManifest.version !== PRODUCT_VERSION || packageLock.version !== PRODUCT_VERSION || packageLock.packages?.['']?.version !== PRODUCT_VERSION) {
   throw new Error('Package, lockfile, release manifest, and shared product version must match.');
+}
+const packageManagerParts = typeof packageJson.packageManager === 'string' ? packageJson.packageManager.split('@') : [];
+const npmVersionParts = packageManagerParts[1]?.split('.') || [];
+const isNumericVersionPart = part => part.length > 0 && [...part].every(character => character >= '0' && character <= '9');
+const packageManagerVersion = packageManagerParts.length === 2 && packageManagerParts[0] === 'npm' &&
+  npmVersionParts.length === 3 && npmVersionParts.every(isNumericVersionPart)
+  ? packageJson.packageManager
+  : null;
+if (!packageManagerVersion || releaseManifest.runtime?.packageManager !== packageManagerVersion) {
+  throw new Error('package.json and RELEASE-MANIFEST.json must declare the same exact npm package-manager version.');
 }
 const vendorJson = JSON.parse(fs.readFileSync(path.join(root, 'vendor/enginex/package.json'), 'utf8'));
 if (vendorJson.version !== '7.0.0') throw new Error(`Expected vendored EnginEx 7.0.0, got ${vendorJson.version}`);

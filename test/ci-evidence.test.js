@@ -8,8 +8,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { PRODUCT_VERSION } = require('../packages/domain/src/version');
 const {
+  EXPECTED_NPM_VERSION,
   JOBS,
   WORKFLOW_FILE,
+  compareSbomInventories,
   evaluateCiEvidence,
   renderMarkdown,
   stageEvidence,
@@ -32,7 +34,7 @@ function write(root, relativePath, value) {
   fs.writeFileSync(absolute, typeof value === 'string' ? value : JSON.stringify(value, null, 2) + '\n');
 }
 
-function createFixtures(t) {
+function createFixtures(t, { npmVersion = EXPECTED_NPM_VERSION } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'virgoscorpio_hub-ci-evidence-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const artifactRoot = path.join(root, 'artifacts', 'ci-evidence');
@@ -58,8 +60,14 @@ function createFixtures(t) {
   };
   const sbom = {
     bomFormat: 'CycloneDX',
-    specVersion: '1.6',
-    metadata: { component: { purl: `pkg:npm/virgoscorpio-hub@${PRODUCT_VERSION}` } },
+    specVersion: '1.5',
+    metadata: {
+      component: {
+        'bom-ref': `virgoscorpio-hub@${PRODUCT_VERSION}`,
+        purl: `pkg:npm/virgoscorpio-hub@${PRODUCT_VERSION}`,
+      },
+      tools: [{ vendor: 'npm', name: 'cli', version: npmVersion }],
+    },
     components: [{ name: 'fixture', version: '1.0.0' }],
     dependencies: [],
   };
@@ -87,6 +95,11 @@ function createFixtures(t) {
     todo: 0,
   };
   const migrations = {
+    schemaVersion: 1,
+    product: 'VirgoScorpio Hub',
+    version: PRODUCT_VERSION,
+    sourceRevision: expected.mergeSha,
+    gate: 'fresh-migrations',
     status: 'PASS',
     environment: { node: 'v22.23.4' },
     migrationCount: 18,
@@ -158,6 +171,50 @@ function createFixtures(t) {
   };
   return { root, artifactRoot, jobApi, runApi };
 }
+
+test('CI SBOM generation uses the exact npm CLI version declared in package.json', () => {
+  assert.equal(require('../package.json').packageManager, 'npm@11.19.1');
+  assert.equal(EXPECTED_NPM_VERSION, '11.19.1');
+});
+
+test('SBOM inventory comparison ignores generation metadata but detects component and dependency drift', () => {
+  const left = {
+    bomFormat: 'CycloneDX',
+    metadata: { component: { 'bom-ref': 'root@1.0.0', purl: 'pkg:npm/root@1.0.0' }, timestamp: '2026-01-01T00:00:00.000Z' },
+    components: [{ 'bom-ref': 'alpha@1.0.0', name: 'alpha', version: '1.0.0', purl: 'pkg:npm/alpha@1.0.0' }],
+    dependencies: [
+      { ref: 'root@1.0.0', dependsOn: ['alpha@1.0.0'] },
+      { ref: 'alpha@1.0.0', dependsOn: [] },
+    ],
+  };
+  const identicalInventory = {
+    ...left,
+    metadata: { ...left.metadata, timestamp: '2026-02-01T00:00:00.000Z' },
+  };
+  assert.deepEqual(compareSbomInventories(left, identicalInventory), {
+    same: true,
+    leftOnlyComponents: [],
+    rightOnlyComponents: [],
+    leftOnlyEdges: [],
+    rightOnlyEdges: [],
+  });
+
+  const changed = {
+    ...identicalInventory,
+    components: [...identicalInventory.components, {
+      'bom-ref': 'tslib@2.8.1', name: 'tslib', version: '2.8.1', purl: 'pkg:npm/tslib@2.8.1',
+    }],
+    dependencies: [
+      { ref: 'root@1.0.0', dependsOn: ['alpha@1.0.0'] },
+      { ref: 'alpha@1.0.0', dependsOn: ['tslib@2.8.1'] },
+      { ref: 'tslib@2.8.1', dependsOn: [] },
+    ],
+  };
+  const delta = compareSbomInventories(left, changed);
+  assert.equal(delta.same, false);
+  assert.deepEqual(delta.rightOnlyComponents, ['pkg:npm/tslib@2.8.1']);
+  assert.deepEqual(delta.rightOnlyEdges, ['pkg:npm/alpha@1.0.0 -> pkg:npm/tslib@2.8.1']);
+});
 
 test('stages files with SHA-256 and exact run, attempt, source and job identity', t => {
   const { root, artifactRoot } = createFixtures(t);
@@ -256,6 +313,18 @@ test('consolidates all successful producers but never marks production certified
     report.checks.find(check => check.id === 'service-less-integration-node-24.22.1')?.status,
     'PARTIAL',
   );
+});
+
+test('rejects Node.js producer SBOMs generated with an unpinned npm CLI', t => {
+  const { artifactRoot, jobApi, runApi } = createFixtures(t, { npmVersion: '10.9.9' });
+  const report = evaluateCiEvidence({ artifactRoot, expected, run: runApi, jobs: jobApi });
+  assert.equal(report.ciStatus, 'BLOCKED');
+  for (const key of ['node-22.23.4', 'node-24.22.1']) {
+    const job = report.jobs.find(item => item.key === key);
+    assert.equal(job.status, 'BLOCKED');
+    assert.ok(job.errors.some(error => /pinned npm CLI 11\.19\.1/.test(error)));
+  }
+  assert.equal(report.checks.find(check => check.id === 'sbom-runtime-parity')?.status, 'BLOCKED');
 });
 
 test('accepts an empty CodeQL evidence inventory when artifact download omits empty directories', t => {

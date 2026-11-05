@@ -11,6 +11,7 @@ const {
   assessSourceTreeStatus,
   hasNoHighAuditFindings,
   hasSuccessfulPlaywrightSummary,
+  isCurrentReleaseEvidence,
   isFreshMigrationEvidence,
   parseGitPorcelainStatus,
   parseTapSummary,
@@ -26,18 +27,40 @@ function git(cwd, args) {
   return result.stdout;
 }
 
-test('fresh migration evidence must match the current migration count and idempotency result', () => {
+test('release evidence must be versioned and bound to the exact source revision', () => {
   const current = {
+    schemaVersion: 1,
+    product: 'VirgoScorpio Hub',
+    version: '0.6.2',
+    sourceRevision: 'a'.repeat(40),
+  };
+  assert.equal(isCurrentReleaseEvidence(current, '0.6.2', 'a'.repeat(40)), true);
+  assert.equal(isCurrentReleaseEvidence(current, '0.6.1', 'a'.repeat(40)), false);
+  assert.equal(isCurrentReleaseEvidence(current, '0.6.2', 'b'.repeat(40)), false);
+  assert.equal(isCurrentReleaseEvidence({ ...current, sourceRevision: undefined }, '0.6.2', 'a'.repeat(40)), false);
+  assert.equal(isCurrentReleaseEvidence({ ...current, schemaVersion: 0 }, '0.6.2', 'a'.repeat(40)), false);
+});
+
+test('fresh migration evidence must match version, source revision, migration inventory, and idempotency result', () => {
+  const current = {
+    schemaVersion: 1,
+    product: 'VirgoScorpio Hub',
+    version: '0.6.2',
+    sourceRevision: 'a'.repeat(40),
+    gate: 'fresh-migrations',
     status: 'PASS',
     migrationCount: 18,
     firstPass: '18/18 migrations applied',
     secondPass: '18/18 migrations skipped as already applied',
     cleanup: 'disposable database dropped',
   };
-  assert.equal(isFreshMigrationEvidence(current, 18), true);
-  assert.equal(isFreshMigrationEvidence(current, 17), false);
-  assert.equal(isFreshMigrationEvidence({ ...current, secondPass: '15/15 migrations skipped as already applied' }, 18), false);
-  assert.equal(isFreshMigrationEvidence({ ...current, status: 'BLOCKED' }, 18), false);
+  assert.equal(isFreshMigrationEvidence(current, 18, '0.6.2', 'a'.repeat(40)), true);
+  assert.equal(isFreshMigrationEvidence(current, 17, '0.6.2', 'a'.repeat(40)), false);
+  assert.equal(isFreshMigrationEvidence(current, 18, '0.6.1', 'a'.repeat(40)), false);
+  assert.equal(isFreshMigrationEvidence(current, 18, '0.6.2', 'b'.repeat(40)), false);
+  assert.equal(isFreshMigrationEvidence({ ...current, version: '0.5.1', migrationCount: 14 }, 18, '0.6.2', 'a'.repeat(40)), false);
+  assert.equal(isFreshMigrationEvidence({ ...current, secondPass: '15/15 migrations skipped as already applied' }, 18, '0.6.2', 'a'.repeat(40)), false);
+  assert.equal(isFreshMigrationEvidence({ ...current, status: 'BLOCKED' }, 18, '0.6.2', 'a'.repeat(40)), false);
 });
 
 test('Playwright validation requires a positive passed count and rejects failures or skips', () => {

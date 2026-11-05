@@ -2,6 +2,24 @@
 
 All notable project-level changes should be recorded here. This changelog does not imply that every listed item has been released or production-certified; CI and release-readiness evidence remain separate.
 
+## 0.6.2 (unreleased patch candidate)
+
+### API architecture and maintainability
+- Extract the site-scoped library and media HTTP routes into `apps/api/src/library-routes.js`; retain request authentication, site resolution, capability enforcement, request lifecycle and centralized errors in the API composition pipeline.
+- Preserve library upload limits, metadata and optimistic-version operations, audit events, private-download headers, optional optimization status handling, and tenant-scoped store operations. Keep PostgreSQL/object-storage compensation and reconciliation explicit; no distributed transaction or database migration is introduced.
+- Add focused tests for unmatched dispatch, site/capability ordering, cross-site rejection before store access, upload audit minimization, private-download hardening, version replacement and unsupported optimization behavior.
+- Update required-artifact verification and architecture/route ownership documentation. Preserve route paths, methods, HTTP statuses and response shapes; normalize the legacy pre-rename disabled/not-found error-code prefixes to the established `ERR_VIRGOSCORPIO_HUB_*` namespace shared by current library-store and public-asset routes.
+- Bump VirgoScorpio Hub from 0.6.1 to 0.6.2 as a SemVer patch for a compatible internal route-family extraction. This is an unreleased candidate; no tag or package publication is implied.
+
+### Validation and release evidence hardening
+- Fresh `npm ci --no-audit --no-fund` completed in the isolated candidate worktree on Windows / Node.js 26.12.1.
+- `npm run check` passes after the final route-compatibility regression additions: 206 required paths, 213 JavaScript files syntax-checked, 476 tests (473 passed, 0 failed, 3 Windows/platform-specific skips). Focused release-evidence, CycloneDX and library-route suites pass. `npm audit --audit-level=high` reports zero vulnerabilities. Library route-level disabled/not-found errors now consistently use the established VirgoScorpio Hub error-code namespace shared by the library store and public asset routes; live tenant-isolation tests verify the contract.
+- Pin npm CLI `11.19.1` in `package.json` and `RELEASE-MANIFEST.json`; the Node 22/24 CI matrix installs and verifies the same CLI before `npm ci`, audits and SBOM generation. The CI evidence aggregator verifies the SBOM tool identity and compares normalized package identities/dependency edges across runtimes, blocking real inventory drift.
+- Bind formal and supplemental release evidence to schema version, product, exact candidate version and full Git source revision. The fresh-migration harness records that revision; old or unversioned retained evidence is rejected rather than treated as current. Dedicated CI migration artifacts remain independently run- and checksum-bound.
+- Focused API/library/commerce/platform/request-validation regression suites passed 49/49 with zero skips.
+- Hosted push run #269 and PR run #270 passed all six jobs on the final route/error-contract and evidence/toolchain candidate: Node.js 22.23.4 and 24.22.1 each passed 476/476 Hub tests and 94/94 EnginEx tests; dedicated PostgreSQL/Memgraph passed 65/65 with zero skips; migrations applied 18/18 and skipped 18/18 on rerun; the v0008-to-v0009 upgrade fixture and Memgraph outage/replay/rebuild passed; browser smoke passed 9/9; CodeQL and consolidated evidence passed. Both SBOMs identify npm 11.19.1 and match at 177 components / 178 dependency records with identical normalized dependency graphs. Audits reported zero vulnerabilities. Strict formal readiness remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE.
+
+
 ## 0.6.1 (unreleased patch candidate)
 
 ### API architecture and maintainability
