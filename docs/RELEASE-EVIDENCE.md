@@ -2,7 +2,7 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
-## Latest candidate evidence snapshot — 5 November 2026
+## Current mainline and latest candidate evidence snapshot — 5 November 2026
 
 PR #68 candidate source `8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3` passed hosted pull-request workflow [run #270](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42026945926) and push run [#269](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42026938931), merge ref `e39cd5c33f940762ed9fa88b27aad8f8d3070947`. All six jobs in both runs completed successfully. Node.js 22.23.4 and 24.22.1 each passed 476/476 Hub tests and 94/94 EnginEx tests, zero failures/skips; both checked 206 required artifact paths and 213 JavaScript files and reported zero audit vulnerabilities.
 
@@ -10,7 +10,7 @@ Both CycloneDX 1.5 SBOMs identify npm CLI 11.19.1 and derive from the same lockf
 
 The dedicated PostgreSQL/Memgraph job passed 65/65 tests with zero skips; it applied 18 migrations, verified all 18 idempotent second-pass skips, exercised the v0008-to-v0009 upgrade fixture, Memgraph outage/replay and graph rebuild, and dropped only its disposable database. Browser/editor smoke passed 9/9; CodeQL and consolidated revision-bound evidence passed. The service-less integration matrix still records 29 skips and remains PARTIAL.
 
-Exact formal readiness remains **NO-GO**: 7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE; `readyForProduction: false`. The blocked formal PostgreSQL/Memgraph evidence record lacks exact current schema/product/version/source SHA identity even though the dedicated run-bound CI producer artifact passes. Fourteen independent/provider/security/product/operations evidence requirements remain missing. PR #68 is open and unmerged; no release is authorized.
+Exact formal readiness remains **NO-GO**: 7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE; `readyForProduction: false`. The current mainline is VirgoScorpio Hub 0.6.2 at `d50e56801ea77a811ec809be1574e769917fff78`; PRs #68 and #69 are merged. Mainline run [#278](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42067882403) attempt 2 passed its five producer jobs, but the aggregate gate remains BLOCKED by stale workflow-run metadata during rerun. The formal PostgreSQL/Memgraph evidence record still lacks the required exact schema/product/version/source SHA identity; the separate run-bound integration artifact does not replace that contract. Fourteen independent/provider/security/product/operations evidence requirements remain missing. No release or production deployment is authorized.
 
 
 
@@ -18,7 +18,7 @@ Exact formal readiness remains **NO-GO**: 7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSI
 
 Hub 0.6.2 PR #68 head `31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9` was tested by GitHub Actions PR run [#260](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976111045) and push run [#259](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976023520). All six checks in each run completed successfully. The PR merge-ref was `16d9852126da4aa5c3e15d42460375a2e0ad0cd7`. Node 22.23.4 and 24.22.1 each passed 469/469 Hub tests, 94/94 EnginEx tests, 205 required artifact checks and 213 JavaScript syntax checks. Live PostgreSQL/Memgraph passed 65/65; 18 migrations applied and were skipped on the idempotent second pass; browser smoke passed 9/9; dependency audit reported zero vulnerabilities; CodeQL and consolidated evidence jobs passed.
 
-The exact candidate readiness result on that earlier revision remains **NO-GO**: `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. The CI artifact bundle proved the dedicated live migrations passed; a separate local readiness snapshot consumed tracked 0.5.1 migration evidence and marked the supplemental check BLOCKED because it did not describe the 0.6.2 inventory. This was stale, unversioned evidence—not a failed live migration marker. The follow-up implementation below binds formal and supplemental evidence to schema version, product version and exact Git source revision. PR #68 remains unmerged and no release is authorized.
+The exact candidate readiness result on that earlier revision remains **NO-GO**: `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. The CI artifact bundle proved the dedicated live migrations passed; a separate local readiness snapshot consumed tracked 0.5.1 migration evidence and marked the supplemental check BLOCKED because it did not describe the 0.6.2 inventory. This was stale, unversioned evidence—not a failed live migration marker. The follow-up implementation below binds formal and supplemental evidence to schema version, product version and exact Git source revision. At the time of that candidate snapshot PR #68 remained unmerged; it subsequently merged as `be1441e216c20358e8506389915a676209808e37`, followed by PR #69 at `d50e56801ea77a811ec809be1574e769917fff78`. No release is authorized.
 
 ## Historical mainline evidence snapshot — 4 November 2026
 

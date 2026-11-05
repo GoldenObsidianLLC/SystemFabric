@@ -6,6 +6,8 @@
 
 **A modular Node.js application platform designed to augment human capability through secure, governed human-AI collaboration.**
 
+[![VirgoScorpio Hub](https://img.shields.io/badge/VirgoScorpio%20Hub-v0.6.2-c49a3a)](package.json)
+[![EnginEx](https://img.shields.io/badge/EnginEx-v7.0.0-6f42c1)](vendor/enginex/package.json)
 [![VirgoScorpio Hub CI](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/workflows/ci.yml)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/License-GPL--2.0--or--later-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.23.4-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -14,7 +16,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.2 is now the current mainline (unreleased developer-preview patch) following the merge of PR #68 as commit `be1441e216c20358e8506389915a676209808e37`. The library/media route extraction, npm 11.19.1 toolchain pin, release-evidence revision binding and SBOM parity checks passed hosted CI. The follow-on site-membership route extraction is proposed in PR #69 and is being revalidated against main. The platform remains **NOT_PRODUCTION_CERTIFIED**: strict readiness is NO-GO (7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE). See [release readiness](docs/RELEASE_READINESS.md), the [5 November 2026 0.6.2 release-gate report](docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md), the [4 November 0.6.1 baseline report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
+> **Project status:** VirgoScorpio Hub 0.6.2 is the current mainline (unreleased developer-preview patch). PR [#68](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68) (library/media route extraction) and PR [#69](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/69) (site-membership administration and invitations route extraction) are merged; `main` is at `d50e56801ea77a811ec809be1574e769917fff78`. Mainline CI run [#278](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42067882403) remains **BLOCKED** at the evidence-aggregation gate. Attempt 1 did not expose the required PostgreSQL/Memgraph job; attempt 2 passed all five producer jobs (both Node.js matrices, live database integration, browser smoke, and CodeQL) but exposed a stale prior-attempt failure in the workflow-run API status. A narrowly scoped, fail-closed rerun-state correction and regression test are under review; hosted validation is pending. The formal release gate remains **NO-GO / NOT_PRODUCTION_CERTIFIED** (7 PASS, 2 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE). See [release readiness](docs/RELEASE_READINESS.md), the [5 November 2026 0.6.2 release-gate report](docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md), the [4 November 0.6.1 baseline report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
 
 ## Table of contents
 

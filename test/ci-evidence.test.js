@@ -447,6 +447,65 @@ test('rejects missing workflow metadata and failed workflow-run conclusion', t =
   assert.equal(failedRun.ciStatus, 'BLOCKED');
 });
 
+test('accepts a rerun with a stale prior failure only while the current-attempt aggregator is running', t => {
+  const { artifactRoot, jobApi, runApi } = createFixtures(t);
+  const aggregateJob = {
+    id: 9000,
+    run_id: Number(expected.runId),
+    run_attempt: expected.runAttempt,
+    head_sha: expected.headSha,
+    workflow_name: expected.workflow,
+    name: 'Consolidate candidate CI evidence',
+    status: 'in_progress',
+    conclusion: null,
+  };
+  const staleRun = { ...runApi, status: 'completed', conclusion: 'failure' };
+
+  const currentAttempt = evaluateCiEvidence({
+    artifactRoot,
+    expected,
+    run: staleRun,
+    jobs: [...jobApi, aggregateJob],
+  });
+  assert.equal(currentAttempt.ciStatus, 'PASS', JSON.stringify(currentAttempt.checks, null, 2));
+  assert.equal(currentAttempt.workflowRun.status, 'in_progress');
+  assert.equal(currentAttempt.workflowRun.conclusion, null);
+
+  const completedFailedAggregator = evaluateCiEvidence({
+    artifactRoot,
+    expected,
+    run: staleRun,
+    jobs: [...jobApi, { ...aggregateJob, status: 'completed', conclusion: 'failure' }],
+  });
+  assert.equal(completedFailedAggregator.ciStatus, 'BLOCKED');
+
+  const wrongAttemptAggregator = evaluateCiEvidence({
+    artifactRoot,
+    expected,
+    run: staleRun,
+    jobs: [...jobApi, { ...aggregateJob, run_attempt: expected.runAttempt - 1 }],
+  });
+  assert.equal(wrongAttemptAggregator.ciStatus, 'BLOCKED');
+
+  const wrongRevisionAggregator = evaluateCiEvidence({
+    artifactRoot,
+    expected,
+    run: staleRun,
+    jobs: [...jobApi, { ...aggregateJob, head_sha: 'f'.repeat(40) }],
+  });
+  assert.equal(wrongRevisionAggregator.ciStatus, 'BLOCKED');
+
+  const failedProducer = jobApi.map(job => job.name === JOBS[0].jobName
+    ? { ...job, conclusion: 'failure' } : job);
+  const failedCurrentAttempt = evaluateCiEvidence({
+    artifactRoot,
+    expected,
+    run: staleRun,
+    jobs: [...failedProducer, aggregateJob],
+  });
+  assert.equal(failedCurrentAttempt.ciStatus, 'BLOCKED');
+});
+
 test('rejects workflow and producer-job identity drift or duplicate jobs', t => {
   const { artifactRoot, jobApi, runApi } = createFixtures(t);
   const wrongRepository = evaluateCiEvidence({

@@ -13,6 +13,7 @@ const {
 } = require('./release-readiness-validation');
 
 const WORKFLOW_FILE = '.github/workflows/ci.yml';
+const AGGREGATE_JOB_NAME = 'Consolidate candidate CI evidence';
 const packageManager = require('../package.json').packageManager;
 const EXPECTED_NPM_VERSION = /^npm@(\d+\.\d+\.\d+)$/.exec(packageManager || '')?.[1] || null;
 if (!EXPECTED_NPM_VERSION) throw new Error('package.json must pin an exact npm packageManager version.');
@@ -532,7 +533,38 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
   const expectedApiHead = expected.eventName === 'pull_request' ? expected.headSha : expected.mergeSha;
   const runInProgress = run?.status === 'in_progress' && run.conclusion == null;
   const runCompletedSuccessfully = run?.status === 'completed' && run.conclusion === 'success';
-  const runCompletionValid = runInProgress || runCompletedSuccessfully;
+
+  // During a rerun, the workflow-run endpoint can briefly retain the prior
+  // attempt's completed/failure state after the current attempt's producer
+  // jobs have succeeded. Accept that narrow window only while this attempt's
+  // aggregate job is actively running and every expected producer job is
+  // uniquely identified, completed successfully, and bound to this attempt.
+  const producerJobsCompleteForAttempt = JOBS.every(config => {
+    const matches = (Array.isArray(jobs) ? jobs : []).filter(job => job?.name === config.jobName);
+    if (matches.length !== 1) return false;
+    const job = matches[0];
+    return Number.isSafeInteger(job.id) && job.id > 0
+      && String(job.run_id ?? '') === String(expected.runId)
+      && job.run_attempt === expected.runAttempt
+      && String(job.head_sha || '').toLowerCase() === expectedApiHead.toLowerCase()
+      && job.workflow_name === expected.workflow
+      && job.status === 'completed'
+      && job.conclusion === 'success';
+  });
+  const aggregateJobInProgress = (Array.isArray(jobs) ? jobs : []).some(job =>
+    job?.name === AGGREGATE_JOB_NAME
+      && String(job.run_id ?? '') === String(expected.runId)
+      && job.run_attempt === expected.runAttempt
+      && job.workflow_name === expected.workflow
+      && String(job.head_sha || '').toLowerCase() === expectedApiHead.toLowerCase()
+      && job.status === 'in_progress'
+      && job.conclusion == null
+  );
+  const stalePreviousConclusionDuringRerun = run?.status === 'completed'
+    && run.conclusion === 'failure'
+    && aggregateJobInProgress
+    && producerJobsCompleteForAttempt;
+  const runCompletionValid = runInProgress || runCompletedSuccessfully || stalePreviousConclusionDuringRerun;
   const runValid = Boolean(run)
     && String(run.id ?? '') === String(expected.runId)
     && run.name === expected.workflow
@@ -546,7 +578,9 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
     runValid
       ? runInProgress
         ? 'Workflow identity, event, attempt, repository, and source revisions verified; the workflow remains in progress while its aggregate job executes.'
-        : 'Completed workflow identity, event, attempt, repository, source revisions, and successful conclusion verified.'
+        : stalePreviousConclusionDuringRerun
+          ? 'Workflow identity and source revisions verified; the run endpoint still reports the prior failed attempt, while all producer jobs in this exact attempt succeeded and the aggregate job is running.'
+          : 'Completed workflow identity, event, attempt, repository, source revisions, and successful conclusion verified.'
       : 'Workflow run metadata is missing, mismatched, incomplete or unsuccessful.');
 
   const byName = new Map();
@@ -637,7 +671,9 @@ function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
       headSha: expected.headSha,
       mergeSha: expected.mergeSha,
       // Persist only the allow-listed state, never raw strings from the Actions API.
-      status: runInProgress ? 'in_progress' : runCompletedSuccessfully ? 'completed' : 'unknown',
+      status: runInProgress || stalePreviousConclusionDuringRerun
+        ? 'in_progress'
+        : runCompletedSuccessfully ? 'completed' : 'unknown',
       conclusion: runCompletedSuccessfully ? 'success' : null,
     },
     ciStatus,
