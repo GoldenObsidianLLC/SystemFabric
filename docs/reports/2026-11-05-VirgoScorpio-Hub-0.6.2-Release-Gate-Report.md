@@ -1,5 +1,109 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
+> **Current mainline decision — 5 November 2026: NO-GO for production.** Hub 0.6.2 is merged to `main` at `d50e56801ea77a811ec809be1574e769917fff78`, but no release tag, GitHub Release, package publication, or production deployment is authorized. Run #278 attempt 2 passed every producer job, but CI evidence aggregation remains BLOCKED by a stale workflow-run conclusion during rerun. Formal readiness remains `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, with **7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE**.
+
+## Current mainline assessment — 5 November 2026
+
+### 1. Release decision and repository identity
+
+PR [#68](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68) extracted site-scoped library/media HTTP routes into `apps/api/src/library-routes.js`. PR [#69](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/69) extracted site-member listing/addition/removal and invitation creation into `apps/api/src/site-membership-routes.js`. Both are merged. Current `main` is `d50e56801ea77a811ec809be1574e769917fff78`.
+
+| Property | Current value |
+|---|---|
+| Product/package version | VirgoScorpio Hub 0.6.2 (unreleased developer-preview patch) |
+| Vendored renderer | EnginEx 7.0.0 |
+| Node.js support | >=22.23.4; hosted matrix 22.23.4 / 24.22.1 |
+| npm CLI | 11.19.1 pinned in `package.json` and CI |
+| Database migration inventory | 18 migrations (001–018) |
+| Latest mainline commit | `d50e56801ea77a811ec809be1574e769917fff78` |
+| Merged PRs | #68 and #69 |
+| Release tag / GitHub Release | None |
+
+The 0.6.1 to 0.6.2 increment remains a SemVer **patch**: the merged work is an internal route-family decomposition with no intended public HTTP contract or schema change. The current 0.6.2 mainline is still unreleased; the package version is not evidence of publication or certification.
+
+### 2. Mainline CI — producer jobs PASS; aggregate gate BLOCKED
+
+Mainline workflow [run #278](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42067882403) was rerun once. The run as a whole is **not green**:
+
+| Attempt | Producer/API observation | Aggregate result |
+|---|---|---|
+| 1 | PostgreSQL/Memgraph job was absent from the Actions job list. Browser job remained queued in the API, although its run-bound browser artifact recorded 9/9 successful Playwright tests. | BLOCKED: missing DB evidence and inconsistent browser job state. |
+| 2 | All five required producer jobs completed successfully on exact main SHA `d50e56801ea77a811ec809be1574e769917fff78`. | BLOCKED: the workflow-run API still exposed the previous attempt's failed conclusion while the current attempt's aggregate job was running. |
+
+Attempt 2's five producer jobs yielded:
+
+| Producer | Result | Evidence |
+|---|---|---|
+| Node.js 22.23.4 | PASS | 486/486 Hub tests; 94/94 EnginEx tests; 208 required paths and 215 JavaScript files syntax-checked. |
+| Node.js 24.22.1 | PASS | 486/486 Hub tests; 94/94 EnginEx tests; 208 required paths and 215 JavaScript files syntax-checked. |
+| PostgreSQL / Memgraph integration | PASS | 65/65 live integration tests, zero failures/skips; fresh migrations 18/18 applied and 18/18 skipped on the idempotent second pass; Memgraph outage/replay and canonical graph rebuild passed. |
+| Browser editor/accessibility smoke | PASS | 9/9 Playwright smoke tests. This is not full manual accessibility or WCAG acceptance. |
+| CodeQL | PASS | Analysis workflow completed successfully; this is not an independent security assessment or human-reviewed alert disposition. |
+
+Both hosted Node jobs completed fresh `npm ci`, full and production dependency audits reported zero vulnerabilities, and CycloneDX 1.5 generation passed. The SBOMs identify npm 11.19.1, use lockfile SHA-256 `f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce`, and contain 177 components / 178 dependency records with identical normalized component identities and dependency edges. The service-less integration subset remains PARTIAL (29 skips per runtime) and is not confused with the dedicated live integration run.
+
+The current defect is in the aggregator's interpretation of the workflow-run summary during a rerun, not in the five producer results. The narrowly scoped correction in follow-up branch `fix/ci-evidence-rerun-state-2026-11-05` permits the stale prior-failure window only when all five producer jobs are uniquely identified, bound to the current run attempt and exact revision, and complete/successful, while the current-attempt aggregate job is actively running. It does **not** accept a failed producer, wrong attempt/revision, or a completed failed aggregator. Targeted regression validation: 17 passed, 0 failed, 1 Windows-specific skip in `test/ci-evidence.test.js`. Hosted CI for the correction is pending; do not mark the mainline run green until the complete workflow is green.
+
+Local Windows / Node.js 26.12.1 validation after a clean `npm ci --ignore-scripts --no-audit --no-fund` passed `npm test`: 487 tests, 484 passed, zero failed, and three Windows/platform-specific skips, including the new rerun-state regression. The focused `node --test test/ci-evidence.test.js` run passed 17 tests with one Windows-specific skip. `npm run check` did not complete locally: Node hit a native V8 memory-allocation failure during the sequential syntax-check subprocess loop at `packages/observability/src/deployment-contract.js`; an individual `node --check` of that file passed. The verifier now excludes ignored `.worktrees` copies from the repository syntax inventory, but the local Windows memory limit remains unresolved. Do not report local `npm run check` as PASS. Hosted attempt 2's runtime jobs passed the artifact and syntax checks on Linux.
+
+### 3. Formal release readiness — NO-GO
+
+The current Node 22/24 readiness reports on the exact main SHA agree:
+
+| Formal status | Count | Interpretation |
+|---|---:|---|
+| PASS | 7 | Configured source/runtime/test checks passed. |
+| PARTIAL | 2 | Service-less integration tests are skipped in the matrix jobs; human dependency/lockfile review remains open. |
+| BLOCKED | 1 | The formal PostgreSQL/Memgraph evidence contract does not have the required exact-revision evidence record. |
+| MISSING_EVIDENCE | 14 | Independent, provider, product-acceptance, security, supply-chain and operations evidence is absent. |
+| NOT_RUN | 0 | Configured formal rows were evaluated. |
+
+The formal blocked gate expects `artifacts/evidence/postgres-memgraph-live.json` with schema version 1, product identity, version 0.6.2, and exact source revision. Attempt 2's separate run-bound integration artifact proves 65/65 tests and its fresh-migration artifact proves all 18 migrations plus the idempotent second pass on the current source SHA. These artifacts are valuable engineering evidence, but they do **not** automatically satisfy the distinct formal evidence path/contract. The retained local `artifacts/evidence/fresh-migrations.json` is still historical 0.5.1 evidence for 14 migrations and remains blocked as supplemental evidence; it was preserved rather than rewritten or misrepresented.
+
+The 14 missing gates are:
+
+1. Independent tenant/site isolation and authorization review (issue #14).
+2. Live identity provider, email delivery, MFA recovery and session lifecycle (issue #15).
+3. Live ClamAV scanning, test corpus and legacy-asset quarantine (issue #16).
+4. Enabled cloud storage provider credentials, least privilege and lifecycle (issue #17).
+5. Stripe checkout, webhook replay, refunds and subscriptions (issue #18).
+6. Full browser journeys and manual accessibility acceptance (issue #19).
+7. Commerce parity acceptance (issue #20).
+8. Community privacy, moderation, search and export/deletion acceptance (issue #21).
+9. Signed plugin pipeline and adversarial container isolation (issue #22).
+10. Human dependency/lockfile, SBOM, provenance, license and CodeQL review (issue #23).
+11. Load/soak, fault injection and backup/restore drills (issue #24).
+12. Independent application security assessment and severe-finding remediation (issue #25).
+13. Deployment runbooks, secret controls, rollback, monitoring and release-owner approval (issue #26).
+14. Production observability backend, security, retention, delivery and named ownership evidence.
+
+Green engineering CI, including the successful producer jobs in run #278 attempt 2, is not production certification and does not close any of these external gates.
+
+### 4. Architecture and continuity review
+
+The merged route extractions preserve the existing API composition authority:
+
+- Authentication, session resolution, site selection and capability checks remain centralized. Route modules receive narrow, explicit request-scoped dependencies and do not establish a second authentication or tenant-authorization path.
+- Library/media routes preserve request paths, methods, status/response contracts, upload bounds, metadata-only audit content, private-download headers, optimistic version checks and explicit PostgreSQL/object-storage compensation/reconciliation.
+- Site-membership routes preserve the `site:manage` guard, bounded request bodies, mutation-before-audit ordering and invitation-token minimization. Token material is returned only to the trusted response and is never written to audit metadata.
+- Neither extraction introduces a database migration or claims a cross-system atomic transaction.
+
+Root README version badges now identify VirgoScorpio Hub 0.6.2 first and EnginEx 7.0.0 second. `compose.yaml` declares the stable project identity `virgoscorpio-hub`, so future generated service/network names do not depend on the checkout directory. Existing legacy Docker containers and volumes have **not** been removed or renamed; the running Memgraph container and retained PostgreSQL/Memgraph volumes require backup-first migration and verification before retirement.
+
+### 5. Recommended next actions
+
+**P0 — Keep production NO-GO until evidence exists.** Produce/review the formal exact-SHA PostgreSQL/Memgraph evidence record; complete the 14 external/provider/independent acceptance gates; approve the actual release scope, operational controls and release owner. No external evidence should be inferred from CI.
+
+**P1 — Repair and revalidate the CI aggregation path.** Obtain human review of `fix/ci-evidence-rerun-state-2026-11-05`, require all six jobs (five producers plus aggregator) to pass on the exact PR revision, then merge only with a green final check set. Do not weaken checksum, job identity, source revision, zero-skip live integration, or production-boundary checks.
+
+**P1 — Continue route-family decomposition only at a proven seam.** The site-membership extraction is now complete. A candidate next slice is the custom content-type registry/records HTTP family in `server.js`; first add dispatch, authorization-order, versioned-definition, record-validation and tenant-isolation regression tests. Keep the SQL advisory-lock/transaction and content ownership predicates intact, and make no public-contract or schema change without evidence.
+
+**P2 — Migrate local Docker state safely.** Back up the legacy PostgreSQL and live Memgraph data volumes, verify backup contents and restore in isolated new project-named volumes, run application/integration checks, and only then retire old containers/network/volumes. No in-place volume rename or destructive cleanup is authorized by this report.
+
+**Disposition:** retain Hub 0.6.2 as an unreleased developer-preview mainline. No tag, GitHub Release, package publication, production deployment, or production certification is authorized.
+
+## Historical PR #68 candidate record — pre-merge
+
 **Assessment date:** 5 November 2026 (America/Chicago)
 **Repository:** GoldenObsidianLLC/VirgoScorpio-Hub
 **Default branch:** main
@@ -11,7 +115,7 @@
 **Candidate package version:** 0.6.2 (unreleased patch candidate)
 **CI evidence:** PR run #260 / 41976111045; push run #259 / 41976023520
 
-> **Release decision: NO-GO for production.** The 0.6.2 candidate passed the full hosted engineering CI matrix on both the push and pull-request events. The revision-bound release-readiness evaluator still reports NOT_PRODUCTION_CERTIFIED, readyForProduction=false, with 14 required evidence items missing. PR #68 remains open and no production release is authorized.
+> **Historical release decision — pre-merge PR #68 candidate: NO-GO for production.** The 0.6.2 candidate passed the full hosted engineering CI matrix on both the push and pull-request events. The revision-bound release-readiness evaluator still reports NOT_PRODUCTION_CERTIFIED, readyForProduction=false, with 14 required evidence items missing. PR #68 was open at that historical assessment; it subsequently merged, followed by PR #69. The current mainline state and run #278 are assessed at the beginning of this report. No production release is authorized.
 
 ## 1. Executive decision
 
@@ -266,7 +370,7 @@ The original worktree branch fix/serialize-live-integration-tests and its untrac
 ## 8. Repository governance and release controls
 
 1. Protect main. At review time GitHub reports main protected=false. Require PR review and successful supported-runtime, live integration, browser/accessibility, CodeQL and consolidated evidence checks; disallow force-push and branch deletion.
-2. Complete PR #68 review. PR #68 is open, unmerged and reported mergeable. The review endpoint returned no submitted reviews at assessment time. Obtain the required human review before merge.
+2. Historical at the candidate assessment time, PR #68 was open and unmerged, and the review endpoint returned no submitted reviews. PR #68 subsequently merged as `be1441e216c20358e8506389915a676209808e37`; PR #69 then merged as `d50e56801ea77a811ec809be1574e769917fff78`. The current mainline status is recorded at the start of this report.
 3. Keep production certification separate from engineering CI. The release readiness evaluator must pass in strict mode after all 14 evidence artifacts are accepted and reviewed.
 4. Bind every evidence artifact to the exact final source SHA, environment and reviewer/date. The PR merge-ref and head SHAs are both recorded in CI producer manifests.
 5. Reconcile the 2-component SBOM delta and document LGPL license/notice obligations.
@@ -340,4 +444,4 @@ The final candidate revision `8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3` passed b
 
 Both npm 11.19.1 CycloneDX 1.5 SBOMs contain 177 components and 178 dependency records from the same lockfile SHA and passed normalized package/dependency graph parity. The raw SBOM hashes differ because platform/generation metadata differs; the normalized inventory is identical. Human license/provenance review remains open, including LGPL-3.0-or-later distribution obligations.
 
-The exact formal production gate remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE. The blocked formal PostgreSQL/Memgraph record still lacks current schema/product/version/source SHA identity even though the separate run-bound live integration artifact proves the current 65-test/18-migration result. Fourteen independent, provider, product-acceptance, security and operations requirements remain missing. PR #68 remains open and unmerged at this report revision; no release tag, GitHub Release or production deployment is authorized.
+The exact formal production gate remains NO-GO: 7 PASS, 2 PARTIAL, 1 BLOCKED and 14 MISSING_EVIDENCE. The blocked formal PostgreSQL/Memgraph record still lacks current schema/product/version/source SHA identity even though the separate run-bound live integration artifact proves the current 65-test/18-migration result. Fourteen independent, provider, product-acceptance, security and operations requirements remain missing. At the time of this historical candidate addendum, PR #68 remained open/unmerged; it subsequently merged as `be1441e216c20358e8506389915a676209808e37`, followed by PR #69 as `d50e56801ea77a811ec809be1574e769917fff78`. No release tag, GitHub Release or production deployment is authorized.
