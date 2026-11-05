@@ -55,6 +55,12 @@ The API composition module keeps ownership of request parsing, authentication, s
 
 Keep authentication, site-scope checks, and capability checks in their established order. A route-family module must not widen its own authority or bypass the supplied policy functions. The extraction is an internal refactor; it does not change the HTTP route contract or introduce a database migration.
 
+## API AI task route seam
+
+The authenticated read-side AI task endpoints (`GET /api/v1/ai/status`, `GET /api/v1/ai/tasks`, and `GET /api/v1/ai/tasks/:id`) are composed by `apps/api/src/ai-task-routes.js`. Its small injected interface provides the task store, provider information, a site-capability callback, and central response/error helpers. The API server authenticates requests before dispatch, resolves the selected site, and enforces `ai:use`; this module does not authenticate principals or infer tenant scope. Pagination cursors bind the site, actor, status, task type, creation time, and task ID so cursors cannot be replayed across principals, sites, or filter sets.
+
+AI provider generation, saved-page context assembly, site AI policy changes, and queue enqueue/worker composition remain in the API composition module. Extract those workflows separately only after their authorization, policy, cancellation, provider, and persistence contracts have a clear seam.
+
 ## Shared packages
 
 The `packages/` tree separates platform concerns into modules such as AI provider adapters, authentication, billing, commerce, community workflows, persistence, domain schemas, graph projection, library/media storage, notifications, observability, plugins, rendering, security, and widgets. A package's presence is not proof of a deployed integration or an operational service-level objective.
@@ -67,6 +73,7 @@ Use this map to find representative source files and tests for a focused contrib
 |---|---|---|
 | API composition and request lifecycle | [`apps/api/src/server.js`](../apps/api/src/server.js), [`platform-routes.js`](../apps/api/src/platform-routes.js) | [`test/api.test.js`](../test/api.test.js), [`test/tenant-route-capabilities.test.js`](../test/tenant-route-capabilities.test.js) |
 | Commerce and membership HTTP routes | [`apps/api/src/commerce-routes.js`](../apps/api/src/commerce-routes.js), [`request-validation.js`](../apps/api/src/request-validation.js) | [`test/commerce-routes.test.js`](../test/commerce-routes.test.js), [`test/request-validation.test.js`](../test/request-validation.test.js), [`test/checkout-idempotency.test.js`](../test/checkout-idempotency.test.js), [`test/checkout-reconciliation.test.js`](../test/checkout-reconciliation.test.js) |
+| AI task status and history routes | [`apps/api/src/ai-task-routes.js`](../apps/api/src/ai-task-routes.js) | [`test/ai-task-routes.test.js`](../test/ai-task-routes.test.js), [`test/api.test.js`](../test/api.test.js) |
 | Browser authentication routes and cookie protocol | [`apps/api/src/auth-routes.js`](../apps/api/src/auth-routes.js), [`apps/api/src/auth-cookies.js`](../apps/api/src/auth-cookies.js) | [`test/api.test.js`](../test/api.test.js), [`test/auth-cookies.test.js`](../test/auth-cookies.test.js) |
 | Admin UI and editor | [`apps/admin/`](../apps/admin/) | [`test/e2e/editor.spec.js`](../test/e2e/editor.spec.js), [`test/e2e/accessibility.spec.js`](../test/e2e/accessibility.spec.js) |
 | Authentication, identity and session persistence | [`packages/auth/src/service.js`](../packages/auth/src/service.js), [`packages/auth/src/session-service.js`](../packages/auth/src/session-service.js) | [`test/auth-security.test.js`](../test/auth-security.test.js), [`test/session-service.test.js`](../test/session-service.test.js), [`test/security-boundaries.test.js`](../test/security-boundaries.test.js) |
