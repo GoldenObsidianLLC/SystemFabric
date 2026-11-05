@@ -1,8 +1,8 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
-> **Current mainline decision — 5 November 2026: NO-GO for production.** Hub 0.6.2 is merged to `main` at `d50e56801ea77a811ec809be1574e769917fff78`, but no release tag, GitHub Release, package publication, or production deployment is authorized. Run #278 attempt 2 passed every producer job, but CI evidence aggregation remains BLOCKED by a stale workflow-run conclusion during rerun. Formal readiness remains `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, with **7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE**.
+> **Current mainline decision — 5 November 2026: NO-GO for production.** Hub 0.6.2 is on `main` at `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge main workflow #292 passed all six jobs. PR #72 (`aca463db5b7cdca9284a9a6ea1bab222a470f5cb`) proposes stable Compose data-volume identity and local Docker recovery documentation; its hosted push workflow #295 and pull-request workflow #296 both passed all six jobs, but PR #72 remains open for human review. Local restore validation on code revision `aca463db5b7cdca9284a9a6ea1bab222a470f5cb` passes the current 18-migration schemas, 65/65 live integration tests with zero skips, fresh migration/idempotency, Memgraph outage/replay, graph rebuild, the 9-check development preflight, and 9/9 local Playwright browser smoke. No release tag, GitHub Release, package publication, or production deployment is authorized. Formal readiness remains `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, with **7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE**.
 
-## Current mainline assessment — 5 November 2026
+## Historical mainline assessment — before PR #70/#71 merge
 
 ### 1. Release decision and repository identity
 
@@ -482,4 +482,26 @@ PR #70 (CI rerun evidence correction) merged as `dd811c6bfbd0d4475fa9199f335c65d
 
 The exact-sha formal readiness status remains **NO-GO / NOT_PRODUCTION_CERTIFIED**: 7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE. Successful CI does not satisfy independent/provider/product/operations evidence gates or the formal PostgreSQL/Memgraph evidence contract.
 
-A separate local development Docker migration is documented in [2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md](2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md). Four source-volume cold backups (PostgreSQL data, Memgraph data/config/logs) passed archive-integrity and SHA-256 verification. PostgreSQL and Memgraph data were restored into newly named Compose volumes. PostgreSQL 18.6 completed WAL recovery and became ready to accept connections; however, the restored cluster still has legacy systemfabric identities while the current Compose file expects virgoscorpio_hub, and the legacy test database still records only migrations 0001–0014. Memgraph 3.13.1 started and returned basic query success with zero nodes/relationships, matching the source inventory. Original containers/volumes remain preserved. PostgreSQL role/database migration, application connection checks, current 18-migration upgrade/idempotency, live integration, and end-to-end validation remain pending. This local experiment is not the production load/backup/restore certification evidence and closes no release gate.
+### PR #72 — local Docker resource migration (open; not merged)
+
+PR [#72](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/72), branch `chore/docker-resource-migration-2026-11-05`, is based on current main `54b62e233e519aa0afa6c4170578def9c02e15fc` and currently points at `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`. Hosted push workflow [#295](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42127116871) and pull-request workflow [#296](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42127125785) each passed all six jobs: Node.js 22.23.4 and 24.22.1, live PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL, and consolidated evidence. PR #72 remains open and has no requested human reviewers; do not merge it without human review.
+
+The local recovery was performed in an isolated worktree and new stable Compose volumes. All four cold backup archives passed integrity and SHA-256 verification. The original legacy PostgreSQL/Memgraph containers and volumes remain preserved. A new `virgoscorpio_hub` role and application/test databases were provisioned without copying or modifying the legacy 14-migration `systemfabric_test` schema. Both new databases now have the current exact 18-migration ledger and 69 public base tables; application migration re-entry skipped all 18 migrations.
+
+Local validation on Windows / Node.js 26.12.1 against the restored services:
+
+| Check | Result |
+|---|---|
+| `npm run test:migrations:fresh` | PASS — exact revision-bound result for `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`; 18/18 applied, 18/18 idempotent skips, exact ledger, generated disposable DB dropped. |
+| `npm run test:integration:live` | PASS — 65/65, zero failures, zero skips, zero TODOs. |
+| `npm run test:integration:memgraph-outage` | PASS — pending event/lease recovery, replay after graph restart, no duplicate delivery. |
+| `npm run test:graph:rebuild` | PASS — canonical projection, tombstone preservation, stale-node cleanup, idempotent second rebuild. |
+| `npm run dev:doctor` | PASS — 9/9 preflight checks; zero service warnings and blockers. |
+| `npm run migrate` | PASS — all 18 application migrations skipped as already applied. |
+| `npm run test:e2e` | PASS — 9/9 local Playwright tests using `virgoscorpio_hub_test` and loopback Memurai; temporary API server closed after the run. |
+
+The PostgreSQL container reports healthy; Memgraph is running after the outage/replay test. The pinned runtime images were observed as `postgres@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5` and `memgraph/memgraph@sha256:bd3fe13228f40881365486729c78110dde6e04f3c1f102c84720d31f38b693f8`. The local host `vm.max_map_count` warning (262144 vs. 524288 recommended) remains a development runtime tuning note.
+
+Local Playwright smoke passed 9/9 using the isolated `virgoscorpio_hub_test` database and loopback Memurai endpoint. The E2E suite exercises editor, collaboration and accessibility smoke paths; it does not replace manual WCAG/accessibility acceptance or full application-data acceptance. No legacy-resource retirement/rollback decision has been made. Do not remove the old containers or volumes before the agreed rollback window and explicit acceptance. The detailed backup hashes, restore procedure, image IDs, live test counts and current checklist are in [2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md](2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md).
+
+This local validation is supplemental developer-environment evidence only. It does not satisfy the production load/backup/restore gate (issue #24), the formal PostgreSQL/Memgraph evidence contract, or any of the 14 external missing gates. The formal release decision remains NO-GO / `NOT_PRODUCTION_CERTIFIED`.

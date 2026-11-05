@@ -1,12 +1,12 @@
 # Local Docker Resource Migration Report — 5 November 2026
 
-> **Status: PARTIAL — cold backups verified and copied into isolated Compose volumes; PostgreSQL identity/schema migration and application-level validation remain pending.** This is a local development recovery exercise, not production backup/restore certification.
+> **Status: PARTIAL — cold backups verified and restored into isolated Compose volumes; both new Hub databases have the current 18-migration schema, and local live integration, fresh-migration, Memgraph outage/replay, graph-rebuild, and Playwright browser-smoke checks pass. Legacy-resource retirement/rollback acceptance remains open.** This is a local development recovery exercise, not production backup/restore certification.
 
 ## Purpose and guardrails
 
 Migrate the preserved pre-Compose PostgreSQL and Memgraph development resources into the stable virgoscorpio-hub Compose project without deleting, overwriting, or reinitializing the source volumes. The source containers and volumes remain available for rollback.
 
-Work was performed from a clean Git worktree based on main commit 54b62e233e519aa0afa6c4170578def9c02e15fc; the pre-existing developer worktree and its two local evidence artifacts were left untouched. The new worktree branch is chore/docker-resource-migration-2026-11-05.
+Work was performed from a clean Git worktree based on main commit `54b62e233e519aa0afa6c4170578def9c02e15fc`; the pre-existing developer worktree and its two local evidence artifacts were left untouched. The branch is `chore/docker-resource-migration-2026-11-05`. The local executable validation described below was run against code revision `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`; the later PR follow-up on this branch records the validation results in Markdown only and does not alter application code, dependencies, Compose configuration, or database migrations.
 
 ## Source inventory and diagnosis
 
@@ -55,15 +55,20 @@ docker compose config --quiet passed. Compose create created the new named volum
 
 - The restored PostgreSQL 18.6 server started from the new volume, completed crash/WAL recovery, wrote its end-of-recovery checkpoint, and reported that it was ready to accept connections.
 - Docker Compose reports the container healthy based on pg_isready. This is only transport/readiness health, not an application identity check.
-- The restored cluster contains the legacy systemfabric superuser and systemfabric/systemfabric_test databases. The new Compose defaults expect a virgoscorpio_hub role/database, which do not exist yet. PostgreSQL logs therefore record failed health probes for role virgoscorpio_hub even though pg_isready is healthy.
-- The legacy systemfabric database has no user tables. The separate systemfabric_test database has 67 public tables and a legacy systemfabric_schema_migrations ledger for versions 0001–0014. Current mainline uses a different migration-ledger name (virgoscorpio_hub_schema_migrations) and its migration runner deliberately refuses to initialize a non-empty database without its own initialized ledger. Copying the old 14-migration test schema directly into the new test database would therefore be the wrong upgrade path and could produce a misleading/blocked migration state.
-- Keep systemfabric_test intact as a legacy comparison/reference database; do not copy it into the new test database. Provision the Compose-compatible local development role with CREATEDB capability (the standard Compose POSTGRES_USER is a local development superuser) and create a fresh virgoscorpio_hub application database. Apply the current 18 migrations to that empty app database. Then set TEST_DATABASE_URL to a local database name ending in _test; scripts/test-integration-live.js will create the missing local test database under the same role, run the live integration suite against the restored PG/Memgraph services, and apply all 18 migrations. scripts/test-fresh-migrations.js will create a separate random disposable database, apply all 18 migrations, verify the exact ledger and idempotent second pass, and drop only that generated database. Keep systemfabric and systemfabric_test unchanged until acceptance is complete.
+- The restored cluster retains the legacy `systemfabric` superuser and `systemfabric` / `systemfabric_test` databases. A separate `virgoscorpio_hub` login role now exists with local `CREATEDB` capability and credentials aligned with the documented Compose development configuration. A host-side Node.js connection from the project runtime succeeds. The `virgoscorpio_hub` application database and dedicated `virgoscorpio_hub_test` database are owned by this role.
+- The new application database has the exact ordered `virgoscorpio_hub_schema_migrations` ledger for 0001–0018 and 69 public base tables. A second `npm run migrate` pass skipped all 18 migrations as already applied. The dedicated test database was created empty; `npm run test:integration:live` applied the same 18 migrations and left the test fixture cleanup clean (zero `outbox_events` and zero `content_items` rows).
+- The legacy `systemfabric_test` database still contains 67 public tables and its separate `systemfabric_schema_migrations` ledger through 0014. It was not copied or upgraded. Keep both legacy databases unchanged as rollback/reference material; the new Hub test schema was built fresh rather than mixing incompatible migration ledgers.
+- `npm run test:migrations:fresh` passed against a uniquely generated local disposable database bound to source revision `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`: 18/18 migrations applied, the exact ordered ledger verified, 18/18 migrations skipped on the idempotent second pass, and only the generated `virgoscorpio_hub_fresh_276875c1e263_test` database was dropped.
+- `npm run test:integration:live` passed 65/65 PostgreSQL/Memgraph/product/tenant-isolation tests with zero failures, cancellations, skips or TODOs on Node.js 26.12.1. It used `virgoscorpio_hub_test` and graph endpoint `127.0.0.1:7687`. The evidence JSON was retained outside the repository to preserve the tracked historical supplemental artifact.
 
 ### Memgraph restore result
 
 - The restored Memgraph 3.13.1 container starts from the new virgoscorpio-hub-memgraph volume.
-- mgconsole RETURN 1 succeeds; node and relationship counts both return zero, matching the source inventory.
-- The container emits the existing vm.max_map_count warning (262144 vs. the documented 524288 recommendation). This did not prevent startup or the basic query checks. It remains a host/runtime tuning note, not a claim of production qualification.
+- `mgconsole RETURN 1` succeeds; node and relationship counts both return zero, matching the source inventory.
+- `npm run test:integration:memgraph-outage` passed against the restored Compose container: a real graph outage left the event pending and released its worker lease; after Memgraph restarted, the event replayed successfully, the expected projection appeared, and the processed event was not replayed again. The Compose Memgraph container was running again after the test.
+- `npm run test:graph:rebuild` passed using a separate disposable Memgraph 3.13.1 container: canonical content, taxonomy and relationships rebuilt; deleted content and relationship tombstones were preserved; stale graph nodes were removed; and a second rebuild produced the same summary. The disposable container was removed by the test cleanup.
+- `npm run dev:doctor` passed all 9 preflight checks with zero warnings/blockers; `npm run migrate` against the application database skipped all 18 already-applied migrations.
+- The container emits the existing `vm.max_map_count` warning (262144 vs. the documented 524288 recommendation). This did not prevent startup or the live recovery tests. It remains a host/runtime tuning note, not a claim of production qualification.
 
 ## Preservation and rollback
 
@@ -73,15 +78,32 @@ docker compose config --quiet passed. Compose create created the new named volum
 - All restore experiments target the new explicitly named Compose volumes. The existing original volumes are the rollback source until application-level acceptance is complete.
 - Backup archives and SHA-256 sidecars remain outside the repository. No database dump, credential, or customer data was added to Git.
 
-## Remaining validation
+## Validation disposition
 
-- [ ] Provision the local Compose-compatible virgoscorpio_hub role with CREATEDB capability and create a fresh virgoscorpio_hub app database; keep legacy systemfabric/systemfabric_test databases unchanged.
-- [ ] Apply the current 18 migrations to the empty application database via scripts/migrate.js and verify migration checksums/schema objects.
-- [ ] Run scripts/test-integration-live.js with DATABASE_URL and TEST_DATABASE_URL pointing to the restored local server; verify all live PostgreSQL/Memgraph suites without skips.
-- [ ] Run scripts/test-fresh-migrations.js with local TEST_DATABASE_URL; verify 18/18 apply, 18/18 idempotent skips, exact ledger, and drop of only its generated disposable database.
-- [ ] Validate representative object/table state and application startup against the new DATABASE_URL.
-- [ ] Run the live PostgreSQL/Memgraph integration suite against the restored project services, including graph projection rebuild, outage/replay, and canonical rebuild checks.
-- [ ] Verify the API/browser smoke paths that depend on the database.
-- [ ] Record Compose image digests, final service health, exact commands/results, and the rollback decision. Retain the legacy resources through an agreed rollback window.
+| Check | Result | Notes |
+|---|---|---|
+| Compose configuration | PASS | `docker compose config --quiet`. |
+| PostgreSQL application schema | PASS | 18/18 exact migration records; 69 public base tables; migration re-entry skipped 18/18. |
+| PostgreSQL test schema | PASS | Fresh `virgoscorpio_hub_test` database; 18/18 migrations applied; 69 public base tables. |
+| Fresh migration/idempotency harness | PASS | 18/18 applied, 18/18 skipped on second pass, exact ledger verified, generated database dropped; result bound to `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`. |
+| Live PostgreSQL/Memgraph integration | PASS | 65/65 tests, zero failures, zero skips, zero TODOs. |
+| Memgraph outage/replay | PASS | Durable event recovered after restart; no duplicate replay. |
+| Graph projection rebuild | PASS | Canonical projection, tombstone, stale-node cleanup and idempotent second rebuild verified using a disposable container. |
+| Development preflight | PASS | `npm run dev:doctor`: 9 passed, zero service warnings, zero blockers. |
+| Local Playwright API/browser smoke | PASS | 9/9 tests using `virgoscorpio_hub_test`, loopback Memurai `redis://127.0.0.1:6379`, and API server `127.0.0.1:8787`; the runner closed the temporary API server afterward. |
+| Legacy-resource retirement / rollback decision | PENDING | Original containers and volumes remain preserved; do not prune or delete them until an explicit rollback window and acceptance decision. |
+
+### Compose image and health record
+
+| Service | Image | Registry digest | Local image ID | Final status |
+|---|---|---|---|---|
+| PostgreSQL | `postgres:18-alpine` | `postgres@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5` | `sha256:57b23a0326ee442e83b3d3fa027c5a148be0a392d7c91d1ca4e1e70131ee859a` | Running / healthy |
+| Memgraph | `memgraph/memgraph:3.13.1` | `memgraph/memgraph@sha256:bd3fe13228f40881365486729c78110dde6e04f3c1f102c84720d31f38b693f8` | `sha256:829dbceb931e760b5206ebe7a8aa921aa71e0c4e56864fe265e57abe2f08033b` | Running; live query, outage/replay and rebuild checks passed |
+
+Hosted PR #72 and push workflows both passed all six jobs on exact head `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`. This includes the hosted browser/editor smoke and CodeQL jobs; those hosted checks do not turn the local restore into production evidence.
+
+Validation commands (with `DATABASE_URL`, `TEST_DATABASE_URL`, `MEMGRAPH_URL`, and `MEMGRAPH_TEST_URL` scoped to the local Compose services): `npm run test:migrations:fresh`, `npm run test:integration:live`, `npm run test:integration:memgraph-outage`, `npm run test:graph:rebuild`, `npm run dev:doctor`, `npm run migrate`, and `npm run test:e2e`. The E2E process also requires `VIRGOSCORPIO_HUB_TEST_REDIS_URL` to be explicitly set to the loopback test Redis/Memurai endpoint; no external Redis endpoint was used.
+
+Retain the legacy resources and cold backups. No source volume/container retirement or production rollback decision has been made.
 
 This local restore does not satisfy the formal production load/backup/restore gate (issue #24) or the formal PostgreSQL/Memgraph evidence gate. Those require the approved release topology, exact candidate SHA, documented RPO/RTO, reviewer, and independently accepted production-oriented evidence. VirgoScorpio Hub remains NOT_PRODUCTION_CERTIFIED / NO-GO.
