@@ -14,7 +14,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.1 is the current unreleased mainline patch candidate, including the EnginEx 7.0.0 security/compatibility upgrade and internal commerce/AI route-family extractions. The follow-on 0.6.2 candidate adds the site-scoped library/media route-family seam. The platform remains **NOT_PRODUCTION_CERTIFIED**: current main CI is green, but the formal release gate remains NO-GO with 14 required evidence items missing. See [release readiness](docs/RELEASE_READINESS.md), the [4 November 2026 release-gate report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
+> **Project status:** VirgoScorpio Hub 0.6.1 is the current mainline and 0.6.2 is the unreleased patch candidate in PR #68. The 0.6.2 library/media route extraction has passed local validation and both hosted push and pull-request CI workflows (469/469 Hub tests on Node 22/24, 94/94 EnginEx tests, 65/65 live PostgreSQL/Memgraph tests, 18/18 fresh migrations plus idempotent re-entry, and 9/9 browser smoke). The platform remains **NOT_PRODUCTION_CERTIFIED**: the exact candidate readiness report is NO-GO with 14 required evidence items missing. See [release readiness](docs/RELEASE_READINESS.md), the [5 November 2026 0.6.2 release-gate report](docs/reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md), the [4 November 0.6.1 baseline report](docs/reports/2026-11-04-VirgoScorpio-Hub-0.6.1-Release-Gate-Report.md), the [EnginEx 7.0.0 migration guide](docs/ENGINEX-7-MIGRATION.md), and [CHANGELOG](CHANGELOG.md).
 
 ## Table of contents
 

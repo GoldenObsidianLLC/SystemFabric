@@ -2,7 +2,13 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
-## Current mainline evidence snapshot — 4 November 2026
+## Current candidate evidence snapshot — 5 November 2026
+
+Hub 0.6.2 PR #68 head `31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9` was tested by GitHub Actions PR run [#260](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976111045) and push run [#259](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41976023520). All six checks in each run completed successfully. The PR merge-ref was `16d9852126da4aa5c3e15d42460375a2e0ad0cd7`. Node 22.23.4 and 24.22.1 each passed 469/469 Hub tests, 94/94 EnginEx tests, 205 required artifact checks and 213 JavaScript syntax checks. Live PostgreSQL/Memgraph passed 65/65; 18 migrations applied and were skipped on the idempotent second pass; browser smoke passed 9/9; dependency audit reported zero vulnerabilities; CodeQL and consolidated evidence jobs passed.
+
+The exact candidate readiness result remains **NO-GO**: `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, 8 PASS, 2 PARTIAL and 14 MISSING_EVIDENCE. The formal evidence aggregator marks production certification BLOCKED until independent, provider, supply-chain, accessibility, operations and release-owner evidence is supplied. The per-runtime supplemental fresh-migration marker discrepancy, while dedicated live migration evidence is PASS, must be corrected. See the [5 November 2026 full 0.6.2 release gate report](reports/2026-11-05-VirgoScorpio-Hub-0.6.2-Release-Gate-Report.md). This candidate is not merged or released.
+
+## Historical mainline evidence snapshot — 4 November 2026
 
 The reviewed 0.6.1 mainline revision is `489325585d57fe95f961c36a597faa7065848c7f`; hosted workflow [run #258](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/41949722725) completed all six checks. The Node.js 22.23.4 and 24.22.1 jobs each passed 461/461 Hub tests and 94/94 EnginEx tests; the dedicated PostgreSQL/Memgraph job passed 65/65 tests and verified 18 migrations plus idempotent re-entry; browser smoke passed 9/9; CodeQL and consolidated CI evidence jobs completed successfully.
 

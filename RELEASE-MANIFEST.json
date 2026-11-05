@@ -14,7 +14,7 @@
       "trackedInGit": true,
       "cleanNpmCiValidated": true,
       "reviewedByMaintainer": false,
-      "reason": "A fresh npm ci --no-audit --no-fund completed successfully in the isolated 0.6.2 candidate worktree on Windows / Node.js 26.12.1. Explicit maintainer dependency/lockfile and license review remains open; hosted supported-runtime CI is still required on the candidate PR."
+      "reason": "Fresh npm ci --no-audit --no-fund passed in the isolated 0.6.2 worktree and in both hosted Node.js 22.23.4/24.22.1 CI jobs. Human dependency/lockfile review, SBOM reconciliation and license/notice approval remain open."
     }
   },
   "renderer": {
@@ -97,7 +97,8 @@
       "dependency audit and SBOM steps in CI workflow",
       "Hosted CI executed on main commit 489325585d57fe95f961c36a597faa7065848c7f (workflow run 41949722725): all six checks passed, including Node.js 22.23.4 and 24.22.1 (461/461 Hub tests and 94/94 EnginEx tests per runtime), dedicated PostgreSQL/Memgraph integration (65/65), fresh migrations 18/18 plus idempotent re-entry, browser/accessibility smoke (9/9), CodeQL execution and consolidated revision-bound evidence. The current formal production gate remains NO-GO with 14 missing evidence items.",
       "release-readiness JSON/Markdown report and fail-closed readiness command",
-      "VS Code Dev Container, preflight checks, strict live integration test runner and blocker-to-test instructions are included in this candidate workspace"
+      "VS Code Dev Container, preflight checks, strict live integration test runner and blocker-to-test instructions are included in this candidate workspace",
+      "Hub 0.6.2 candidate PR #68 passed hosted push run #259 and PR run #260; all six CI jobs per run passed on Node.js 22.23.4/24.22.1, live PostgreSQL/Memgraph (65/65), fresh migrations (18/18 plus idempotent re-entry), browser smoke (9/9), CodeQL and consolidated evidence. Release readiness remains NO-GO with 14 missing evidence items; PR remains open/unmerged."
     ]
   },
   "validation": {
@@ -400,7 +401,7 @@
     }
   },
   "candidateValidation": {
-    "reviewedAt": "2026-11-04",
+    "reviewedAt": "2026-11-05",
     "baselineCommit": "489325585d57fe95f961c36a597faa7065848c7f",
     "branch": "refactor/api-library-routes-2026-11",
     "semver": {
@@ -430,7 +431,7 @@
       },
       "artifactCheck": {
         "status": "PASS",
-        "requiredPaths": 205,
+        "requiredPaths": 206,
         "javascriptFilesSyntaxChecked": 213
       },
       "unitTests": {
@@ -473,9 +474,109 @@
         "date": "2026-11-04"
       }
     },
-    "hostedCi": "PENDING_PULL_REQUEST; require Node.js 22.23.4/24.22.1, PostgreSQL/Memgraph live integration, browser/accessibility smoke, CodeQL and consolidated revision-bound evidence on the candidate commit.",
+    "hostedCi": "PASS on both PR #68 run 41976111045 (#260) and push run 41976023520 (#259); all six jobs succeeded. PR #68 remains OPEN and UNMERGED pending human review.",
     "productionCertified": false,
-    "localValidationSummary": "PASS: fresh npm ci; 205 required paths; 213 JavaScript files syntax-checked; 469 root tests (466 passed, 0 failed, 3 Windows/platform-specific skips); focused suite 49/49; EnginEx 94 (91 passed, 0 failed, 3 platform-specific skips); high-severity npm audit reports zero vulnerabilities."
+    "localValidationSummary": "PASS: fresh npm ci; 206 required paths; 213 JavaScript files syntax-checked; 469 root tests (466 passed, 0 failed, 3 Windows/platform-specific skips); focused suite 49/49; EnginEx 94 (91 passed, 0 failed, 3 platform-specific skips); high-severity npm audit reports zero vulnerabilities.",
+    "hostedCiEvidence": {
+      "pullRequest": {
+        "number": 68,
+        "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
+        "state": "open",
+        "merged": false,
+        "head": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+        "mergeRef": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7"
+      },
+      "runs": [
+        {
+          "event": "pull_request",
+          "runNumber": 260,
+          "runId": 41976111045,
+          "conclusion": "success"
+        },
+        {
+          "event": "push",
+          "runNumber": 259,
+          "runId": 41976023520,
+          "conclusion": "success"
+        }
+      ],
+      "completedJobsPerRun": 6,
+      "node22": {
+        "version": "22.23.4",
+        "hubTests": {
+          "passed": 469,
+          "failed": 0,
+          "skipped": 0
+        },
+        "enginexTests": {
+          "passed": 94,
+          "failed": 0,
+          "skipped": 0
+        },
+        "requiredPaths": 205,
+        "javascriptSyntaxChecked": 213,
+        "npmAuditVulnerabilities": 0
+      },
+      "node24": {
+        "version": "24.22.1",
+        "hubTests": {
+          "passed": 469,
+          "failed": 0,
+          "skipped": 0
+        },
+        "enginexTests": {
+          "passed": 94,
+          "failed": 0,
+          "skipped": 0
+        },
+        "requiredPaths": 205,
+        "javascriptSyntaxChecked": 213,
+        "npmAuditVulnerabilities": 0
+      },
+      "liveIntegration": {
+        "tests": 65,
+        "passed": 65,
+        "failed": 0,
+        "skipped": 0,
+        "migrationsApplied": 18,
+        "migrationsSkippedOnSecondPass": 18,
+        "disposableDatabaseDropped": true
+      },
+      "browserSmoke": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      },
+      "codeqlWorkflow": "success",
+      "evidenceAggregation": "success"
+    },
+    "formalReadiness": {
+      "sourceRevision": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
+      "readyForProduction": false,
+      "pass": 8,
+      "partial": 2,
+      "blocked": 0,
+      "missingEvidence": 14,
+      "notRun": 0,
+      "productionCertification": "BLOCKED"
+    },
+    "supplementalEvidenceDiscrepancy": {
+      "status": "OPEN",
+      "summary": "The per-runtime release-readiness JSON marks its supplemental fresh-migration artifact BLOCKED because a retained output marker was not recognized; the dedicated live integration producer supplies a schema-valid PASS artifact with 18/18 applied and 18/18 idempotent skips, and its job passed.",
+      "action": "Correct the output marker/parser and add a regression test without weakening the structured evidence validator."
+    },
+    "pullRequest": {
+      "number": 68,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
+      "state": "open",
+      "merged": false,
+      "head": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+      "base": "489325585d57fe95f961c36a597faa7065848c7f",
+      "mergeRef": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "reviewCount": 0,
+      "issueCommentCount": 0
+    }
   },
   "postMergeCodeScanning": {
     "analyzedAt": "2026-11-04T21:18:28Z",
@@ -885,8 +986,118 @@
     ],
     "publicHttpContractChanged": false,
     "databaseMigrationsAdded": false,
-    "localValidation": "PASS: clean npm ci; 205 required paths; 213 JavaScript syntax checks; npm run check 469 tests (466 pass, 0 fail, 3 Windows skips); focused tests 49/49; EnginEx 94 (91 pass, 3 platform skips); npm audit high 0.",
-    "hostedCi": "PENDING_PULL_REQUEST",
-    "productionCertified": false
+    "localValidation": "PASS: clean npm ci; 206 required paths; 213 JavaScript syntax checks; npm run check 469 tests (466 pass, 0 fail, 3 Windows skips); focused tests 49/49; EnginEx 94 (91 pass, 3 platform skips); npm audit high 0.",
+    "hostedCi": "PASS: PR #68 workflow run 41976111045 (#260) and push run 41976023520 (#259) completed all six jobs successfully; the candidate PR remains open and unmerged.",
+    "productionCertified": false,
+    "pullRequest": {
+      "number": 68,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
+      "state": "open",
+      "merged": false,
+      "head": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+      "base": "489325585d57fe95f961c36a597faa7065848c7f",
+      "mergeRef": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "reviewCount": 0,
+      "issueCommentCount": 0
+    }
+  },
+  "latestCandidateEvidence": {
+    "reviewedAt": "2026-11-05",
+    "version": "0.6.2",
+    "branch": "refactor/api-library-routes-2026-11",
+    "headCommit": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+    "mergeRefCommit": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+    "pullRequest": {
+      "number": 68,
+      "url": "https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/68",
+      "state": "open",
+      "merged": false,
+      "head": "31dd63908fbf8a9fb0340323d92ffd6cdd4d89b9",
+      "base": "489325585d57fe95f961c36a597faa7065848c7f",
+      "mergeRef": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "reviewCount": 0,
+      "issueCommentCount": 0
+    },
+    "ci": {
+      "pullRequestRun": {
+        "id": 41976111045,
+        "number": 260,
+        "conclusion": "success"
+      },
+      "pushRun": {
+        "id": 41976023520,
+        "number": 259,
+        "conclusion": "success"
+      },
+      "jobsPerRun": 6,
+      "status": "PASS"
+    },
+    "tests": {
+      "node22Hub": {
+        "passed": 469,
+        "failed": 0,
+        "skipped": 0
+      },
+      "node24Hub": {
+        "passed": 469,
+        "failed": 0,
+        "skipped": 0
+      },
+      "enginexPerRuntime": {
+        "passed": 94,
+        "failed": 0,
+        "skipped": 0
+      },
+      "livePostgresMemgraph": {
+        "passed": 65,
+        "failed": 0,
+        "skipped": 0
+      },
+      "migrations": {
+        "applied": 18,
+        "secondPassSkipped": 18
+      },
+      "playwrightSmoke": {
+        "passed": 9,
+        "failed": 0,
+        "skipped": 0
+      },
+      "requiredPaths": 205,
+      "javascriptSyntaxChecked": 213,
+      "npmAuditVulnerabilities": 0
+    },
+    "sbom": {
+      "cyclonedx": "1.5",
+      "lockfileSha256": "f404ce5862bffa60daa2cb9cd471e6ac7893b048b2e877e623ddf43c1a15e7ce",
+      "node22Npm": "10.9.9",
+      "node22Components": 179,
+      "node22Dependencies": 180,
+      "node22SbomSha256": "ac54c55c22594ec1e94fc3e832702e78fb89300cd87c0118c0b000cd679aa68a",
+      "node24Npm": "11.19.1",
+      "node24Components": 177,
+      "node24Dependencies": 178,
+      "node24SbomSha256": "a87e8dfa31c62381cd7da071a17dc138dce7c65caefe9b4e015b6a423d21f3ac",
+      "mismatchComponents": {
+        "node22Only": [
+          "@emnapi/runtime@1.11.3",
+          "@img/sharp-wasm32@0.35.5"
+        ],
+        "node24Only": [
+          "tslib@2.8.1"
+        ]
+      },
+      "disposition": "OPEN_RECONCILIATION"
+    },
+    "formalReadiness": {
+      "sourceRevision": "16d9852126da4aa5c3e15d42460375a2e0ad0cd7",
+      "releaseClassification": "NOT_PRODUCTION_CERTIFIED",
+      "readyForProduction": false,
+      "pass": 8,
+      "partial": 2,
+      "blocked": 0,
+      "missingEvidence": 14,
+      "notRun": 0,
+      "productionCertification": "BLOCKED"
+    }
   }
 }
