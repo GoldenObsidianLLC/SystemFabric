@@ -5,6 +5,7 @@ const path = require('node:path');
 const net = require('node:net');
 const { spawnSync } = require('node:child_process');
 const { loadEnvFile } = require('./load-env');
+const { checkPostgresConnection } = require('./dev-doctor-postgres');
 
 const root = path.resolve(__dirname, '..');
 const minimumNode = [22, 23, 4];
@@ -76,8 +77,18 @@ async function main() {
   for (const [label, raw, envName] of checks) {
     const endpoint = raw ? parseUrl(raw, label) : null;
     if (!endpoint) { add(label, false, `${envName} is not configured or invalid.`); continue; }
-    const reachable = await tcpCheck(endpoint.host, endpoint.port);
-    add(label, reachable, reachable ? `${endpoint.host}:${endpoint.port} accepts TCP connections.` : `Cannot connect to ${endpoint.host}:${endpoint.port}; start Compose services or check the URL.`, false);
+    if (label === 'Memgraph') {
+      const reachable = await tcpCheck(endpoint.host, endpoint.port);
+      add(label, reachable, reachable
+        ? `${endpoint.host}:${endpoint.port} accepts TCP connections.`
+        : `Cannot connect to ${endpoint.host}:${endpoint.port}; start Compose services or check the URL.`, false);
+      continue;
+    }
+
+    const database = await checkPostgresConnection(raw, { requireTestDatabase: label === 'Test PostgreSQL' });
+    add(label, database.ok, database.ok
+      ? `${database.host}:${database.port} authenticated; read-only SELECT 1 succeeded.`
+      : `${endpoint.host}:${endpoint.port} ${database.reason}`, false);
   }
 
   console.log('\nVirgoScorpio Hub VS Code development preflight');
