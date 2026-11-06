@@ -8,6 +8,7 @@ All notable project-level changes should be recorded here. This changelog does n
 
 - Replaced the copied EnginEx source directory with a Git submodule linked to GoldenObsidianLLC/EnginEx and pinned the renderer to an exact commit.
 - Updated renderer license attribution to GPL-2.0-or-later and enabled recursive submodule checkout in CI.
+- Updated release-readiness source-tree verification to validate the pinned EnginEx gitlink and its nested clean worktree separately from the superproject's own status.
 
 ### Current mainline disposition - 6 November 2026
 - PRs #68 through #76 are merged. Current main is d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a; post-merge workflow #317 passed all six hosted jobs. Exact-SHA local release readiness at d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a: 7 PASS, 1 PARTIAL, 2 BLOCKED, 14 MISSING_EVIDENCE; readyForProduction=false. PARTIAL: human dependency/lockfile review. BLOCKED: local Windows integration runner (66/67 complete; Redis stress child process exited with 3221226505 without an assertion failure) and formal PostgreSQL/Memgraph evidence not bound to this SHA. Isolated Redis stress passed 2/2 with 20,000/20,000 deliveries and zero queue overflows; affected tenant suites passed 13/13 in isolation. Hosted workflow #317 passed its PostgreSQL/Memgraph job. Fourteen independent/provider/product/supply-chain/operations evidence gates remain open. Hub 0.6.2 remains unreleased; no tag, GitHub Release, package publication or production deployment is authorized.
