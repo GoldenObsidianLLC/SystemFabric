@@ -576,8 +576,6 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
       apiJob.status !== 'completed' || apiJob.conclusion !== 'success') {
     throw new Error('The PostgreSQL/Memgraph GitHub Actions job identity is incomplete or mismatched.');
   }
-  const completedAt = new Date(apiJob.completed_at || '');
-  if (!Number.isFinite(completedAt.valueOf())) throw new Error('The PostgreSQL/Memgraph GitHub Actions completion timestamp is missing or invalid.');
 
   const expectedManifest = {
     ...expected,
@@ -632,7 +630,7 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
     version: PRODUCT_VERSION,
     sourceRevision: expected.mergeSha.toLowerCase(),
     status: 'passed',
-    executedAt: completedAt.toISOString(),
+    executedAt: manifestValidation.manifest.generatedAt,
     command: 'GitHub Actions workflow "' + expected.workflow + '" run ' + expected.runId +
       ' attempt ' + expected.runAttempt + '; job "' + config.jobName +
       '" executed npm run test:migrations:fresh, npm run test:integration:live, ' +
@@ -650,7 +648,6 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
       runAttempt: expected.runAttempt,
       headSha: expected.headSha.toLowerCase(),
       sourceRevision: expected.mergeSha.toLowerCase(),
-      jobId: apiJob.id,
       jobName: config.jobName,
       manifestPath: 'artifacts/evidence/postgres-memgraph-ci-manifest.json',
       manifestSha256,
@@ -678,13 +675,10 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
     }
     const serializedEvidence = JSON.stringify(evidence, null, 2) + '\n';
 
-    // This persisted JSON is a bounded CI attestation, not an uploaded file.
-    // Its remote inputs have already passed exact repository/workflow/run/
-    // attempt/job/SHA checks, strict schema and zero-skip result validation,
-    // and checksum verification against the producer manifest. Only fixed
-    // schema fields and validated scalar values cross this file boundary.
-
-    // codeql[js/http-to-file-access]
+    // The Actions REST response is used for validation only and is not
+    // serialized. Attestation values come from fixed schema constants,
+    // workflow environment identity, and local producer artifacts whose
+    // manifest and SHA-256 inventory were verified above.
     fs.writeFileSync(outputDescriptor, serializedEvidence, 'utf8');
     fs.fsyncSync(outputDescriptor);
   } finally {
