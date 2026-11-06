@@ -1,6 +1,6 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
-> **Current mainline decision - 6 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on main at d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a. PRs #68 through #76 are merged; post-merge workflow #317 passed all six hosted jobs. PR #75 hardened relationship site context/outbox handling; PR #76 did the same for taxonomy. Exact-SHA local readiness is 7 PASS, 1 PARTIAL, 2 BLOCKED, 14 MISSING_EVIDENCE; readyForProduction=false. The local integration sweep had one Windows Redis stress child-process termination without an assertion failure; isolated Redis and tenant tests passed. The formal exact-SHA PostgreSQL/Memgraph evidence remains blocked. The older result at 70ce31a23aa670afca1d89fb5c776e1ca36abd84 is historical. Issues #14 and #25 remain open. No release tag, GitHub Release, package publication or production deployment is authorized.
+> **Historical snapshot — pre-PR #77–#79 merge state.** This report preserves the earlier assessment at d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a; its run #317 evidence gaps and pull-request dispositions are superseded. For the current mainline at dd0c867e5815aa1b0c7b88542bdebcaf6eb7407e, see the [6 November 2026 Mainline Status Report](2026-11-06-VirgoScorpio-Hub-0.6.2-Mainline-Status.md). Historical findings and run-specific results below remain preserved for audit continuity.
 
 ## Historical mainline assessment — before PR #70/#71 merge
 

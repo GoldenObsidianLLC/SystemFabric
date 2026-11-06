@@ -576,8 +576,6 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
       apiJob.status !== 'completed' || apiJob.conclusion !== 'success') {
     throw new Error('The PostgreSQL/Memgraph GitHub Actions job identity is incomplete or mismatched.');
   }
-  const completedAt = new Date(apiJob.completed_at || '');
-  if (!Number.isFinite(completedAt.valueOf())) throw new Error('The PostgreSQL/Memgraph GitHub Actions completion timestamp is missing or invalid.');
 
   const expectedManifest = {
     ...expected,
@@ -632,7 +630,7 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
     version: PRODUCT_VERSION,
     sourceRevision: expected.mergeSha.toLowerCase(),
     status: 'passed',
-    executedAt: completedAt.toISOString(),
+    executedAt: manifestValidation.manifest.generatedAt,
     command: 'GitHub Actions workflow "' + expected.workflow + '" run ' + expected.runId +
       ' attempt ' + expected.runAttempt + '; job "' + config.jobName +
       '" executed npm run test:migrations:fresh, npm run test:integration:live, ' +
@@ -650,7 +648,6 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
       runAttempt: expected.runAttempt,
       headSha: expected.headSha.toLowerCase(),
       sourceRevision: expected.mergeSha.toLowerCase(),
-      jobId: apiJob.id,
       jobName: config.jobName,
       manifestPath: 'artifacts/evidence/postgres-memgraph-ci-manifest.json',
       manifestSha256,
@@ -668,11 +665,33 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
 
   const outputDirectory = ensureEvidenceDirectory(root, 'artifacts/evidence');
   const outputPath = path.join(outputDirectory, 'postgres-memgraph-live.json');
-  if (fs.existsSync(outputPath)) {
-    const outputStat = fs.lstatSync(outputPath);
-    if (!outputStat.isFile() || outputStat.isSymbolicLink()) throw new Error('Formal PostgreSQL/Memgraph evidence target must be a regular file.');
+  // Stage into an exclusive same-directory file before the atomic replace.
+  // rename replaces the destination entry (including a symlink) instead of
+  // following it, and keeps the previously committed historical record intact
+  // until every producer input has passed validation and the new file is fsynced.
+  const temporaryPath = path.join(outputDirectory, '.postgres-memgraph-live-' + crypto.randomUUID() + '.tmp');
+  try {
+    const outputDescriptor = fs.openSync(temporaryPath, 'wx', 0o600);
+    try {
+      if (!fs.fstatSync(outputDescriptor).isFile()) {
+        throw new Error('Formal PostgreSQL/Memgraph evidence staging target must be a regular file.');
+      }
+      const serializedEvidence = JSON.stringify(evidence, null, 2) + '\n';
+
+      // The Actions REST response is used for validation only and is not
+      // serialized. Attestation values come from fixed schema constants,
+      // workflow environment identity, and local producer artifacts whose
+      // manifest and SHA-256 inventory were verified above.
+      fs.writeFileSync(outputDescriptor, serializedEvidence, 'utf8');
+      fs.fsyncSync(outputDescriptor);
+    } finally {
+      fs.closeSync(outputDescriptor);
+    }
+    fs.renameSync(temporaryPath, outputPath);
+  } catch (error) {
+    fs.rmSync(temporaryPath, { force: true });
+    throw error;
   }
-  fs.writeFileSync(outputPath, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
   return evidence;
 }
 

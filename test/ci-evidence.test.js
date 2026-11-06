@@ -238,7 +238,7 @@ test('materializes the formal PostgreSQL/Memgraph release evidence from checksum
   const { root, artifactRoot, jobApi } = createFixtures(t);
   const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
   const directory = path.join(artifactRoot, config.artifactName);
-  const apiJob = jobApi.find(job => job.name === config.jobName);
+  const apiJob = { ...jobApi.find(job => job.name === config.jobName), id: 987654321, completed_at: 'UNTRUSTED-API-TIMESTAMP' };
   const validation = validateJobEvidence(config, directory, expected, apiJob);
   assert.equal(validation.status, 'PASS', validation.errors.join('; '));
 
@@ -249,12 +249,17 @@ test('materializes the formal PostgreSQL/Memgraph release evidence from checksum
   assert.equal(stored.sourceRevision, expected.mergeSha);
   assert.equal(stored.product, 'VirgoScorpio Hub');
   assert.equal(stored.version, PRODUCT_VERSION);
-  assert.equal(stored.executedAt, new Date(apiJob.completed_at).toISOString());
+  const producerManifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
+  assert.equal(stored.executedAt, producerManifest.generatedAt);
+  const serializedEvidence = fs.readFileSync(evidencePath, 'utf8');
+  assert.ok(!serializedEvidence.includes('UNTRUSTED-API-TIMESTAMP'));
+  assert.ok(!serializedEvidence.includes('987654321'));
   assert.match(stored.command, /test:migrations:fresh.*test:integration:live.*test:integration:memgraph-outage.*test:graph:rebuild/);
   assert.match(stored.environment, /Node\.js v22\.23\.4.*PostgreSQL service postgres:18-alpine/);
   assert.equal(stored.results.integration.tests, 22);
   assert.equal(stored.results.migrations.migrationCount, 18);
-  assert.equal(stored.ciEvidence.jobId, apiJob.id);
+  assert.equal(stored.ciEvidence.jobName, config.jobName);
+  assert.equal(Object.hasOwn(stored.ciEvidence, 'jobId'), false);
   assert.equal(stored.ciEvidence.runId, expected.runId);
   assert.equal(stored.ciEvidence.runAttempt, expected.runAttempt);
   assert.equal(evidence.artifacts.length, config.requiredFiles.length + 1);
@@ -276,7 +281,64 @@ test('materializes the formal PostgreSQL/Memgraph release evidence from checksum
   assert.equal(stored.ciEvidence.manifestSha256, manifestSha256);
 });
 
-test('refuses stale source revisions, missing completion metadata, and unverified database payloads', t => {
+test('atomically replaces an existing formal evidence file only after validation', t => {
+  const { root, artifactRoot, jobApi } = createFixtures(t);
+  const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
+  const directory = path.join(artifactRoot, config.artifactName);
+  const apiJob = jobApi.find(job => job.name === config.jobName);
+  const validation = validateJobEvidence(config, directory, expected, apiJob);
+  assert.equal(validation.status, 'PASS', validation.errors.join('; '));
+
+  const outputPath = path.join(root, 'artifacts', 'evidence', 'postgres-memgraph-live.json');
+  const original = JSON.stringify({ preserve: 'existing evidence' }) + '\n';
+  write(root, 'artifacts/evidence/postgres-memgraph-live.json', original);
+
+  const evidence = writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation });
+  const stored = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+  assert.equal(stored.status, 'passed');
+  assert.equal(stored.sourceRevision, expected.mergeSha);
+  assert.equal(stored.ciEvidence.manifestSha256, evidence.ciEvidence.manifestSha256);
+  assert.notEqual(fs.readFileSync(outputPath, 'utf8'), original);
+  assert.equal(fs.readdirSync(path.dirname(outputPath)).some(name => name.endsWith('.tmp')), false);
+});
+
+test('does not follow a pre-existing symlink at the formal evidence target', t => {
+  const { root, artifactRoot, jobApi } = createFixtures(t);
+  const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
+  const directory = path.join(artifactRoot, config.artifactName);
+  const apiJob = jobApi.find(job => job.name === config.jobName);
+  const validation = validateJobEvidence(config, directory, expected, apiJob);
+  assert.equal(validation.status, 'PASS', validation.errors.join('; '));
+
+  const outputPath = path.join(root, 'artifacts', 'evidence', 'postgres-memgraph-live.json');
+  const protectedPath = path.join(root, 'protected-evidence.json');
+  const original = JSON.stringify({ preserve: 'outside target' }) + '\n';
+  fs.writeFileSync(protectedPath, original);
+  try {
+    fs.symlinkSync(protectedPath, outputPath, 'file');
+  } catch {
+    t.skip('Symlink creation is not permitted by this operating system account.');
+    return;
+  }
+
+  const evidence = writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation });
+  // Bind inspection and content reads to one descriptor so the test does not
+  // re-resolve a path after checking it (the race this regression guards).
+  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const outputDescriptor = fs.openSync(outputPath, fs.constants.O_RDONLY | noFollow);
+  try {
+    const openedTarget = fs.fstatSync(outputDescriptor);
+    assert.equal(openedTarget.isFile(), true);
+    assert.equal(JSON.parse(fs.readFileSync(outputDescriptor, 'utf8')).status, 'passed');
+  } finally {
+    fs.closeSync(outputDescriptor);
+  }
+  assert.equal(fs.readFileSync(protectedPath, 'utf8'), original);
+  assert.equal(fs.readdirSync(path.dirname(outputPath)).some(name => name.endsWith('.tmp')), false);
+  assert.equal(evidence.sourceRevision, expected.mergeSha);
+});
+
+test('refuses stale revisions and unverified payloads without serializing GitHub API fields', t => {
   const { root, artifactRoot, jobApi } = createFixtures(t);
   const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
   const directory = path.join(artifactRoot, config.artifactName);
@@ -287,10 +349,6 @@ test('refuses stale source revisions, missing completion metadata, and unverifie
   assert.throws(() => writePostgresMemgraphReleaseEvidence({
     root, directory, expected: { ...expected, mergeSha: 'f'.repeat(40) }, apiJob, validation,
   }), /manifest failed re-validation.*mergeSha/i);
-
-  assert.throws(() => writePostgresMemgraphReleaseEvidence({
-    root, directory, expected, apiJob: { ...apiJob, completed_at: null }, validation,
-  }), /completion timestamp/i);
 
   const liveFile = path.join(directory, 'files', 'artifacts', 'evidence', 'integration-live.json');
   fs.appendFileSync(liveFile, 'tampered\n');
