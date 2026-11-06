@@ -5,7 +5,7 @@ All notable project-level changes should be recorded here. This changelog does n
 ## 0.6.2 (unreleased patch candidate)
 
 ### Current mainline disposition — 5 November 2026
-- PRs #68 (library/media routes), #69 (site-membership routes), #70 (CI rerun evidence correction), and #71 (custom content-type routes) are merged. Main is `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge push workflow [#292](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42120302005) passed all six hosted jobs. PR #70's mainline run [#289](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42112860410) also passed all six jobs.
+- PRs #68–#72 (library/media routes, site-membership routes, CI rerun evidence, custom content types, and stable local Compose volumes) are merged. PR #72 merged as `70ce31a23aa670afca1d89fb5c776e1ca36abd84`; current mainline push workflow [#301](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42135144431) passed all six hosted jobs. The current local readiness snapshot is 8 PASS, 1 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE; production remains NO-GO. Hub 0.6.2 remains unreleased; no tag, GitHub Release, package publication, or production deployment is authorized.
 - Pre-merge candidate notes below preserve their original run/branch context; statements that a PR remained open or hosted validation was pending are historical and superseded by this current disposition.
 
 ### Local development environment
