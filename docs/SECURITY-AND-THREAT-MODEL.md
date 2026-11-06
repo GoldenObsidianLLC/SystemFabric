@@ -1,6 +1,6 @@
 # VirgoScorpio Hub Security and Threat Model
 
-**Scope:** VirgoScorpio Hub 0.6.0 security/compatibility candidate / developer preview. EnginEx 7.0.0 removes the legacy arbitrary-JavaScript template renderer. This document describes implemented controls and remaining security work; it is not a certification or independent audit.
+**Scope:** VirgoScorpio Hub 0.6.2 unreleased developer preview. This is an evolving threat model, not a certification or independent audit. EnginEx 7.0.0 removes the legacy arbitrary-JavaScript template renderer. This document describes implemented controls and remaining security work; it is not a certification or independent audit.
 
 ## Assets to protect
 
@@ -63,7 +63,7 @@
 | Credential brute force | Request throttling, strong password policy, scrypt, optional TOTP MFA | Distributed/global rate limiter and operational alerting |
 | Session theft | Opaque tokens, HttpOnly cookie, expiry, revocation | Rotate sessions after privilege changes, device/session management, reauthentication for critical operations |
 | CSRF | CSRF cookie/header and Origin check for cookie writes | Enforce Origin on all same-site mutations in production and test proxy edge cases |
-| Cross-tenant data access | Site-scoped data access and capability checks on API paths | Exhaustive route-by-route tenant isolation testing / independent review |
+| Cross-tenant data access | Site-scoped data access, shared site-selector reconciliation and capability checks on API paths | Independent route-by-route tenant isolation/authorization review remains mandatory; internal regression suites and the 6 November maintainer pre-review are targeted evidence only and do not close issue #14 |
 | Stale graph authorization | Graph projections do not grant access | Rebuild/reconciliation and outage tests |
 | SQL injection | Parameterized application queries; allowlisted interpolated graph relationship types | SQL fuzz/property tests, least-privileged DB role and review every query |
 | XSS/unsafe HTML | Escaped rendering, restricted styles, script-disabled CSP | Browser-level tests, HTML fuzzing, review every new widget/renderer helper |

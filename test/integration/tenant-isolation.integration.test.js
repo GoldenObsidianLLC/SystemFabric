@@ -214,5 +214,61 @@ test(
     assert.equal(matchingSelectors.status, 200, 'matching route, header, and query selectors should be accepted');
     const matchingSelectorsBody = await matchingSelectors.json();
     assert.doesNotMatch(JSON.stringify(matchingSelectorsBody), new RegExp(privateMarker));
+    const relationshipHeaderMismatch = await fetch(base + '/api/v1/sites/' + siteB + '/relationships', {
+      headers: { ...authHeaders, 'x-virgoscorpio-hub-site-id': siteA },
+    });
+    assert.equal(relationshipHeaderMismatch.status, 400, 'relationship routes must reject a conflicting site header');
+    assert.equal(
+      (await relationshipHeaderMismatch.json()).code,
+      'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
+    );
+
+    const relationshipQueryMismatch = await fetch(
+      base + '/api/v1/sites/' + siteB + '/relationships?siteId=' + siteA,
+      { headers: authHeaders }
+    );
+    assert.equal(relationshipQueryMismatch.status, 400, 'relationship routes must reject a conflicting site query');
+    assert.equal(
+      (await relationshipQueryMismatch.json()).code,
+      'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
+    );
+
+    const relationshipBodyMismatch = await fetch(base + '/api/v1/sites/' + siteB + '/relationships', {
+      method: 'POST',
+      headers: { ...authHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        siteId: siteA,
+        sourceId: randomUUID(),
+        targetId: randomUUID(),
+        kind: 'RELATED_TO',
+      }),
+    });
+    assert.equal(relationshipBodyMismatch.status, 400, 'relationship writes must reject a conflicting body site');
+    assert.equal(
+      (await relationshipBodyMismatch.json()).code,
+      'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
+    );
+
+    const relationshipDeleteMismatch = await fetch(
+      base + '/api/v1/sites/' + siteB + '/relationships/' + randomUUID(),
+      {
+        method: 'DELETE',
+        headers: { ...authHeaders, 'x-virgoscorpio-hub-site-id': siteA },
+      }
+    );
+    assert.equal(relationshipDeleteMismatch.status, 400, 'relationship deletes must reject a conflicting site header');
+    assert.equal(
+      (await relationshipDeleteMismatch.json()).code,
+      'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
+    );
+    const relationshipDuplicateQuery = await fetch(
+      base + '/api/v1/sites/' + siteB + '/relationships?siteId=' + siteB + '&siteId=' + siteB,
+      { headers: authHeaders }
+    );
+    assert.equal(relationshipDuplicateQuery.status, 400, 'relationship routes must reject repeated site selectors');
+    assert.equal(
+      (await relationshipDuplicateQuery.json()).code,
+      'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
+    );
   }
 );

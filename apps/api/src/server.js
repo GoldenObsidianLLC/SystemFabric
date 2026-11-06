@@ -1449,13 +1449,14 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if ((relationshipsCollectionMatch && ['GET', 'POST'].includes(req.method)) || (relationshipItemMatch && req.method === 'DELETE')) {
         if (!localPool) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', 'Relationship management requires PostgreSQL.');
         const siteId = relationshipsCollectionMatch?.[1] || relationshipItemMatch[1];
+        const body = req.method === 'POST' ? await readJson(req, Math.min(maxBody, 32_000)) : {};
+        await siteIdFor({ req, url, body, actor, routeSiteId: siteId });
         await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'content:edit');
         if (req.method === 'GET') {
           const result = await localPool.query('SELECT id,source_id,target_id,kind,metadata,version,created_at,deleted_at FROM content_relationships WHERE site_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 500', [siteId]);
           return sendJson(res, 200, { relationships: result.rows, requestId });
         }
         if (req.method === 'POST') {
-          const body = await readJson(req, Math.min(maxBody, 32_000));
           if (!ID_RE.test(String(body.sourceId || '')) || !ID_RE.test(String(body.targetId || '')) || body.sourceId === body.targetId || !['HAS_TERM','PARENT_OF','RELATED_TO','LOCALIZED_AS','NAVIGATES_TO'].includes(body.kind)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_RELATIONSHIP_INVALID', 'sourceId, targetId and an approved relationship kind are required.');
           const client = await localPool.connect();
           try {
