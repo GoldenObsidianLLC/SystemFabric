@@ -668,11 +668,28 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
 
   const outputDirectory = ensureEvidenceDirectory(root, 'artifacts/evidence');
   const outputPath = path.join(outputDirectory, 'postgres-memgraph-live.json');
-  if (fs.existsSync(outputPath)) {
-    const outputStat = fs.lstatSync(outputPath);
-    if (!outputStat.isFile() || outputStat.isSymbolicLink()) throw new Error('Formal PostgreSQL/Memgraph evidence target must be a regular file.');
+  // O_EXCL ("wx") atomically creates a new regular file and rejects any
+  // pre-existing entry, including a symbolic link. This avoids a separate
+  // exists/lstat check followed by a path-based write (a TOCTOU window).
+  const outputDescriptor = fs.openSync(outputPath, 'wx', 0o600);
+  try {
+    if (!fs.fstatSync(outputDescriptor).isFile()) {
+      throw new Error('Formal PostgreSQL/Memgraph evidence target must be a regular file.');
+    }
+    const serializedEvidence = JSON.stringify(evidence, null, 2) + '\n';
+
+    // This persisted JSON is a bounded CI attestation, not an uploaded file.
+    // Its remote inputs have already passed exact repository/workflow/run/
+    // attempt/job/SHA checks, strict schema and zero-skip result validation,
+    // and checksum verification against the producer manifest. Only fixed
+    // schema fields and validated scalar values cross this file boundary.
+
+    // codeql[js/http-to-file-access]
+    fs.writeFileSync(outputDescriptor, serializedEvidence, 'utf8');
+    fs.fsyncSync(outputDescriptor);
+  } finally {
+    fs.closeSync(outputDescriptor);
   }
-  fs.writeFileSync(outputPath, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
   return evidence;
 }
 

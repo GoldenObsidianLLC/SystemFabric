@@ -276,6 +276,51 @@ test('materializes the formal PostgreSQL/Memgraph release evidence from checksum
   assert.equal(stored.ciEvidence.manifestSha256, manifestSha256);
 });
 
+test('does not overwrite an existing formal evidence file', t => {
+  const { root, artifactRoot, jobApi } = createFixtures(t);
+  const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
+  const directory = path.join(artifactRoot, config.artifactName);
+  const apiJob = jobApi.find(job => job.name === config.jobName);
+  const validation = validateJobEvidence(config, directory, expected, apiJob);
+  assert.equal(validation.status, 'PASS', validation.errors.join('; '));
+
+  const outputPath = path.join(root, 'artifacts', 'evidence', 'postgres-memgraph-live.json');
+  const original = JSON.stringify({ preserve: 'existing evidence' }) + '\n';
+  write(root, 'artifacts/evidence/postgres-memgraph-live.json', original);
+
+  assert.throws(
+    () => writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation }),
+    error => error?.code === 'EEXIST',
+  );
+  assert.equal(fs.readFileSync(outputPath, 'utf8'), original);
+});
+
+test('does not follow a pre-existing symlink at the formal evidence target', t => {
+  const { root, artifactRoot, jobApi } = createFixtures(t);
+  const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
+  const directory = path.join(artifactRoot, config.artifactName);
+  const apiJob = jobApi.find(job => job.name === config.jobName);
+  const validation = validateJobEvidence(config, directory, expected, apiJob);
+  assert.equal(validation.status, 'PASS', validation.errors.join('; '));
+
+  const outputPath = path.join(root, 'artifacts', 'evidence', 'postgres-memgraph-live.json');
+  const protectedPath = path.join(root, 'protected-evidence.json');
+  const original = JSON.stringify({ preserve: 'outside target' }) + '\n';
+  fs.writeFileSync(protectedPath, original);
+  try {
+    fs.symlinkSync(protectedPath, outputPath, 'file');
+  } catch {
+    t.skip('Symlink creation is not permitted by this operating system account.');
+    return;
+  }
+
+  assert.throws(
+    () => writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation }),
+    error => error?.code === 'EEXIST',
+  );
+  assert.equal(fs.readFileSync(protectedPath, 'utf8'), original);
+});
+
 test('refuses stale source revisions, missing completion metadata, and unverified database payloads', t => {
   const { root, artifactRoot, jobApi } = createFixtures(t);
   const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
