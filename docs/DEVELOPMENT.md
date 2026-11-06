@@ -62,7 +62,9 @@ gitleaks dir --redact --verbose .
 gitleaks git --redact --verbose --log-opts="--all"
 ```
 
-The live integration command requires a reachable PostgreSQL server with a dedicated `virgoscorpio_hub_test` database and Memgraph. Follow the integration script's current configuration and avoid destructive operations against shared databases.
+The live integration command requires a reachable PostgreSQL server with a dedicated virgoscorpio_hub_test database and Memgraph. Follow the integration script's current configuration and avoid destructive operations against shared databases.
+
+Run npm run dev:doctor after configuring .env. The preflight authenticates DATABASE_URL and TEST_DATABASE_URL independently with a bounded, read-only SELECT 1; it does not write to either database. The test URL must target a database name ending in test. PostgreSQL authentication, connection, and timeout failures are reported by safe error category only. Connection strings and credentials are never printed. Memgraph preflight checks its configured Bolt endpoint for TCP reachability.
 
 ## Working on a change
 
