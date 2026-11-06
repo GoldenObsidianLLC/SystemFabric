@@ -68,6 +68,25 @@ Result: **9/9 tests passed, zero failures, zero skips, zero TODOs.**
 | PostgreSQL outbox/event contracts | test/outbox-contract.test.js and test/outbox-delivery.test.js | Site-scope envelope validation, subscriptions, ordering/replay rules; not an independent two-tenant worker review. |
 | Memgraph projection | test/integration/memgraph.integration.test.js | Site-scoped node/edge projection and mismatched-site reads in isolated fixtures; full two-site adversarial projection/rebuild review remains. |
 
+## Follow-up finding: relationship outbox event scope and classification
+
+The same route review found a second defect in the API-level relationship event producers. Both relationship.upsert and relationship.delete inserted core outbox columns and put siteId in the JSON payload, but omitted the durable envelope columns site_id, actor_id, correlation_id and classification. With the migration defaults this produced site_id NULL and classification internal, even though the event contract registry requires these relationship domain events to be site-private. The existing outbox envelope validator therefore rejects the row as a domain-event classification/scope mismatch; the graph projection worker cannot safely process it as a site-scoped event. This was observed in the isolated test database: a relationship.upsert row had site_id NULL and classification internal while payload.siteId contained the selected tenant.
+
+The API route now writes site_id, optional actor_id, correlation_id and classification site-private for both upsert and delete. This follows the established packages/db/src/relationship-store.js pattern and preserves the existing aggregate identity/version idempotency key. No migration is needed because all columns and constraints already exist. SQL reads, capability checks and endpoint validation remain path-site scoped.
+
+The positive-control integration now asserts the persisted outbox envelope for both relationship.upsert and relationship.delete: site_id equals Site B, classification is site-private, and payload.siteId agrees. The fixture teardown removes only the exact relationship aggregate IDs and the two event types created by that fixture, keeping the later outage harness precondition deterministic.
+
+Final local acceptance on a newly created isolated database virgoscorpio_hub_pr75c_test:
+
+- npm run test:integration:live: PASS, 66/66, zero failures, skips or TODOs. All 18 migrations applied. The new relationship selector, endpoint and outbox-envelope assertions passed.
+- Pending/processing outbox events after the live suite: 0.
+- npm run test:integration:memgraph-outage: PASS. The real Memgraph container was stopped, the site-private event remained pending and the worker lease was released; after restart the event replayed, the expected graph projection existed, and the processed event did not replay again.
+- Memgraph was confirmed running after the harness; pending/processing outbox events remained 0.
+- npm run check: PASS, 213 required paths, 219 JavaScript files syntax-checked, 517 Hub tests (514 passed, zero failed, three Windows/platform-specific skips).
+- git diff --check: PASS.
+
+These are local developer-environment regression results on the PR candidate, not independent security evidence or production certification. Issue #14 and issue #25 remain open.
+
 ## Independent reviewer work still required
 
 The reviewer for issue #14 must be independent of implementation and must review an exact final commit. At minimum:

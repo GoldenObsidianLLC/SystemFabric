@@ -63,7 +63,7 @@
 | Credential brute force | Request throttling, strong password policy, scrypt, optional TOTP MFA | Distributed/global rate limiter and operational alerting |
 | Session theft | Opaque tokens, HttpOnly cookie, expiry, revocation | Rotate sessions after privilege changes, device/session management, reauthentication for critical operations |
 | CSRF | CSRF cookie/header and Origin check for cookie writes | Enforce Origin on all same-site mutations in production and test proxy edge cases |
-| Cross-tenant data access | Site-scoped data access, shared site-selector reconciliation and capability checks on API paths | Independent route-by-route tenant isolation/authorization review remains mandatory; internal regression suites and the 6 November maintainer pre-review are targeted evidence only and do not close issue #14 |
+| Cross-tenant data access | Site-scoped data access, shared site-selector reconciliation, capability checks, and site-private outbox event envelopes | Independent route-by-route tenant isolation/authorization review remains mandatory; internal regression suites and the 6 November maintainer pre-review are targeted evidence only and do not close issue #14 |
 | Stale graph authorization | Graph projections do not grant access | Rebuild/reconciliation and outage tests |
 | SQL injection | Parameterized application queries; allowlisted interpolated graph relationship types | SQL fuzz/property tests, least-privileged DB role and review every query |
 | XSS/unsafe HTML | Escaped rendering, restricted styles, script-disabled CSP | Browser-level tests, HTML fuzzing, review every new widget/renderer helper |
