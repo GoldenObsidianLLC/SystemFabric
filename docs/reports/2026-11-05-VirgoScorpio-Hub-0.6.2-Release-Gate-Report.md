@@ -1,6 +1,6 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
-> **Current mainline decision — 5 November 2026: NO-GO for production.** Hub 0.6.2 is on `main` at `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge main workflow #292 passed all six jobs. PR #72 (`aca463db5b7cdca9284a9a6ea1bab222a470f5cb`) proposes stable Compose data-volume identity and local Docker recovery documentation; its hosted push workflow #295 and pull-request workflow #296 both passed all six jobs, but PR #72 remains open for human review. Local restore validation on code revision `aca463db5b7cdca9284a9a6ea1bab222a470f5cb` passes the current 18-migration schemas, 65/65 live integration tests with zero skips, fresh migration/idempotency, Memgraph outage/replay, graph rebuild, the 9-check development preflight, and 9/9 local Playwright browser smoke. No release tag, GitHub Release, package publication, or production deployment is authorized. Formal readiness remains `NOT_PRODUCTION_CERTIFIED`, `readyForProduction: false`, with **7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE**.
+> **Current mainline decision — 5 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on `main` at `70ce31a23aa670afca1d89fb5c776e1ca36abd84`. PRs #68–#72 are merged; PR #72 merged as this mainline commit. Post-merge workflow [#301](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42135144431) passed all six hosted jobs. The current exact-HEAD local readiness result is 8 PASS, 1 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE. Local application-level restore acceptance passed fresh/idempotent migrations 18/18 twice, live PostgreSQL/Memgraph/Redis integration 65/65 with zero skips, API `/health` HTTP 200 plus an API-pool query against the restored application database (18 migration records, 69 public tables, one site), and the 9/9 development preflight. The formal PostgreSQL/Memgraph evidence contract remains BLOCKED because its tracked evidence is not bound to this exact SHA. No release tag, GitHub Release, package publication, or production deployment is authorized.
 
 ## Historical mainline assessment — before PR #70/#71 merge
 
@@ -476,13 +476,13 @@ PR #71 remains open and has no submitted human review recorded at this assessmen
 Disposition: retain Hub 0.6.2 as an unreleased developer-preview patch. Merge neither follow-up without human review and the final green checks on the exact revisions. Do not create a tag, GitHub Release, package publication or production deployment. NOT_PRODUCTION_CERTIFIED remains in force.
 
 
-## Mainline merge and local development infrastructure update — 5 November 2026
+## Historical mainline merge and local development infrastructure snapshot — 5 November 2026 (before PR #72 merge)
 
 PR #70 (CI rerun evidence correction) merged as `dd811c6bfbd0d4475fa9199f335c65d730679fd4`; its post-merge mainline workflow [#289](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42112860410) passed all six hosted jobs. PR #71 (custom content-type route extraction) then merged to main as `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge workflow [#292](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42120302005) passed all six hosted jobs. The current mainline state is 0.6.2; no tag, GitHub Release, package publication, or production deployment is authorized.
 
 The exact-sha formal readiness status remains **NO-GO / NOT_PRODUCTION_CERTIFIED**: 7 PASS, 2 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE. Successful CI does not satisfy independent/provider/product/operations evidence gates or the formal PostgreSQL/Memgraph evidence contract.
 
-### PR #72 — local Docker resource migration (open; not merged)
+### PR #72 — local Docker resource migration (pre-merge snapshot; superseded by the current-mainline update below)
 
 PR [#72](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/72), branch `chore/docker-resource-migration-2026-11-05`, is based on current main `54b62e233e519aa0afa6c4170578def9c02e15fc` and currently points at `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`. Hosted push workflow [#295](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42127116871) and pull-request workflow [#296](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42127125785) each passed all six jobs: Node.js 22.23.4 and 24.22.1, live PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL, and consolidated evidence. PR #72 remains open and has no requested human reviewers; do not merge it without human review.
 
@@ -505,3 +505,86 @@ The PostgreSQL container reports healthy; Memgraph is running after the outage/r
 Local Playwright smoke passed 9/9 using the isolated `virgoscorpio_hub_test` database and loopback Memurai endpoint. The E2E suite exercises editor, collaboration and accessibility smoke paths; it does not replace manual WCAG/accessibility acceptance or full application-data acceptance. No legacy-resource retirement/rollback decision has been made. Do not remove the old containers or volumes before the agreed rollback window and explicit acceptance. The detailed backup hashes, restore procedure, image IDs, live test counts and current checklist are in [2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md](2026-11-05-LOCAL-DOCKER-RESOURCE-MIGRATION.md).
 
 This local validation is supplemental developer-environment evidence only. It does not satisfy the production load/backup/restore gate (issue #24), the formal PostgreSQL/Memgraph evidence contract, or any of the 14 external missing gates. The formal release decision remains NO-GO / `NOT_PRODUCTION_CERTIFIED`.
+
+
+## Current mainline, application restore acceptance, and release gate — 5 November 2026
+
+### Repository and hosted CI disposition
+
+PR #72 is merged. The mainline commit is `70ce31a23aa670afca1d89fb5c776e1ca36abd84`; PRs #68–#72 are all merged. Post-merge push workflow [#301](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42135144431) completed successfully with all six jobs: supported Node.js 22.23.4 and 24.22.1 unit/security/dependency checks, PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL, and consolidated evidence. Hub 0.6.2 remains an unreleased developer-preview patch. No release tag, GitHub Release, package publication, or production deployment is authorized. No version bump is appropriate for this local-infrastructure/documentation merge.
+
+### Exact-HEAD formal readiness snapshot
+
+The latest local `npm run release:readiness` evaluation was generated on clean source SHA `70ce31a23aa670afca1d89fb5c776e1ca36abd84` using Windows x64 / Node.js 26.12.1:
+
+| Formal result | Count | Current interpretation |
+|---|---:|---|
+| PASS | 8 | Clean source tree; supported runtime; all 18 migration files present; artifact/syntax check; Hub unit/security tests; EnginEx tests; live integration tests; Playwright dependency available. |
+| PARTIAL | 1 | The committed npm lockfile is reproducible, but explicit human dependency/lockfile review remains open. |
+| BLOCKED | 1 | `postgres-memgraph-live` evidence does not contain the required current schema/product/version/exact-HEAD identity at the formal evidence path. |
+| MISSING_EVIDENCE | 14 | Independent, provider, product, supply-chain, security, backup/restore, observability, and operations gates below. |
+| NOT_RUN | 0 | All checks configured by the local evaluator ran. |
+
+The local source checks included 508 Hub tests (505 passed, zero failed, three Windows/platform-specific skips), 94 EnginEx tests (91 passed, zero failed, three platform-specific skips), and the artifact/syntax verifier (210 required paths, 217 JavaScript files). The readiness integration stage passed 65/65 with zero failures, cancellations, skips, or TODOs. These are local engineering results; the supported Node 22/24 hosted matrix is separately validated by mainline run #301.
+
+**Credential-drift diagnostic:** The first local readiness attempt on this SHA reported 20 PostgreSQL authentication errors (`28P01`) because the ignored local `.env` contained stale `DATABASE_URL` and `TEST_DATABASE_URL` credentials. The local preflight at that point checked TCP reachability but not PostgreSQL authentication. Only those two ignored local environment entries were aligned to the checked-in development template; no credentials were printed, committed, or added to Git. The subsequent exact-HEAD readiness run passed the full 65-test live integration suite. The earlier failed invocation is diagnostic history and is not counted as accepted evidence.
+
+The formal database gate remains BLOCKED intentionally. The tracked `artifacts/evidence/postgres-memgraph-live.json` and `fresh-migrations.json` files are historical and must not be represented as current simply because the live test harness passes. Exact-SHA current local migration/integration/API/readiness outputs were retained outside the repository at `VirgoScorpio-Hub Backups/2026-11-05/release-acceptance-70ce31a`. The tracked evidence files were restored byte-for-byte after the test runners; the external local files are supplemental and do not substitute for the required formal evidence record.
+
+### Application-level restored environment acceptance
+
+The restored developer Compose environment was tested at the exact mainline SHA above. All tests used the newly named Compose volumes and the dedicated `virgoscorpio_hub_test` database for test writes. The restored application database was read through the actual API composition pool, not through a replacement test database.
+
+| Acceptance check | Result | Scope / observation |
+|---|---|---|
+| `docker compose config --quiet` and current service state | PASS | PostgreSQL 18.6 healthy; Memgraph 3.13.1 running. |
+| `npm run dev:doctor` | PASS | 9/9 development preflight checks; zero warnings/blockers. Its PostgreSQL checks currently prove TCP reachability, not credential authentication. |
+| `npm run test:migrations:fresh` | PASS | 18/18 migrations applied; exact ordered ledger verified; 18/18 skipped on the second pass; only the generated disposable database was dropped. Evidence records exact SHA `70ce31a23aa670afca1d89fb5c776e1ca36abd84`. |
+| `npm run test:integration:live` | PASS | 65/65 PostgreSQL/Memgraph/Redis/product/tenant-isolation tests; zero failures, skips, cancellations, or TODOs against `virgoscorpio_hub_test`. |
+| Application database migration/schema read | PASS | Application database `virgoscorpio_hub`: 18 migration records, 69 public base tables, one site. No data was written by the smoke query. |
+| Actual API runtime smoke | PASS | `createApiServer` listened on an ephemeral loopback port; `/health` returned HTTP 200, service `virgoscorpio-hub-api`, version `0.6.2`; the API's own PostgreSQL pool successfully queried the application database. Listener and pool were closed after the check. |
+| Local Playwright smoke | PASS | 9/9 on the PR #72 application code tree using isolated test PostgreSQL and loopback Memurai. Mainline run #301 also passed hosted browser/editor smoke. This is not manual WCAG or screen-reader acceptance. |
+| Full application data restore acceptance | PARTIAL | The legacy source `systemfabric_test` core tables inspected earlier were empty, and its 14-migration schema was intentionally not mixed into the current 18-migration Hub schema. The current Hub application DB is a clean schema with one site; no legacy customer/application records were demonstrated as restored. |
+
+The local migration evidence, live integration result, API smoke summary, and current readiness JSON/Markdown were copied outside Git and checksummed. Selected SHA-256 values:
+
+| External artifact (under `release-acceptance-70ce31a`) | SHA-256 |
+|---|---|
+| `fresh-migrations-70ce31a.json` | `629753EDD4B7D716642161AB9ECD70D197EECC8991EDB59ADB803234FEF2021C` |
+| `integration-live-70ce31a.json` | `4374F8C22D1A8673BC2BB61041FFF51D26C1B12B8484431ABACA8A8C3C5B73F6` |
+| `application-smoke-70ce31a.json` | `42FCC415872B01B894DE39CC3CB3F5FD5F5DE4B81A5A429FD45366DAAD8B8F4F` |
+| `release-readiness-70ce31a.json` | `6ACA877033739DCDB736942EC769A9CFB6B02CAC0DDEA08D8987FDBB40817476` |
+
+Original legacy PostgreSQL/Memgraph containers, all original volumes, and the four verified cold backups remain preserved. No `docker volume prune`, deletion, rename, or legacy-resource retirement was performed. The local Memgraph host `vm.max_map_count` warning (262144 versus the recommended 524288) remains a developer-runtime tuning note. This local restore exercise is not the approved production topology and does not close issue #24.
+
+### Remaining 14 missing evidence gates
+
+| Gate | Tracker | Required evidence / acceptance |
+|---|---:|---|
+| `tenant-isolation-review` | [#14](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/14) | Independent route/capability/data-access review, adversarial two-tenant tests, findings and retest. |
+| `identity-provider-e2e` | [#15](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/15) | Real OIDC/SAML (as scoped), email, MFA recovery, session rotation/logout and failure/replay tests. |
+| `clamav-corpus` | [#16](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/16) | Live scanner/corpus, fail-closed outage behavior, legacy-asset rescan/quarantine and tenant isolation. |
+| `cloud-live-providers` | [#17](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/17) | Enabled provider credentials, least-privilege CRUD/multipart, lifecycle, outage and restore. |
+| `stripe-live-lifecycle` | [#18](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/18) | Stripe test-mode checkout, signatures, replay/idempotency, ambiguous outcomes, refunds and subscriptions. |
+| `browser-accessibility` | [#19](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/19) | Full supported-browser journeys, keyboard/screen-reader/manual WCAG review and reviewer sign-off. |
+| `commerce-parity-acceptance` | [#20](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/20) | Scoped tax/shipping/discount/inventory/order/refund/download/subscription acceptance; exclude unsupported claims. |
+| `community-parity-acceptance` | [#21](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/21) | Privacy, moderation, abuse controls, search, export/deletion and explicit feature-scope acceptance. |
+| `plugin-container-isolation` | [#22](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/22) | Signed provenance verification and adversarial filesystem/network/resource/runtime isolation tests. |
+| `dependency-sbom-codeql` | [#23](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/23) | Human dependency/lockfile/SBOM/license/provenance/CodeQL review and exact-revision evidence. |
+| `load-backup-restore` | [#24](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/24) | Approved production-topology load/soak/fault tests plus full PostgreSQL/graph/object restore with measured RPO/RTO. |
+| `independent-security-review` | [#25](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/25) | Qualified independent assessment, severity-ranked findings and critical/high remediation/retest or authorized risk acceptance. |
+| `operations-release-approval` | [#26](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/issues/26) | Named owner, rehearsed deploy/rollback/secret/incident runbooks, monitoring and explicit exact-SHA release decision. |
+| `observability-production` | — | Approved OTLP backend, TLS/authentication, retention, delivery/alert validation, named owner and exact-environment evidence. |
+
+### Recommended execution order
+
+1. **Keep production NO-GO.** Do not create a release tag, publish packages, enable production traffic, or delete legacy rollback resources.
+2. Complete independent tenant-isolation review (#14) and independent application-security assessment (#25); remediate and independently retest severe findings.
+3. Freeze the release topology/provider/feature scope, then execute identity, scanner, cloud, Stripe and signed-plugin evidence in the approved test environments (#15–#18, #22).
+4. Complete browser/WCAG plus scoped commerce/community acceptance (#19–#21); ensure product claims match accepted capabilities.
+5. Complete human supply-chain review (#23), production-topology load/restore drills (#24), observability deployment acceptance, and operations/release-owner approval (#26).
+6. Resolve the formal PostgreSQL/Memgraph evidence identity/path issue for the exact final source SHA. Regenerate all revision-bound evidence after the last code or documentation commit; do not transplant the local sidecars as if they were current formal-path evidence.
+
+### Next engineering improvement identified
+
+The credential-drift incident showed that `scripts/dev-doctor.js` reports PostgreSQL PASS after a TCP handshake only; it does not authenticate with `DATABASE_URL` or `TEST_DATABASE_URL`. Add a bounded, read-only `SELECT 1` credential check (with redacted error codes and no connection-string logging) and tests proving a bad password is surfaced without mutating either database. This is a development-diagnostic improvement, not a production-gate waiver or an application-code regression.
