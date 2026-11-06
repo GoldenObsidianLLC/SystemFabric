@@ -1,6 +1,6 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
-> **Current mainline decision — 6 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on main at aecc3d24df94399648311d561587ef42db91cab8. PRs #68–#75 are merged; post-merge workflow #314 passed all six hosted jobs. PR #75 corrected relationship site-context validation and site-private outbox event envelopes. PR #76 is the unmerged taxonomy site-context/outbox-envelope candidate; its local live/replay results are supplemental developer evidence, not production approval. The latest complete formal readiness snapshot retained here is from 70ce31a23aa670afca1d89fb5c776e1ca36abd84 (8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE) and is a historical baseline, not a regenerated evaluation of aecc3d24df94399648311d561587ef42db91cab8. Independent tenant-isolation issue #14 and broader security issue #25 remain open. No release tag, GitHub Release, package publication or production deployment is authorized.
+> **Current mainline decision - 6 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on main at d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a. PRs #68 through #76 are merged; post-merge workflow #317 passed all six hosted jobs. PR #75 hardened relationship site context/outbox handling; PR #76 did the same for taxonomy. Exact-SHA local readiness is 7 PASS, 1 PARTIAL, 2 BLOCKED, 14 MISSING_EVIDENCE; readyForProduction=false. The local integration sweep had one Windows Redis stress child-process termination without an assertion failure; isolated Redis and tenant tests passed. The formal exact-SHA PostgreSQL/Memgraph evidence remains blocked. The older result at 70ce31a23aa670afca1d89fb5c776e1ca36abd84 is historical. Issues #14 and #25 remain open. No release tag, GitHub Release, package publication or production deployment is authorized.
 
 ## Historical mainline assessment — before PR #70/#71 merge
 
@@ -632,3 +632,45 @@ The taxonomy route now also resolves path/header/query/body site selectors throu
 - git diff --check: PASS.
 
 These results are local maintainer regression evidence, not independent security assessment or production certification. The candidate adds no migration, dependency, package version or public response-shape change. Hub 0.6.2 remains unreleased and NOT_PRODUCTION_CERTIFIED; issues #14 and #25 remain open.
+
+## Current mainline release-gate reassessment and producer audit - 6 November 2026
+
+Mainline: d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a. PRs #75 and #76 are merged. Workflow [#317](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42260276430) passed all six jobs.
+
+### Exact-SHA readiness
+
+**7 PASS, 1 PARTIAL, 2 BLOCKED, 14 MISSING_EVIDENCE**, readyForProduction false. The PARTIAL item is human dependency/lockfile review. The BLOCKED items are (1) the local Windows integration runner, where 66/67 completed and the Redis stress child process exited with 3221226505 without an assertion failure, and (2) the formal postgres-memgraph-live.json evidence record, which is not bound to this exact SHA.
+
+The isolated Redis stress file passed 2/2 with 20,000/20,000 deliveries across ten subscribers, zero queue overflows and p50/p95/p99 latency of 0.80/1.25/1.59 ms. Two isolated tenant integration suites passed 13/13. The hosted mainline workflow passed its PostgreSQL/Memgraph job. These targeted passes do not overwrite the full-sweep process crash.
+
+### Supplemental acceptance
+
+- Local source check: 213 required paths and 219 JavaScript files; PASS.
+- Hub tests: 517 total, 514 passed, zero failed, three Windows-specific skips.
+- EnginEx tests: 94 total, 91 passed, zero failed, three skips.
+- Eighteen migrations applied to a fresh isolated local readiness database. Formal disposable/idempotent migration evidence remains stale/blocked.
+- Local Chromium smoke, Memgraph outage/replay and graph rebuild: PASS. Full WCAG, provider lifecycle and production restore gates remain open.
+- Current local npm audit and CycloneDX SBOM evidence is not retained.
+
+### Production outbox producer audit
+
+Content event writes use packages/db/src/postgres-store.js writeOutbox; relationship events use packages/db/src/relationship-store.js and API route-owned transaction writers; taxonomy uses apps/api/src/server.js writeTaxonomyOutboxEvent. All registered families persist site scope and site-private classification with optional actor/correlation metadata; content also carries causation metadata. The event registry aligns content, relationship and taxonomy domain types. Remaining direct test inserts are explicitly internal fixtures or site-scoped synthetic projection events. No further production writer gap or migration need was found. See [Production Outbox Producer Audit - 6 November 2026](2026-11-06-OUTBOX-PRODUCER-AUDIT.md).
+
+### Fourteen missing gates
+
+1. Independent tenant/site isolation review (issue #14).
+2. Identity provider, email and MFA recovery (issue #15).
+3. ClamAV corpus and quarantine (issue #16).
+4. Cloud storage provider lifecycle (issue #17).
+5. Stripe lifecycle (issue #18).
+6. Full browser/WCAG acceptance (issue #19).
+7. Commerce parity (issue #20).
+8. Community privacy/parity (issue #21).
+9. Signed plugin isolation (issue #22).
+10. Human dependency, SBOM, provenance and CodeQL review (issue #23).
+11. Load/soak/fault/backup/restore (issue #24).
+12. Independent security assessment (issue #25).
+13. Operations runbooks and release-owner approval (issue #26).
+14. Production observability deployment evidence.
+
+**Disposition: NO-GO / NOT_PRODUCTION_CERTIFIED.** No tag, GitHub Release, package publication or production deployment is authorized.
