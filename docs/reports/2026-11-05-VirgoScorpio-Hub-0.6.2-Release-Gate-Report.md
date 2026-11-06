@@ -1,6 +1,6 @@
 # VirgoScorpio Hub 0.6.2 Release Gate Report
 
-> **Current mainline decision — 6 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on main at 9c28d5501b6e3cfd723f2495d1544beed4f29d4d. PRs #68–#74 are merged; post-merge workflow #309 passed all six hosted jobs. The latest complete formal readiness snapshot retained here is from 70ce31a23aa670afca1d89fb5c776e1ca36abd84 (8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE) and is a historical baseline, not a regenerated evaluation of 9c28d55. PR #75 is an unmerged relationship-route site-context hardening candidate based on 9c28d55; targeted tenant integration passed 9/9, but hosted CI and human review remain outstanding. The internal pre-review does not close independent tenant-isolation issue #14. No release tag, GitHub Release, package publication or production deployment is authorized.
+> **Current mainline decision — 6 November 2026: NO-GO for production.** VirgoScorpio Hub 0.6.2 is on main at aecc3d24df94399648311d561587ef42db91cab8. PRs #68–#75 are merged; post-merge workflow #314 passed all six hosted jobs. PR #75 corrected relationship site-context validation and site-private outbox event envelopes. PR #76 is the unmerged taxonomy site-context/outbox-envelope candidate; its local live/replay results are supplemental developer evidence, not production approval. The latest complete formal readiness snapshot retained here is from 70ce31a23aa670afca1d89fb5c776e1ca36abd84 (8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE) and is a historical baseline, not a regenerated evaluation of aecc3d24df94399648311d561587ef42db91cab8. Independent tenant-isolation issue #14 and broader security issue #25 remain open. No release tag, GitHub Release, package publication or production deployment is authorized.
 
 ## Historical mainline assessment — before PR #70/#71 merge
 
@@ -589,7 +589,7 @@ Original legacy PostgreSQL/Memgraph containers, all original volumes, and the fo
 
 The credential-drift incident showed that `scripts/dev-doctor.js` reports PostgreSQL PASS after a TCP handshake only; it does not authenticate with `DATABASE_URL` or `TEST_DATABASE_URL`. Add a bounded, read-only `SELECT 1` credential check (with redacted error codes and no connection-string logging) and tests proving a bad password is surfaced without mutating either database. This is a development-diagnostic improvement, not a production-gate waiver or an application-code regression.
 
-## Current mainline after PRs #73 and #74 — 6 November 2026
+## Historical mainline detail after PRs #73 and #74 — 6 November 2026
 
 The current mainline is VirgoScorpio Hub 0.6.2 at 9c28d5501b6e3cfd723f2495d1544beed4f29d4d. PR #73 (release documentation synchronization) merged as 4b24227eebb61d7ad6903a4c6b9f5ce131c07026; PR #74 (authenticated PostgreSQL development preflight) merged as 9c28d5501b6e3cfd723f2495d1544beed4f29d4d. Mainline push workflow #309 passed all six hosted jobs: supported Node.js 22.23.4 and 24.22.1, PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL and consolidated evidence. These changes added no migration, dependency or public API contract change and did not authorize a release or production deployment.
 
@@ -601,10 +601,34 @@ The relationship route now uses the shared siteIdFor request-context resolver so
 
 The 6 November Tenant Isolation Internal Pre-Review records the test inventory, scope and gaps. It is explicitly **not independent review evidence** and does not close issue #14 or the broader independent security assessment issue #25. A qualified reviewer must still complete the route/data-access inventory, adversarial two-tenant review across workers/providers/realtime/storage/privileged paths, findings disposition and exact-SHA evidence. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
-PR #75 is the current unmerged code candidate based on mainline 9c28d55. It hardens relationship path/header/query/body selector reconciliation and adds site-private outbox envelopes for relationship upsert/delete. Hosted CI and human review are required. No release tag, GitHub Release, package publication or production deployment is authorized.
+PR #75 subsequently merged to main as aecc3d24df94399648311d561587ef42db91cab8; post-merge workflow #314 passed all six hosted jobs. Its relationship site-context and outbox-envelope findings are recorded above as merged changes. PR #76 is the current unmerged taxonomy site-context/outbox-envelope candidate. No release tag, GitHub Release, package publication or production deployment is authorized.
 
 ### Relationship event-envelope follow-up — PR #75
 
 The candidate also corrects a site-scope defect in the relationship API event producers. The upsert and delete paths previously omitted outbox_events.site_id and classification, so PostgreSQL defaulted them to NULL/internal even though the relationship domain-event registry requires site-private. The outbox envelope validator rejects that mismatch, preventing correct tenant-scoped graph projection. Both producers now write site_id, optional actor_id/correlation_id and site-private classification, following packages/db/src/relationship-store.js. The regression asserts the persisted envelope for both event types; no migration or dependency change is required.
 
 After adding event-scoped fixture teardown, a newly created isolated local database completed the full live integration suite 66/66 with zero skips, had zero pending/processing outbox events at the end, and passed the real Memgraph outage/replay harness: the event remained pending during outage, replayed after restart, produced the expected projection and was not delivered twice. Memgraph was running afterward and the queue remained empty. Full npm run check passed (213 required artifacts, 219 JavaScript files, 517 Hub tests: 514 passed, zero failed, three Windows-specific skips). These are local PR-candidate results, not independent review evidence or production certification.
+
+
+## Taxonomy route and outbox-envelope follow-up — PR #76 candidate — 6 November 2026
+
+The mainline audit following PR #75 identified the same event-envelope omission in the taxonomy API. The registered domain event types taxonomy.upsert and taxonomy.delete require site-private classification, but the API create/update/delete paths inserted only aggregate identity and JSON payload. PostgreSQL defaulted site_id to NULL and classification to internal, despite payload.siteId. This disagreed with the canonical event contract and prevented the graph worker from accepting the events as tenant-scoped domain events.
+
+The candidate adds one reusable writeTaxonomyOutboxEvent helper. Create and update emit taxonomy.upsert; delete emits taxonomy.delete. Every event now persists site_id, optional actor_id, correlation_id and site-private classification while retaining the existing aggregate/version/event idempotency key. No schema migration is needed.
+
+The taxonomy route now also resolves path/header/query/body site selectors through the shared siteIdFor contract before capability checks and tenant data access. POST and PUT bodies use the existing 64 KB bound and are parsed once. GET, POST, PUT and DELETE reject conflicting selectors consistently with other site-addressed route families.
+
+### Live regression and local validation
+
+- Taxonomy GET with a conflicting site header: HTTP 400 and the existing site-context mismatch error.
+- Taxonomy POST with a conflicting body site: HTTP 400 and no term persisted.
+- Taxonomy PUT with a conflicting body site: HTTP 400 and the existing term label/version remain unchanged.
+- Taxonomy DELETE with a conflicting site header: HTTP 400 and the term remains active.
+- Valid same-site create/update/delete: 201/200/200. The three durable events were checked for the expected event type/version, site_id, actor_id, non-empty correlation_id, site-private classification and matching payload.siteId/status.
+- Full local PostgreSQL/Memgraph/Redis live integration: 67/67 passed with zero failures, skips or TODOs on fresh isolated database virgoscorpio_hub_pr76_test; all 18 migrations applied.
+- Pending/processing outbox events after the live suite: 0.
+- Real Memgraph outage/replay harness: PASS. A site-private event remained pending and released its lease while Memgraph was stopped; after restart the projection succeeded exactly once. Memgraph was running afterward and the queue returned to zero pending/processing events.
+- Full npm run check: PASS with 213 required artifact paths, 219 JavaScript files syntax-checked and 517 Hub tests (514 passed, zero failed, three Windows/platform-specific skips).
+- git diff --check: PASS.
+
+These results are local maintainer regression evidence, not independent security assessment or production certification. The candidate adds no migration, dependency, package version or public response-shape change. Hub 0.6.2 remains unreleased and NOT_PRODUCTION_CERTIFIED; issues #14 and #25 remain open.

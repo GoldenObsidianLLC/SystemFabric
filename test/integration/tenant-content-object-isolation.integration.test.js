@@ -276,6 +276,87 @@ test(
       }
     });
 
+    await t.test('taxonomy CRUD rejects conflicting site context and emits site-private outbox envelopes', async () => {
+      const slug = 'site-b-taxonomy-' + randomUUID().slice(0, 8);
+      const conflictingGet = await fetch(base + '/api/v1/sites/' + siteB + '/terms', {
+        headers: { ...headers, 'x-virgoscorpio-hub-site-id': siteA },
+      });
+      assert.equal(conflictingGet.status, 400);
+      assert.equal((await conflictingGet.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+
+      const conflictingCreate = await fetch(base + '/api/v1/sites/' + siteB + '/terms', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ siteId: siteA, taxonomy: 'category', slug, label: 'Should Not Persist' }),
+      });
+      assert.equal(conflictingCreate.status, 400);
+      assert.equal((await conflictingCreate.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+      const absent = await pool.query('SELECT id FROM taxonomy_terms WHERE site_id=$1 AND slug=$2', [siteB, slug]);
+      assert.equal(absent.rowCount, 0, 'conflicting create must not persist a term');
+
+      const createdResponse = await fetch(base + '/api/v1/sites/' + siteB + '/terms', {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ taxonomy: 'category', slug, label: 'Site B Taxonomy', metadata: { source: 'tenant integration' } }),
+      });
+      assert.equal(createdResponse.status, 201);
+      const created = (await createdResponse.json()).term;
+      assert.ok(created?.id);
+
+      const mismatchedUpdate = await fetch(base + '/api/v1/sites/' + siteB + '/terms/' + created.id, {
+        method: 'PUT',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ siteId: siteA, expectedVersion: created.version, label: 'Must Not Update' }),
+      });
+      assert.equal(mismatchedUpdate.status, 400);
+      assert.equal((await mismatchedUpdate.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+      const unchanged = await pool.query('SELECT label,version FROM taxonomy_terms WHERE site_id=$1 AND id=$2', [siteB, created.id]);
+      assert.equal(unchanged.rows[0].label, 'Site B Taxonomy');
+      assert.equal(unchanged.rows[0].version, created.version);
+
+      const updatedResponse = await fetch(base + '/api/v1/sites/' + siteB + '/terms/' + created.id, {
+        method: 'PUT',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: created.version, label: 'Site B Taxonomy Updated' }),
+      });
+      assert.equal(updatedResponse.status, 200);
+      const updated = (await updatedResponse.json()).term;
+      assert.equal(updated.version, created.version + 1);
+
+      const conflictingDelete = await fetch(base + '/api/v1/sites/' + siteB + '/terms/' + created.id, {
+        method: 'DELETE',
+        headers: { ...headers, 'x-virgoscorpio-hub-site-id': siteA },
+      });
+      assert.equal(conflictingDelete.status, 400);
+      assert.equal((await conflictingDelete.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+      const stillActive = await pool.query('SELECT deleted_at FROM taxonomy_terms WHERE site_id=$1 AND id=$2', [siteB, created.id]);
+      assert.equal(stillActive.rows[0].deleted_at, null);
+
+      const deletedResponse = await fetch(base + '/api/v1/sites/' + siteB + '/terms/' + created.id, {
+        method: 'DELETE',
+        headers,
+      });
+      assert.equal(deletedResponse.status, 200);
+
+      const events = await pool.query(
+        "SELECT event_type,aggregate_version,site_id,actor_id,correlation_id,classification,payload->>'siteId' AS payload_site_id,payload->>'status' AS payload_status FROM outbox_events WHERE aggregate_type='taxonomy-term' AND aggregate_id=$1 ORDER BY aggregate_version,event_type",
+        [created.id]
+      );
+      assert.deepEqual(events.rows.map(row => ({
+        event_type: row.event_type,
+        aggregate_version: row.aggregate_version,
+        site_id: row.site_id,
+        actor_id: row.actor_id,
+        classification: row.classification,
+        payload_site_id: row.payload_site_id,
+        payload_status: row.payload_status,
+        hasCorrelation: Boolean(row.correlation_id),
+      })), [
+        { event_type: 'taxonomy.upsert', aggregate_version: created.version, site_id: siteB, actor_id: actor.id, classification: 'site-private', payload_site_id: siteB, payload_status: 'active', hasCorrelation: true },
+        { event_type: 'taxonomy.upsert', aggregate_version: updated.version, site_id: siteB, actor_id: actor.id, classification: 'site-private', payload_site_id: siteB, payload_status: 'active', hasCorrelation: true },
+        { event_type: 'taxonomy.delete', aggregate_version: updated.version + 1, site_id: siteB, actor_id: actor.id, classification: 'site-private', payload_site_id: siteB, payload_status: 'deleted', hasCorrelation: true },
+      ]);
+    });
     const cases = [
       {
         name: 'page read',

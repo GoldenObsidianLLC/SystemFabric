@@ -148,6 +148,24 @@ function validateSaveDraftBody(body) {
 function htmlCspPreview() { return "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; script-src 'none'; connect-src 'none'"; }
 function htmlCspAdmin() { return "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'"; }
 
+async function writeTaxonomyOutboxEvent(client, { term, status, actorId = null, correlationId = null }) {
+  if (!term || !['active', 'deleted'].includes(status)) {
+    throw new TypeError('A taxonomy term and an active/deleted status are required.');
+  }
+  const eventType = status === 'deleted' ? 'taxonomy.delete' : 'taxonomy.upsert';
+  await client.query(
+    "INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('taxonomy-term',$1,$2,$3,$4::jsonb,$5,$6,$7,'site-private') ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING",
+    [
+      term.id,
+      term.version,
+      eventType,
+      JSON.stringify({ id: term.id, siteId: term.site_id, taxonomy: term.taxonomy, slug: term.slug, label: term.label, metadata: term.metadata, version: term.version, status }),
+      term.site_id,
+      actorId || null,
+      correlationId || null
+    ]
+  );
+}
 function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAITaskStore, contentStore, pool, identityService, pluginRunner, stripeFetch = fetch, realtimeHub: injectedRealtimeHub, presenceService: injectedPresenceService, realtimeBridge: injectedRealtimeBridge, realtimeMetrics: injectedRealtimeMetrics, realtimeConnectionLimiter: injectedRealtimeConnectionLimiter, publishDocumentOperation: injectedDocumentPublisher, realtimeHeartbeatMs = 15_000, logger = console, otelLogger = null, structuredLogger: suppliedStructuredLogger = null } = {}) {
   if (env.NODE_ENV === 'production') {
     const missing = [];
@@ -1386,6 +1404,8 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if ((termsCollectionMatch && ['GET', 'POST'].includes(req.method)) || (termItemMatch && ['PUT', 'DELETE'].includes(req.method))) {
         if (!localPool) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', 'Taxonomy management requires PostgreSQL.');
         const siteId = termsCollectionMatch?.[1] || termItemMatch[1];
+        const body = ['POST', 'PUT'].includes(req.method) ? await readJson(req, Math.min(maxBody, 64_000)) : {};
+        await siteIdFor({ req, url, body, actor, routeSiteId: siteId });
         await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'content:edit');
         if (req.method === 'GET') {
           const taxonomy = url.searchParams.get('taxonomy');
@@ -1395,7 +1415,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
           return sendJson(res, 200, { terms: result.rows, requestId });
         }
         if (req.method === 'POST') {
-          const body = await readJson(req, Math.min(maxBody, 64_000));
+          // The bounded body was parsed before site-context validation.
           const taxonomy = String(body.taxonomy || 'category').toLowerCase();
           const slug = normalizeSlug(body.slug || body.label);
           if (!/^[a-z][a-z0-9_-]{0,62}$/.test(taxonomy) || !slug || slug.length > 180 || typeof body.label !== 'string' || !body.label.trim() || body.label.length > 180) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_TAXONOMY_INVALID', 'taxonomy, slug and label are required and must be valid.');
@@ -1406,7 +1426,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
             await client.query('BEGIN');
             const result = await client.query('INSERT INTO taxonomy_terms(site_id,taxonomy,slug,label,metadata) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING id,site_id,taxonomy,slug,label,version,metadata', [siteId, taxonomy, slug, body.label.trim(), JSON.stringify(metadata)]);
             const term = result.rows[0];
-            await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('taxonomy-term',$1,$2,'taxonomy.upsert',$3::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [term.id, term.version, JSON.stringify({ id: term.id, siteId: term.site_id, taxonomy: term.taxonomy, slug: term.slug, label: term.label, metadata: term.metadata, version: term.version, status: 'active' })]);
+            await writeTaxonomyOutboxEvent(client, { term, status: 'active', actorId: actor.user.id, correlationId: requestId });
             await client.query('COMMIT');
             if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'taxonomy.created', targetType: 'taxonomy-term', targetId: term.id, requestId, details: { taxonomy, slug } });
             return sendJson(res, 201, { term, requestId });
@@ -1421,7 +1441,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
           const existing = selected.rows[0];
           if (!existing) throw fail(404, 'ERR_VIRGOSCORPIO_HUB_TAXONOMY_TERM_NOT_FOUND', 'Taxonomy term not found.');
           if (req.method === 'PUT') {
-            const body = await readJson(req, Math.min(maxBody, 64_000));
+            // The bounded body was parsed before site-context validation.
             if (!Number.isInteger(Number(body.expectedVersion)) || Number(body.expectedVersion) !== existing.version) throw fail(409, 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT', 'Taxonomy term changed since it was loaded. Reload before retrying.');
             const label = body.label === undefined ? existing.label : body.label;
             const slug = body.slug === undefined ? existing.slug : normalizeSlug(body.slug);
@@ -1429,14 +1449,14 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
             if (typeof label !== 'string' || !label.trim() || label.length > 180 || !slug || slug.length > 180 || !metadata || typeof metadata !== 'object' || Array.isArray(metadata) || JSON.stringify(metadata).length > 16_000) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_TAXONOMY_INVALID', 'Term label, slug or metadata is invalid.');
             const updated = await client.query('UPDATE taxonomy_terms SET slug=$3,label=$4,metadata=$5::jsonb,version=version+1 WHERE site_id=$1 AND id=$2 RETURNING id,site_id,taxonomy,slug,label,version,metadata', [siteId, termId, slug, label.trim(), JSON.stringify(metadata)]);
             const term = updated.rows[0];
-            await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('taxonomy-term',$1,$2,'taxonomy.upsert',$3::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [term.id, term.version, JSON.stringify({ id: term.id, siteId: term.site_id, taxonomy: term.taxonomy, slug: term.slug, label: term.label, metadata: term.metadata, version: term.version, status: 'active' })]);
+            await writeTaxonomyOutboxEvent(client, { term, status: 'active', actorId: actor.user.id, correlationId: requestId });
             await client.query('COMMIT');
             if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'taxonomy.updated', targetType: 'taxonomy-term', targetId: term.id, requestId });
             return sendJson(res, 200, { term, requestId });
           }
           const updated = await client.query('UPDATE taxonomy_terms SET version=version+1,deleted_at=now() WHERE site_id=$1 AND id=$2 RETURNING id,site_id,taxonomy,slug,label,version,metadata', [siteId, termId]);
           const term = updated.rows[0];
-          await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('taxonomy-term',$1,$2,'taxonomy.delete',$3::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [term.id, term.version, JSON.stringify({ id: term.id, siteId: term.site_id, taxonomy: term.taxonomy, slug: term.slug, label: term.label, metadata: term.metadata, version: term.version, status: 'deleted' })]);
+          await writeTaxonomyOutboxEvent(client, { term, status: 'deleted', actorId: actor.user.id, correlationId: requestId });
           await client.query('COMMIT');
           if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'taxonomy.deleted', targetType: 'taxonomy-term', targetId: term.id, requestId });
           return sendJson(res, 200, { deleted: true, termId, requestId });
