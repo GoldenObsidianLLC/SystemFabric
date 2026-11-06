@@ -4,6 +4,14 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ## 0.6.2 (unreleased patch candidate)
 
+### Current mainline disposition — 5 November 2026
+- PRs #68 (library/media routes), #69 (site-membership routes), #70 (CI rerun evidence correction), and #71 (custom content-type routes) are merged. Main is `54b62e233e519aa0afa6c4170578def9c02e15fc`; post-merge push workflow [#292](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42120302005) passed all six hosted jobs. PR #70's mainline run [#289](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42112860410) also passed all six jobs.
+- Pre-merge candidate notes below preserve their original run/branch context; statements that a PR remained open or hosted validation was pending are historical and superseded by this current disposition.
+
+### Local development environment
+- Give the Compose project a stable `virgoscorpio-hub` identity and assign explicit physical names to PostgreSQL, Memgraph, MinIO, and ClamAV data volumes so local state does not depend on the checkout directory. Document local startup and volume-retention behavior; this is development infrastructure, not production deployment configuration.
+- Open PR [#72](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/pull/72) with the backup-first local Docker resource migration report and isolated restore validation. On PR head `aca463db5b7cdca9284a9a6ea1bab222a470f5cb`, fresh/idempotent migrations passed 18/18 twice, local PostgreSQL/Memgraph integration passed 65/65 with zero skips, Memgraph outage/replay and graph rebuild passed, `npm run dev:doctor` passed 9/9, and local Playwright browser smoke passed 9/9 using isolated test PostgreSQL and loopback Memurai. Hosted PR workflow #296 and push workflow #295 each passed all six jobs. PR #72 remains open for review; original legacy containers/volumes remain preserved. This local development work does not satisfy production backup/restore certification or change the NO-GO release status.
+
 ### API architecture and maintainability
 - Extract site membership administration and invitation creation into `apps/api/src/site-membership-routes.js`. Preserve the existing `site:manage` authorization guard, bounded request bodies, audit ordering, invitation-token response, and metadata-only audit behavior; keep authentication and tenant authorization in the API composition pipeline. Add focused route-family tests while retaining the live tenant-isolation integration suite.
 - Extract the site-scoped library and media HTTP routes into `apps/api/src/library-routes.js`; retain request authentication, site resolution, capability enforcement, request lifecycle and centralized errors in the API composition pipeline.

@@ -93,10 +93,15 @@ services:
     restart: unless-stopped
 
 volumes:
+  # Explicit physical names keep local state stable across checkout paths.
   virgoscorpio_hub-postgres:
+    name: virgoscorpio-hub-postgres
   virgoscorpio_hub-memgraph:
+    name: virgoscorpio-hub-memgraph
   virgoscorpio_hub-minio:
+    name: virgoscorpio-hub-minio
   virgoscorpio_hub-clamav-db:
+    name: virgoscorpio-hub-clamav-db
 
 secrets:
   otel_receiver_token:
