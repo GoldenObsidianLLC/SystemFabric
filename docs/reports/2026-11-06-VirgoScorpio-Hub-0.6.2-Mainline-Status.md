@@ -24,7 +24,7 @@ PR #80's two CodeQL review threads were marked resolved/outdated after the data-
 
 The formal release evidence record is now present and passes its exact-source contract:
 
-- sourceRevision: dd0c867e5815aa1b0c7b88542bdebcaf6eb7407e.
+- sourceRevision: 29a3e03997da429a1bb05964f46c22cf975a8c2e.
 - Workflow run: 42311936630, attempt 1.
 - Producer job: PostgreSQL and Memgraph integration, job ID 128215233745.
 - Integration: 67/67 passed, zero failed, cancelled, skipped or TODO tests.
