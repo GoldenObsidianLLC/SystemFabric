@@ -281,7 +281,7 @@ test('materializes the formal PostgreSQL/Memgraph release evidence from checksum
   assert.equal(stored.ciEvidence.manifestSha256, manifestSha256);
 });
 
-test('does not overwrite an existing formal evidence file', t => {
+test('atomically replaces an existing formal evidence file only after validation', t => {
   const { root, artifactRoot, jobApi } = createFixtures(t);
   const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
   const directory = path.join(artifactRoot, config.artifactName);
@@ -293,11 +293,13 @@ test('does not overwrite an existing formal evidence file', t => {
   const original = JSON.stringify({ preserve: 'existing evidence' }) + '\n';
   write(root, 'artifacts/evidence/postgres-memgraph-live.json', original);
 
-  assert.throws(
-    () => writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation }),
-    error => error?.code === 'EEXIST',
-  );
-  assert.equal(fs.readFileSync(outputPath, 'utf8'), original);
+  const evidence = writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation });
+  const stored = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+  assert.equal(stored.status, 'passed');
+  assert.equal(stored.sourceRevision, expected.mergeSha);
+  assert.equal(stored.ciEvidence.manifestSha256, evidence.ciEvidence.manifestSha256);
+  assert.notEqual(fs.readFileSync(outputPath, 'utf8'), original);
+  assert.equal(fs.readdirSync(path.dirname(outputPath)).some(name => name.endsWith('.tmp')), false);
 });
 
 test('does not follow a pre-existing symlink at the formal evidence target', t => {
@@ -319,11 +321,14 @@ test('does not follow a pre-existing symlink at the formal evidence target', t =
     return;
   }
 
-  assert.throws(
-    () => writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation }),
-    error => error?.code === 'EEXIST',
-  );
+  const evidence = writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation });
+  const replacedTarget = fs.lstatSync(outputPath);
+  assert.equal(replacedTarget.isFile(), true);
+  assert.equal(replacedTarget.isSymbolicLink(), false);
+  assert.equal(JSON.parse(fs.readFileSync(outputPath, 'utf8')).status, 'passed');
   assert.equal(fs.readFileSync(protectedPath, 'utf8'), original);
+  assert.equal(fs.readdirSync(path.dirname(outputPath)).some(name => name.endsWith('.tmp')), false);
+  assert.equal(evidence.sourceRevision, expected.mergeSha);
 });
 
 test('refuses stale revisions and unverified payloads without serializing GitHub API fields', t => {

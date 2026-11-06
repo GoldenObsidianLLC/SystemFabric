@@ -665,24 +665,32 @@ function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJo
 
   const outputDirectory = ensureEvidenceDirectory(root, 'artifacts/evidence');
   const outputPath = path.join(outputDirectory, 'postgres-memgraph-live.json');
-  // O_EXCL ("wx") atomically creates a new regular file and rejects any
-  // pre-existing entry, including a symbolic link. This avoids a separate
-  // exists/lstat check followed by a path-based write (a TOCTOU window).
-  const outputDescriptor = fs.openSync(outputPath, 'wx', 0o600);
+  // Stage into an exclusive same-directory file before the atomic replace.
+  // rename replaces the destination entry (including a symlink) instead of
+  // following it, and keeps the previously committed historical record intact
+  // until every producer input has passed validation and the new file is fsynced.
+  const temporaryPath = path.join(outputDirectory, '.postgres-memgraph-live-' + crypto.randomUUID() + '.tmp');
   try {
-    if (!fs.fstatSync(outputDescriptor).isFile()) {
-      throw new Error('Formal PostgreSQL/Memgraph evidence target must be a regular file.');
-    }
-    const serializedEvidence = JSON.stringify(evidence, null, 2) + '\n';
+    const outputDescriptor = fs.openSync(temporaryPath, 'wx', 0o600);
+    try {
+      if (!fs.fstatSync(outputDescriptor).isFile()) {
+        throw new Error('Formal PostgreSQL/Memgraph evidence staging target must be a regular file.');
+      }
+      const serializedEvidence = JSON.stringify(evidence, null, 2) + '\n';
 
-    // The Actions REST response is used for validation only and is not
-    // serialized. Attestation values come from fixed schema constants,
-    // workflow environment identity, and local producer artifacts whose
-    // manifest and SHA-256 inventory were verified above.
-    fs.writeFileSync(outputDescriptor, serializedEvidence, 'utf8');
-    fs.fsyncSync(outputDescriptor);
-  } finally {
-    fs.closeSync(outputDescriptor);
+      // The Actions REST response is used for validation only and is not
+      // serialized. Attestation values come from fixed schema constants,
+      // workflow environment identity, and local producer artifacts whose
+      // manifest and SHA-256 inventory were verified above.
+      fs.writeFileSync(outputDescriptor, serializedEvidence, 'utf8');
+      fs.fsyncSync(outputDescriptor);
+    } finally {
+      fs.closeSync(outputDescriptor);
+    }
+    fs.renameSync(temporaryPath, outputPath);
+  } catch (error) {
+    fs.rmSync(temporaryPath, { force: true });
+    throw error;
   }
   return evidence;
 }

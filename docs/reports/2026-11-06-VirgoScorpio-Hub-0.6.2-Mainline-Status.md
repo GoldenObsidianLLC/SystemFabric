@@ -41,7 +41,7 @@ The local Windows readiness attempt after importing the mainline artifact used n
 ## Next engineering actions
 
 1. Keep the production classification fail-closed until all external/independent evidence and release-owner approval are recorded.
-2. Follow up the two CodeQL review comments on PR #78 in scripts/ci-evidence.js: atomically create the formal evidence output using an exclusive file descriptor so an existing file or symlink cannot win a check/write race; remove raw GitHub Actions REST response values from the serialized attestation while preserving their use for exact producer-job validation.
+2. Follow up the two CodeQL review comments on PR #78 in scripts/ci-evidence.js: stage the formal evidence to a unique exclusive file descriptor and atomically rename it into place so an existing file or symlink cannot win a check/write race; remove raw GitHub Actions REST response values from the serialized attestation while preserving their use for exact producer-job validation.
 3. Re-run focused CI-evidence tests and the complete hosted CodeQL/CI workflow on the follow-up change before merging.
 4. Resolve the local EnginEx submodule registration permission issue without modifying or deleting existing developer data.
 
