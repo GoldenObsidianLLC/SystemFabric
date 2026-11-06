@@ -16,7 +16,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.2 is the current unreleased developer-preview mainline at 9c28d5501b6e3cfd723f2495d1544beed4f29d4d. PRs #68–#74 are merged; mainline CI run #309 passed all six jobs. The previous formal readiness counts (8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE) are bound to SHA 70ce31a23aa670afca1d89fb5c776e1ca36abd84 and require exact-source regeneration. The tenant-isolation pre-review candidate is tracked in PR #75; internal tests do not replace independent review. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. No release tag, GitHub Release, package publication or production deployment is authorized. See docs/RELEASE_READINESS.md, the 0.6.2 release-gate report, the tenant-isolation pre-review and CHANGELOG.md.
+> **Project status:** VirgoScorpio Hub 0.6.2 is the current unreleased developer-preview mainline at aecc3d24df94399648311d561587ef42db91cab8. PRs #68–#75 are merged; post-merge mainline CI run #314 passed all six jobs. PR #76 is the unmerged taxonomy site-context and site-private outbox-envelope hardening candidate. The previous formal readiness counts (8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE) remain bound to older SHA 70ce31a23aa670afca1d89fb5c776e1ca36abd84 and require exact-source regeneration. Internal maintainer reviews do not replace independent security review. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. No release tag, GitHub Release, package publication or production deployment is authorized. See docs/RELEASE_READINESS.md, the 0.6.2 release-gate report, the tenant-isolation pre-review, the taxonomy outbox pre-review and CHANGELOG.md.
 
 ## Table of contents
 
