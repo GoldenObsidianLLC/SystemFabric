@@ -1,0 +1,3 @@
+[submodule "vendor/enginex"]
+	path = vendor/enginex
+	url = https://github.com/GoldenObsidianLLC/EnginEx.git
