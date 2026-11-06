@@ -322,10 +322,17 @@ test('does not follow a pre-existing symlink at the formal evidence target', t =
   }
 
   const evidence = writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation });
-  const replacedTarget = fs.lstatSync(outputPath);
-  assert.equal(replacedTarget.isFile(), true);
-  assert.equal(replacedTarget.isSymbolicLink(), false);
-  assert.equal(JSON.parse(fs.readFileSync(outputPath, 'utf8')).status, 'passed');
+  // Bind inspection and content reads to one descriptor so the test does not
+  // re-resolve a path after checking it (the race this regression guards).
+  const noFollow = fs.constants.O_NOFOLLOW || 0;
+  const outputDescriptor = fs.openSync(outputPath, fs.constants.O_RDONLY | noFollow);
+  try {
+    const openedTarget = fs.fstatSync(outputDescriptor);
+    assert.equal(openedTarget.isFile(), true);
+    assert.equal(JSON.parse(fs.readFileSync(outputDescriptor, 'utf8')).status, 'passed');
+  } finally {
+    fs.closeSync(outputDescriptor);
+  }
   assert.equal(fs.readFileSync(protectedPath, 'utf8'), original);
   assert.equal(fs.readdirSync(path.dirname(outputPath)).some(name => name.endsWith('.tmp')), false);
   assert.equal(evidence.sourceRevision, expected.mergeSha);
