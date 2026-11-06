@@ -1040,7 +1040,15 @@ async function main() {
   fs.writeFileSync(path.join(outputDirectory, 'release-readiness-ci.md'), renderMarkdown(report));
   console.log('CI EVIDENCE: ' + report.ciStatus);
   console.log('PRODUCTION CERTIFICATION: NO');
-  if (report.ciStatus !== 'PASS') process.exitCode = 1;
+  if (report.ciStatus !== 'PASS') {
+    for (const check of report.checks.filter(item => item.status !== 'PASS')) {
+      console.error('CI evidence check [' + check.id + ']: ' + check.details);
+    }
+    for (const job of report.jobs.filter(item => item.status !== 'PASS')) {
+      console.error('CI evidence job [' + job.key + ']: ' + job.errors.join(' '));
+    }
+    process.exitCode = 1;
+  }
 }
 
 if (require.main === module) {

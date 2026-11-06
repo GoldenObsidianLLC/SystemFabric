@@ -146,9 +146,31 @@ function assessSourceTreeStatus(statusOutput) {
   };
 }
 
+function assessPinnedSubmodule({ pinnedCommit, worktreeCommit, statusOutput, statusExitCode }) {
+  const validCommit = value => typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value.trim());
+  const pinned = validCommit(pinnedCommit) ? pinnedCommit.trim().toLowerCase() : null;
+  const worktree = validCommit(worktreeCommit) ? worktreeCommit.trim().toLowerCase() : null;
+  const entries = parseGitPorcelainStatus(statusOutput);
+  const changedPaths = [...new Set(entries.map(entry => entry.path))].sort();
+  const errors = [];
+  if (!pinned) errors.push('The superproject gitlink is missing or invalid.');
+  if (!worktree) errors.push('The submodule worktree is not initialized or has no valid HEAD.');
+  if (pinned && worktree && pinned !== worktree) errors.push('The submodule HEAD differs from the pinned gitlink.');
+  if (statusExitCode !== 0) errors.push('The submodule working-tree status could not be verified.');
+  if (changedPaths.length) errors.push('The submodule worktree contains changes: ' + changedPaths.join(', ') + '.');
+  return {
+    clean: errors.length === 0,
+    pinnedCommit: pinned,
+    worktreeCommit: worktree,
+    changedPaths,
+    errors,
+  };
+}
+
 module.exports = {
   APPROVED_GENERATED_OUTPUTS,
   assessSourceTreeStatus,
+  assessPinnedSubmodule,
   hasNoHighAuditFindings,
   hasSuccessfulPlaywrightSummary,
   isCurrentReleaseEvidence,

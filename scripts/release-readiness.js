@@ -15,7 +15,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { loadEnvFile } = require('./load-env');
 const { configureReleaseRedisIntegrationEnv } = require('./release-integration-env');
-const { assessSourceTreeStatus, hasSuccessfulPlaywrightSummary, isCurrentReleaseEvidence, isFreshMigrationEvidence } = require('./release-readiness-validation');
+const { assessSourceTreeStatus, assessPinnedSubmodule, hasSuccessfulPlaywrightSummary, isCurrentReleaseEvidence, isFreshMigrationEvidence } = require('./release-readiness-validation');
 const { validateObservabilityDeploymentManifest } = require('../packages/observability/src/deployment-contract');
 const { readRegularFile } = require('./configure-otel-dev');
 
@@ -124,25 +124,63 @@ const gitSafeDirectory = root.replace(/\\/g, '/');
 // because their timestamps changed.
 spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'update-index', '--refresh'], { cwd: root, encoding: 'utf8', windowsHide: true });
 const gitHeadResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true });
-const gitStatusResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'], { cwd: root, encoding: 'utf8', windowsHide: true });
+const gitStatusResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=all'], { cwd: root, encoding: 'utf8', windowsHide: true });
+// Submodules are intentionally excluded from the superproject status above.
+// Verify the EnginEx gitlink, checked-out revision, and nested worktree separately
+// so a clean, pinned dependency is not mistaken for a modified source path.
+const enginexSubmodulePath = path.join(root, 'vendor/enginex');
+const enginexSafeDirectory = enginexSubmodulePath.replace(/\\/g, '/');
+const enginexGitlinkResult = spawnSync('git', ['-c', `safe.directory=${gitSafeDirectory}`, 'rev-parse', 'HEAD:vendor/enginex'], { cwd: root, encoding: 'utf8', windowsHide: true });
+const enginexHeadResult = spawnSync('git', ['-c', `safe.directory=${enginexSafeDirectory}`, 'rev-parse', 'HEAD'], { cwd: enginexSubmodulePath, encoding: 'utf8', windowsHide: true });
+const enginexStatusResult = spawnSync('git', ['-c', `safe.directory=${enginexSafeDirectory}`, 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--ignore-submodules=none'], { cwd: enginexSubmodulePath, encoding: 'utf8', windowsHide: true });
+let enginexSubmoduleInspection = null;
+try {
+  enginexSubmoduleInspection = assessPinnedSubmodule({
+    pinnedCommit: enginexGitlinkResult.status === 0 ? enginexGitlinkResult.stdout.trim() : null,
+    worktreeCommit: enginexHeadResult.status === 0 ? enginexHeadResult.stdout.trim() : null,
+    statusOutput: enginexStatusResult.stdout || '',
+    statusExitCode: enginexStatusResult.status,
+  });
+} catch {}
 const gitHead = gitHeadResult.status === 0 ? gitHeadResult.stdout.trim() : null;
 let sourceTreeInspection = null;
 try {
   if (gitStatusResult.status === 0) sourceTreeInspection = assessSourceTreeStatus(gitStatusResult.stdout);
 } catch {}
-const sourceTreeClean = Boolean(gitHead) && Boolean(sourceTreeInspection) && sourceTreeInspection.clean;
+const enginexSubmoduleClean = Boolean(enginexSubmoduleInspection) && enginexSubmoduleInspection.clean;
+const sourceTreeClean = Boolean(gitHead) && Boolean(sourceTreeInspection) && sourceTreeInspection.clean && enginexSubmoduleClean;
+const sourceTreeBlockingPaths = [
+  ...(sourceTreeInspection?.sourcePaths || []),
+  ...(!enginexSubmoduleClean ? ['vendor/enginex'] : []),
+];
+const sourceTreeChangedPaths = [...new Set([
+  ...(sourceTreeInspection?.changedPaths || []),
+  ...(enginexSubmoduleInspection?.changedPaths || []).map(filePath => `vendor/enginex/${filePath}`),
+  ...(!enginexSubmoduleClean ? ['vendor/enginex'] : []),
+])].sort();
 report.sourceRevision = gitHead;
+const enginexSubmoduleDetails = !enginexSubmoduleInspection
+  ? 'Could not verify the EnginEx submodule gitlink and nested worktree.'
+  : enginexSubmoduleInspection.clean
+    ? 'vendor/enginex is clean at pinned commit ' + enginexSubmoduleInspection.pinnedCommit + '.'
+    : 'vendor/enginex is blocked: ' + enginexSubmoduleInspection.errors.join(' ');
 report.sourceTree = {
   clean: sourceTreeClean,
-  changedPaths: sourceTreeInspection?.changedPaths || [],
+  changedPaths: sourceTreeChangedPaths,
   approvedGeneratedPaths: sourceTreeInspection?.generatedPaths || [],
-  blockingPaths: sourceTreeInspection?.sourcePaths || [],
+  blockingPaths: sourceTreeBlockingPaths,
+  enginexSubmodule: enginexSubmoduleInspection || {
+    clean: false, pinnedCommit: null, worktreeCommit: null, changedPaths: [],
+    errors: ['Could not verify the EnginEx submodule gitlink and nested worktree.'],
+  },
 };
 const sourceTreeDetails = !gitHead || !sourceTreeInspection
   ? 'Could not establish Git HEAD and a safely parsed Git working-tree state.'
   : sourceTreeClean
-    ? `Clean source tree at ${gitHead}.`
-    : `HEAD ${gitHead}; blocking paths: ${sourceTreeInspection.sourcePaths.join(', ') || 'none'}; explicitly approved generated outputs: ${sourceTreeInspection.generatedPaths.join(', ') || 'none'}.`;
+    ? 'Clean source tree at ' + gitHead + '; ' + enginexSubmoduleDetails
+    : 'HEAD ' + gitHead + '; blocking paths: ' + (sourceTreeBlockingPaths.join(', ') || 'none') +
+      '; explicitly approved generated outputs: ' + ((sourceTreeInspection.generatedPaths || []).join(', ') || 'none') +
+      '; ' + enginexSubmoduleDetails;
 addCheck('clean-source-tree', 'Clean, revision-identified release source tree', sourceTreeClean ? 'PASS' : 'BLOCKED', sourceTreeDetails);
 
 const minimumNode = String(pkg.engines?.node || '>=22.23.4').replace(/^>=?/, '').split(' ')[0];

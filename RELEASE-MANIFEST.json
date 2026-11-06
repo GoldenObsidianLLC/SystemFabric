@@ -21,7 +21,10 @@
     "name": "enginex-ai-native",
     "version": "7.0.0",
     "source": "vendor/enginex",
-    "license": "MIT",
+    "license": "GPL-2.0-or-later",
+    "repository": "https://github.com/GoldenObsidianLLC/EnginEx",
+    "repositoryType": "git-submodule",
+    "submoduleCommit": "d99e021f55664f006b5e65b4a58202f9c7bc4f4b",
     "legacyJavaScriptTemplates": "Removed in EnginEx 7.0.0; legacy opt-in APIs fail closed."
   },
   "data": {

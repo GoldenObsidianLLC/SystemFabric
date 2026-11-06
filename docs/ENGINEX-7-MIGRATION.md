@@ -1,12 +1,13 @@
 # EnginEx 7.0.0 migration guide
 
-**Applies to:** VirgoScorpio Hub 0.6.0 and the vendored EnginEx 7.0.0 renderer.
+**Applies to:** VirgoScorpio Hub 0.6.0 and the EnginEx 7.0.0 renderer linked at vendor/enginex as a Git submodule.
 **Compatibility:** breaking change from EnginEx 6.2.0.
 **Security:** arbitrary JavaScript template execution has been removed.
+**Canonical source:** [GoldenObsidianLLC/EnginEx](https://github.com/GoldenObsidianLLC/EnginEx), pinned by the Hub submodule gitlink.
 
 ## What changed
 
-EnginEx 7.0.0 no longer includes `vendor/enginex/engine-legacy.js`. The following legacy opt-ins now fail closed:
+The standalone EnginEx 7.0.0 repository, linked from this project through the vendor/enginex submodule, no longer includes `vendor/enginex/engine-legacy.js`. The following legacy opt-ins now fail closed:
 
 - `allowUnsafeCode: true` rejects with `ERR_ENGINEX_UNSAFE_API`.
 - `engine.unsafe(...)` rejects with `ERR_ENGINEX_UNSAFE_API`.

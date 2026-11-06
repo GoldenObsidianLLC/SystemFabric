@@ -88,7 +88,7 @@ See [Architecture and data flow](docs/ARCHITECTURE.md) for component responsibil
 | npm | Dependency installation and scripts | Prefer `npm ci` for reproducible dependency installation from the lockfile. |
 | PostgreSQL | Relational persistence and transactional workflows | Live integration tests use a dedicated `virgoscorpio_hub_test` database; do not point destructive test setup at production data. |
 | Memgraph | Graph projection and relationship-oriented operations | Required for live graph integration tests. |
-| EnginEx | Vendored rendering/runtime component | Located at `vendor/enginex/`; consult its own license and notices before modifying or redistributing it separately. |
+| EnginEx | Separately maintained rendering/runtime project | Git submodule at **vendor/enginex/**; canonical source is [GoldenObsidianLLC/EnginEx](https://github.com/GoldenObsidianLLC/EnginEx). Current original project materials use GPL-2.0-or-later. |
 | GitHub Actions | CI and static analysis | The live workflow badge reflects the latest workflow status, not production certification. |
 
 The authoritative dependency declarations and exact scripts are `package.json`, the lockfile, the code under `apps/` and `packages/`, and `.github/workflows/ci.yml`.

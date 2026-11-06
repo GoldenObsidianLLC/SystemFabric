@@ -9,6 +9,7 @@ const { spawnSync } = require('node:child_process');
 const {
   APPROVED_GENERATED_OUTPUTS,
   assessSourceTreeStatus,
+  assessPinnedSubmodule,
   hasNoHighAuditFindings,
   hasSuccessfulPlaywrightSummary,
   isCurrentReleaseEvidence,
@@ -111,6 +112,45 @@ test('only exact, enumerated generated outputs are non-blocking', () => {
     'artifacts/release-readiness.json',
   ]);
   assert.deepEqual(result.sourcePaths, ['artifacts/evidence/unapproved-report.json']);
+});
+
+test('EnginEx submodule cleanliness requires the indexed gitlink, checked-out HEAD, and a clean nested worktree', () => {
+  const commit = 'a'.repeat(40);
+  const clean = assessPinnedSubmodule({
+    pinnedCommit: commit,
+    worktreeCommit: commit,
+    statusOutput: '',
+    statusExitCode: 0,
+  });
+  assert.equal(clean.clean, true);
+  assert.deepEqual(clean.errors, []);
+
+  const wrongRevision = assessPinnedSubmodule({
+    pinnedCommit: commit,
+    worktreeCommit: 'b'.repeat(40),
+    statusOutput: '',
+    statusExitCode: 0,
+  });
+  assert.equal(wrongRevision.clean, false);
+  assert.match(wrongRevision.errors.join(' '), /differs from the pinned gitlink/);
+
+  const dirty = assessPinnedSubmodule({
+    pinnedCommit: commit,
+    worktreeCommit: commit,
+    statusOutput: ' M engine.js\0?? new-file.js\0',
+    statusExitCode: 0,
+  });
+  assert.equal(dirty.clean, false);
+  assert.deepEqual(dirty.changedPaths, ['engine.js', 'new-file.js']);
+
+  const unavailable = assessPinnedSubmodule({
+    pinnedCommit: commit,
+    worktreeCommit: commit,
+    statusOutput: '',
+    statusExitCode: 128,
+  });
+  assert.equal(unavailable.clean, false);
+  assert.match(unavailable.errors.join(' '), /status could not be verified/);
 });
 
 test('untracked source and tracked source edits remain blocking, including filenames with spaces', () => {
