@@ -1449,13 +1449,14 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if ((relationshipsCollectionMatch && ['GET', 'POST'].includes(req.method)) || (relationshipItemMatch && req.method === 'DELETE')) {
         if (!localPool) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', 'Relationship management requires PostgreSQL.');
         const siteId = relationshipsCollectionMatch?.[1] || relationshipItemMatch[1];
+        const body = req.method === 'POST' ? await readJson(req, Math.min(maxBody, 32_000)) : {};
+        await siteIdFor({ req, url, body, actor, routeSiteId: siteId });
         await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'content:edit');
         if (req.method === 'GET') {
           const result = await localPool.query('SELECT id,source_id,target_id,kind,metadata,version,created_at,deleted_at FROM content_relationships WHERE site_id=$1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 500', [siteId]);
           return sendJson(res, 200, { relationships: result.rows, requestId });
         }
         if (req.method === 'POST') {
-          const body = await readJson(req, Math.min(maxBody, 32_000));
           if (!ID_RE.test(String(body.sourceId || '')) || !ID_RE.test(String(body.targetId || '')) || body.sourceId === body.targetId || !['HAS_TERM','PARENT_OF','RELATED_TO','LOCALIZED_AS','NAVIGATES_TO'].includes(body.kind)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_RELATIONSHIP_INVALID', 'sourceId, targetId and an approved relationship kind are required.');
           const client = await localPool.connect();
           try {
@@ -1471,7 +1472,10 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
             if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || JSON.stringify(metadata).length > 16_000) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_RELATIONSHIP_METADATA', 'metadata must be a JSON object up to 16 KB.');
             const inserted = await client.query('INSERT INTO content_relationships(site_id,source_id,target_id,kind,metadata) VALUES($1,$2,$3,$4,$5::jsonb) RETURNING id,site_id,source_id,target_id,kind,metadata,version,created_at', [siteId, body.sourceId, body.targetId, body.kind, JSON.stringify(metadata)]);
             const rel = inserted.rows[0];
-            await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [rel.id, rel.version, JSON.stringify({ relationshipId: rel.id, siteId, sourceId: rel.source_id, targetId: rel.target_id, sourceType, targetType, kind: rel.kind, version: rel.version })]);
+            await client.query(
+              "INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.upsert',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING",
+              [rel.id, rel.version, JSON.stringify({ relationshipId: rel.id, siteId, sourceId: rel.source_id, targetId: rel.target_id, sourceType, targetType, kind: rel.kind, version: rel.version }), siteId, actor.user.id || null, requestId || null]
+            );
             await client.query('COMMIT');
             if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'relationship.created', targetType: 'relationship', targetId: rel.id, requestId, details: { kind: rel.kind } });
             return sendJson(res, 201, { relationship: rel, requestId });
@@ -1487,7 +1491,10 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
           const dst = await client.query("SELECT id,'content'::text AS node_type FROM content_items WHERE site_id=$1 AND id=$2 UNION ALL SELECT id,'term'::text AS node_type FROM taxonomy_terms WHERE site_id=$1 AND id=$2 LIMIT 1", [siteId, rel.target_id]);
           const version = rel.version + 1;
           await client.query('UPDATE content_relationships SET version=$3,deleted_at=now() WHERE site_id=$1 AND id=$2', [siteId, relationshipId, version]);
-          await client.query(`INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload) VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb) ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING`, [rel.id, version, JSON.stringify({ relationshipId: rel.id, siteId, sourceId: rel.source_id, targetId: rel.target_id, sourceType: src.rows[0]?.node_type || 'content', targetType: dst.rows[0]?.node_type || (rel.kind === 'HAS_TERM' ? 'term' : 'content'), kind: rel.kind, version })]);
+          await client.query(
+            "INSERT INTO outbox_events(aggregate_type,aggregate_id,aggregate_version,event_type,payload,site_id,actor_id,correlation_id,classification) VALUES('relationship',$1,$2,'relationship.delete',$3::jsonb,$4,$5,$6,'site-private') ON CONFLICT(aggregate_type,aggregate_id,aggregate_version,event_type) DO NOTHING",
+            [rel.id, version, JSON.stringify({ relationshipId: rel.id, siteId, sourceId: rel.source_id, targetId: rel.target_id, sourceType: src.rows[0]?.node_type || 'content', targetType: dst.rows[0]?.node_type || (rel.kind === 'HAS_TERM' ? 'term' : 'content'), kind: rel.kind, version }), siteId, actor.user.id || null, requestId || null]
+          );
           await client.query('COMMIT');
           if (identity && actor.user.id) await identity.audit({ siteId, actorId: actor.user.id, action: 'relationship.deleted', targetType: 'relationship', targetId: rel.id, requestId });
           return sendJson(res, 200, { deleted: true, relationshipId, requestId });

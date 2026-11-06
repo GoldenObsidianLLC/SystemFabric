@@ -152,6 +152,22 @@ test(
       note: 'positive control',
     });
 
+    const ownContentTarget = await store.saveDraft({
+      siteId: siteB,
+      title: 'Site B Relationship Target',
+      slug: 'site-b-relationship-target-' + randomUUID().slice(0, 8),
+      locale: 'en',
+      contentType: 'page',
+      document: {
+        schemaVersion: 1,
+        documentId: randomUUID(),
+        type: 'page',
+        title: 'Site B Relationship Target',
+        children: [],
+      },
+      authorId: actor.id,
+      note: 'relationship positive control',
+    });
     const session = await identity.login({
       email: actor.email,
       password,
@@ -176,6 +192,89 @@ test(
     const headers = { authorization: `Bearer ${session.token}`, 'x-virgoscorpio-hub-site-id': siteB };
     const before = await contentSideEffects(pool, siteA, foreignContent.id);
     assert.ok(before, 'site A fixture must exist before adversarial requests');
+    await t.test('relationship endpoints must belong to the selected site and valid same-site relationships still work', async () => {
+      const foreignEndpoints = [
+        { sourceId: ownContent.id, targetId: foreignContent.id },
+        { sourceId: foreignContent.id, targetId: ownContent.id },
+      ];
+
+      for (const endpoints of foreignEndpoints) {
+        const response = await fetch(base + '/api/v1/sites/' + siteB + '/relationships', {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({ ...endpoints, kind: 'RELATED_TO' }),
+        });
+        const payload = await response.json();
+        assert.equal(response.status, 404);
+        assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_RELATIONSHIP_ENDPOINT_NOT_FOUND');
+        assert.doesNotMatch(JSON.stringify(payload), /Private Site A Draft|Site A only/);
+
+        const persisted = await pool.query(
+          'SELECT id FROM content_relationships WHERE site_id=$1 AND source_id=$2 AND target_id=$3 AND kind=$4 AND deleted_at IS NULL',
+          [siteB, endpoints.sourceId, endpoints.targetId, 'RELATED_TO']
+        );
+        assert.equal(persisted.rowCount, 0, 'foreign relationship attempts must not persist');
+      }
+
+      try {
+        const validResponse = await fetch(base + '/api/v1/sites/' + siteB + '/relationships', {
+          method: 'POST',
+          headers: { ...headers, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            siteId: siteB,
+            sourceId: ownContent.id,
+            targetId: ownContentTarget.id,
+            kind: 'RELATED_TO',
+          }),
+        });
+        const validPayload = await validResponse.json();
+        assert.equal(validResponse.status, 201, 'same-site relationship creation remains available');
+        assert.equal(validPayload.relationship.site_id, siteB);
+        assert.equal(validPayload.relationship.source_id, ownContent.id);
+        assert.equal(validPayload.relationship.target_id, ownContentTarget.id);
+        const upsertEvent = await pool.query(
+          "SELECT site_id,classification,payload->>'siteId' AS payload_site_id FROM outbox_events WHERE aggregate_type=$1 AND aggregate_id=$2 AND event_type=$3",
+          ['relationship', validPayload.relationship.id, 'relationship.upsert']
+        );
+        assert.equal(upsertEvent.rowCount, 1);
+        assert.equal(upsertEvent.rows[0].site_id, siteB);
+        assert.equal(upsertEvent.rows[0].classification, 'site-private');
+        assert.equal(upsertEvent.rows[0].payload_site_id, siteB);
+
+        const deleteResponse = await fetch(base + '/api/v1/sites/' + siteB + '/relationships/' + validPayload.relationship.id, {
+          method: 'DELETE',
+          headers,
+        });
+        assert.equal(deleteResponse.status, 200, 'same-site relationship deletion remains available');
+        const deleteEvent = await pool.query(
+          "SELECT site_id,classification,payload->>'siteId' AS payload_site_id FROM outbox_events WHERE aggregate_type=$1 AND aggregate_id=$2 AND event_type=$3",
+          ['relationship', validPayload.relationship.id, 'relationship.delete']
+        );
+        assert.equal(deleteEvent.rowCount, 1);
+        assert.equal(deleteEvent.rows[0].site_id, siteB);
+        assert.equal(deleteEvent.rows[0].classification, 'site-private');
+        assert.equal(deleteEvent.rows[0].payload_site_id, siteB);
+      } finally {
+        // The route emits a durable outbox event. Remove only this fixture's
+        // relationship and matching event so later outage/replay tests retain
+        // their empty-queue precondition.
+        const created = await pool.query(
+          'SELECT id FROM content_relationships WHERE site_id=$1 AND source_id=$2 AND target_id=$3 AND kind=$4',
+          [siteB, ownContent.id, ownContentTarget.id, 'RELATED_TO']
+        );
+        const relationshipIds = created.rows.map(row => row.id);
+        if (relationshipIds.length) {
+          await pool.query(
+            'DELETE FROM outbox_events WHERE aggregate_type=$1 AND aggregate_id=ANY($2::uuid[]) AND event_type=ANY($3::text[])',
+            ['relationship', relationshipIds, ['relationship.upsert', 'relationship.delete']]
+          );
+          await pool.query(
+            'DELETE FROM content_relationships WHERE site_id=$1 AND id=ANY($2::uuid[])',
+            [siteB, relationshipIds]
+          );
+        }
+      }
+    });
 
     const cases = [
       {
