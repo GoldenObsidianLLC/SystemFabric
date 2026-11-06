@@ -2,7 +2,19 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
-## Current mainline and latest candidate evidence snapshot — 5 November 2026
+## Mainline and application acceptance snapshot — 5 November 2026 (PR #72 merge baseline)
+
+VirgoScorpio Hub 0.6.2 is on `main` at `70ce31a23aa670afca1d89fb5c776e1ca36abd84`. PRs #68–#72 are merged; PR #72 merge commit is the current mainline SHA. Mainline push workflow [#301](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42135144431) passed all six jobs: Node.js 22.23.4, Node.js 24.22.1, PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL, and consolidated CI evidence.
+
+The current local release-readiness report on that exact SHA is **NO-GO**: 8 PASS, 1 PARTIAL, 1 BLOCKED, and 14 MISSING_EVIDENCE (`readyForProduction: false`). The one PARTIAL gate is the human dependency/lockfile review. The blocked formal PostgreSQL/Memgraph gate requires a schemaVersion 1 evidence record for product VirgoScorpio Hub, version 0.6.2, and exact source revision `70ce31a23aa670afca1d89fb5c776e1ca36abd84` at `artifacts/evidence/postgres-memgraph-live.json`. Existing tracked evidence is historical and does not match that revision; run-bound CI artifacts and external local results are not substituted for this formal contract.
+
+Supplemental local application restore acceptance on the current mainline SHA passed: 18/18 fresh migrations applied and 18/18 skipped on the idempotent second pass; live PostgreSQL/Memgraph/Redis integration passed 65/65 with zero skips/failures/TODOs; the actual API composition returned HTTP 200 from `/health` and used its PostgreSQL pool to read the application database (18 migration records, 69 public base tables, one site); `npm run dev:doctor` passed 9/9; and the configured local Playwright smoke had passed 9/9 on the same PR #72 code tree. The fresh-migration, live-integration, API-smoke, and release-readiness artifacts are retained outside the repository under the local backup directory `VirgoScorpio-Hub Backups/2026-11-05/release-acceptance-70ce31a` so tracked historical evidence remains byte-for-byte unchanged. These are local-development results, not production certification.
+
+All fourteen independent/provider/product/security/supply-chain/operations gates remain missing. Hub 0.6.2 is unreleased; no tag, GitHub Release, package publication, or production deployment is authorized. Use `docs/RELEASE_READINESS.md` and the current 0.6.2 release-gate report for the gate inventory and next actions.
+
+---
+
+## Historical pre-PR #72 merge evidence snapshot — 5 November 2026
 
 PR #68 candidate source `8db6c66f07c6ea89745fe2a0c8dd7f5f4f6440b3` passed hosted pull-request workflow [run #270](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42026945926) and push run [#269](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42026938931), merge ref `e39cd5c33f940762ed9fa88b27aad8f8d3070947`. All six jobs in both runs completed successfully. Node.js 22.23.4 and 24.22.1 each passed 476/476 Hub tests and 94/94 EnginEx tests, zero failures/skips; both checked 206 required artifact paths and 213 JavaScript files and reported zero audit vulnerabilities.
 

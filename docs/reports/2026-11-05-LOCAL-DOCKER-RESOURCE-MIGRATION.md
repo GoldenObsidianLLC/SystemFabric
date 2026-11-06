@@ -107,3 +107,21 @@ Validation commands (with `DATABASE_URL`, `TEST_DATABASE_URL`, `MEMGRAPH_URL`, a
 Retain the legacy resources and cold backups. No source volume/container retirement or production rollback decision has been made.
 
 This local restore does not satisfy the formal production load/backup/restore gate (issue #24) or the formal PostgreSQL/Memgraph evidence gate. Those require the approved release topology, exact candidate SHA, documented RPO/RTO, reviewer, and independently accepted production-oriented evidence. VirgoScorpio Hub remains NOT_PRODUCTION_CERTIFIED / NO-GO.
+
+
+## Mainline merge and application-level restore acceptance — 5 November 2026
+
+PR #72 is merged into `main` as `70ce31a23aa670afca1d89fb5c776e1ca36abd84`. Mainline workflow [#301](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42135144431) passed all six hosted jobs. The local acceptance work was repeated on that exact source SHA after aligning only the ignored local `.env` database URLs with the checked-in development template; the first readiness invocation had exposed stale credentials (`28P01`) and is retained as diagnostic history only.
+
+| Acceptance check | Result |
+|---|---|
+| `npm run test:migrations:fresh` | PASS — 18/18 applied; exact migration ledger verified; 18/18 idempotent skips; generated disposable DB dropped. Evidence binds source SHA `70ce31a23aa670afca1d89fb5c776e1ca36abd84`. |
+| `npm run test:integration:live` | PASS — 65/65, zero failures, zero skips, zero TODOs against `virgoscorpio_hub_test`. |
+| API runtime restore smoke | PASS — actual API composition returned `/health` HTTP 200 for 0.6.2; its own PostgreSQL pool read `virgoscorpio_hub` with 18 migration records, 69 public base tables, and one site. The API listener used an ephemeral loopback port and was closed after the check. |
+| `npm run dev:doctor` | PASS — 9/9. Note: the current doctor only checks PostgreSQL TCP reachability; authenticated `SELECT 1` preflight is a follow-up engineering improvement. |
+| `npm run release:readiness` | 8 PASS, 1 PARTIAL, 1 BLOCKED, 14 MISSING_EVIDENCE; exact source SHA and clean tree. Integration stage passed 65/65. |
+| Local Playwright / hosted browser smoke | PASS — prior local 9/9 on the same PR #72 application code tree; merged mainline workflow #301 browser/editor smoke passed. Manual accessibility acceptance is still open. |
+
+New exact-revision evidence files and checksums are retained outside the repository at `%USERPROFILE%\Documents\VirgoScorpio-Hub Backups\2026-11-05\release-acceptance-70ce31a`. Historical tracked `fresh-migrations.json` and `integration-live.json` artifacts were restored byte-for-byte after the harnesses; no local credentials, customer data, or generated test evidence was added to Git. The local application database smoke query did not write data. The original legacy containers/volumes and cold backups remain preserved.
+
+This acceptance is a developer-environment recovery check only. It does not prove legacy application/customer data restoration, production-topology RPO/RTO, full object-storage restoration, or production disaster recovery. Production remains NO-GO / `NOT_PRODUCTION_CERTIFIED`.
