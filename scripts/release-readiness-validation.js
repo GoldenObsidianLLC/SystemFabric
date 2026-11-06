@@ -9,6 +9,15 @@ const APPROVED_GENERATED_OUTPUTS = new Set([
   'artifacts/evidence/fresh-migrations.json',
   'artifacts/evidence/fresh-migrations.log',
   'artifacts/evidence/integration-live.json',
+  'artifacts/evidence/postgres-memgraph-live.json',
+  'artifacts/evidence/postgres-memgraph-ci-manifest.json',
+  'artifacts/evidence/postgres-memgraph/integration-live.json',
+  'artifacts/evidence/postgres-memgraph/integration-tests.tap.log',
+  'artifacts/evidence/postgres-memgraph/integration-migrations.log',
+  'artifacts/evidence/postgres-memgraph/fresh-migrations.json',
+  'artifacts/evidence/postgres-memgraph/fresh-migrations.log',
+  'artifacts/evidence/postgres-memgraph/memgraph-outage-live.log',
+  'artifacts/evidence/postgres-memgraph/graph-rebuild-live.log',
   'artifacts/evidence/memgraph-outage-live.log',
   'artifacts/evidence/graph-rebuild-live.log',
   'artifacts/evidence/browser-smoke.log',
@@ -18,6 +27,8 @@ const APPROVED_GENERATED_OUTPUTS = new Set([
   'artifacts/virgoscorpio-hub.sbom.cdx.json',
   'artifacts/release-readiness.json',
   'artifacts/release-readiness.md',
+  'artifacts/release-readiness-ci.json',
+  'artifacts/release-readiness-ci.md',
 ]);
 
 function isCurrentReleaseEvidence(value, expectedVersion, expectedRevision) {

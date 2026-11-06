@@ -337,4 +337,13 @@ jobs:
           path: |
             artifacts/release-readiness-ci.json
             artifacts/release-readiness-ci.md
+            artifacts/evidence/postgres-memgraph/integration-live.json
+            artifacts/evidence/postgres-memgraph/integration-tests.tap.log
+            artifacts/evidence/postgres-memgraph/integration-migrations.log
+            artifacts/evidence/postgres-memgraph/fresh-migrations.json
+            artifacts/evidence/postgres-memgraph/fresh-migrations.log
+            artifacts/evidence/postgres-memgraph/memgraph-outage-live.log
+            artifacts/evidence/postgres-memgraph/graph-rebuild-live.log
+            artifacts/evidence/postgres-memgraph-live.json
+            artifacts/evidence/postgres-memgraph-ci-manifest.json
           if-no-files-found: warn

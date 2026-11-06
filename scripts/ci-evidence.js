@@ -527,6 +527,155 @@ function validateJobEvidence(jobConfig, directory, expected, apiJob) {
   };
 }
 
+function ensureEvidenceDirectory(root, relativeDirectory) {
+  const absoluteRoot = path.resolve(root);
+  const rootStat = fs.lstatSync(absoluteRoot);
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error('Repository root must be a real directory.');
+  let current = absoluteRoot;
+  for (const segment of validateRelativePath(relativeDirectory)) {
+    current = path.join(current, segment);
+    if (fs.existsSync(current)) {
+      const stat = fs.lstatSync(current);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('Evidence output directory contains a symlink or non-directory.');
+    } else fs.mkdirSync(current);
+  }
+  if (!isWithin(absoluteRoot, current)) throw new Error('Evidence output directory resolves outside the repository.');
+  return current;
+}
+
+function copyVerifiedEvidenceFile({ sourceDirectory, sourceRelativePath, root, targetRelativePath, expectedSha256 }) {
+  const sourcePath = resolveRegularPath(sourceDirectory, sourceRelativePath);
+  const targetParts = validateRelativePath(targetRelativePath);
+  ensureEvidenceDirectory(root, path.posix.dirname(targetRelativePath));
+  const targetPath = path.join(path.resolve(root), ...targetParts);
+  if (fs.existsSync(targetPath)) {
+    const targetStat = fs.lstatSync(targetPath);
+    if (!targetStat.isFile() || targetStat.isSymbolicLink()) throw new Error('Evidence output target must be a regular file.');
+  }
+  fs.copyFileSync(sourcePath, targetPath);
+  const actualSha256 = sha256File(targetPath);
+  if (actualSha256 !== expectedSha256) {
+    fs.rmSync(targetPath, { force: true });
+    throw new Error('Copied evidence artifact checksum does not match its validated source.');
+  }
+  return targetRelativePath;
+}
+
+function writePostgresMemgraphReleaseEvidence({ root, directory, expected, apiJob, validation }) {
+  const config = JOBS.find(job => job.key === 'postgres-memgraph-integration');
+  if (!config || validation?.key !== config.key || validation.status !== 'PASS') {
+    throw new Error('The PostgreSQL/Memgraph producer job must pass validation before release evidence is written.');
+  }
+  const expectedApiHead = expected.eventName === 'pull_request' ? expected.headSha : expected.mergeSha;
+  if (!/^[0-9a-f]{40}$/i.test(String(expected.mergeSha || '')) ||
+      !/^[0-9a-f]{40}$/i.test(String(expectedApiHead || '')) ||
+      !apiJob || !Number.isSafeInteger(apiJob.id) || apiJob.id < 1 ||
+      apiJob.name !== config.jobName || apiJob.workflow_name !== expected.workflow ||
+      String(apiJob.run_id ?? '') !== String(expected.runId) || apiJob.run_attempt !== expected.runAttempt ||
+      String(apiJob.head_sha || '').toLowerCase() !== expectedApiHead.toLowerCase() ||
+      apiJob.status !== 'completed' || apiJob.conclusion !== 'success') {
+    throw new Error('The PostgreSQL/Memgraph GitHub Actions job identity is incomplete or mismatched.');
+  }
+  const completedAt = new Date(apiJob.completed_at || '');
+  if (!Number.isFinite(completedAt.valueOf())) throw new Error('The PostgreSQL/Memgraph GitHub Actions completion timestamp is missing or invalid.');
+
+  const expectedManifest = {
+    ...expected,
+    workflowFile: WORKFLOW_FILE,
+    jobKey: config.key,
+    jobName: config.jobName,
+    runtime: config.runtime,
+  };
+  const manifestValidation = validateManifestDirectory(directory, expectedManifest);
+  if (!manifestValidation.valid) {
+    throw new Error('The PostgreSQL/Memgraph manifest failed re-validation: ' + manifestValidation.errors.join(' '));
+  }
+
+  const manifestArtifactHashes = new Map(manifestValidation.artifacts.map(artifact => [artifact.path, artifact.sha256]));
+  const manifestSha256 = sha256File(path.join(path.resolve(directory), 'manifest.json'));
+  const copiedArtifacts = [];
+  copiedArtifacts.push(copyVerifiedEvidenceFile({
+    sourceDirectory: directory,
+    sourceRelativePath: 'manifest.json',
+    root,
+    targetRelativePath: 'artifacts/evidence/postgres-memgraph-ci-manifest.json',
+    expectedSha256: manifestSha256,
+  }));
+
+  const evidenceFiles = config.requiredFiles
+    .filter(relativePath => relativePath.startsWith('artifacts/evidence/'))
+    .map(relativePath => relativePath.slice('artifacts/evidence/'.length));
+  for (const fileName of evidenceFiles) {
+    const sourceRelativePath = 'files/artifacts/evidence/' + fileName;
+    const expectedSha256 = manifestArtifactHashes.get(sourceRelativePath);
+    if (!expectedSha256) throw new Error('The verified manifest does not inventory required evidence file ' + fileName + '.');
+    copiedArtifacts.push(copyVerifiedEvidenceFile({
+      sourceDirectory: directory,
+      sourceRelativePath,
+      root,
+      targetRelativePath: 'artifacts/evidence/postgres-memgraph/' + fileName,
+      expectedSha256,
+    }));
+  }
+
+  const live = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/integration-live.json').toString('utf8'));
+  const migrations = JSON.parse(readEvidenceFile(directory, 'artifacts/evidence/fresh-migrations.json').toString('utf8'));
+  if (live.status !== 'PASS' || !Number.isInteger(live.tests) || live.tests < 1 ||
+      live.passed !== live.tests || live.failed !== 0 || live.cancelled !== 0 || live.skipped !== 0 || live.todo !== 0 ||
+      !isFreshMigrationEvidence(migrations, 18, PRODUCT_VERSION, expected.mergeSha)) {
+    throw new Error('The PostgreSQL/Memgraph live test and migration summaries no longer satisfy the release evidence contract.');
+  }
+
+  const evidence = {
+    schemaVersion: 1,
+    product: 'VirgoScorpio Hub',
+    version: PRODUCT_VERSION,
+    sourceRevision: expected.mergeSha.toLowerCase(),
+    status: 'passed',
+    executedAt: completedAt.toISOString(),
+    command: 'GitHub Actions workflow "' + expected.workflow + '" run ' + expected.runId +
+      ' attempt ' + expected.runAttempt + '; job "' + config.jobName +
+      '" executed npm run test:migrations:fresh, npm run test:integration:live, ' +
+      'npm run test:integration:memgraph-outage, and npm run test:graph:rebuild.',
+    environment: 'GitHub Actions ubuntu-24.04; Node.js ' + config.runtime +
+      '; PostgreSQL service postgres:18-alpine; Memgraph integration container; ' +
+      'isolated disposable PostgreSQL database; no production credentials.',
+    artifacts: copiedArtifacts,
+    ciEvidence: {
+      repository: expected.repository,
+      workflow: expected.workflow,
+      workflowFile: WORKFLOW_FILE,
+      eventName: expected.eventName,
+      runId: String(expected.runId),
+      runAttempt: expected.runAttempt,
+      headSha: expected.headSha.toLowerCase(),
+      sourceRevision: expected.mergeSha.toLowerCase(),
+      jobId: apiJob.id,
+      jobName: config.jobName,
+      manifestPath: 'artifacts/evidence/postgres-memgraph-ci-manifest.json',
+      manifestSha256,
+    },
+    results: {
+      integration: { tests: live.tests, passed: live.passed, failed: live.failed, skipped: live.skipped, todo: live.todo },
+      migrations: {
+        migrationCount: migrations.migrationCount,
+        firstPass: migrations.firstPass,
+        secondPass: migrations.secondPass,
+        cleanup: migrations.cleanup,
+      },
+    },
+  };
+
+  const outputDirectory = ensureEvidenceDirectory(root, 'artifacts/evidence');
+  const outputPath = path.join(outputDirectory, 'postgres-memgraph-live.json');
+  if (fs.existsSync(outputPath)) {
+    const outputStat = fs.lstatSync(outputPath);
+    if (!outputStat.isFile() || outputStat.isSymbolicLink()) throw new Error('Formal PostgreSQL/Memgraph evidence target must be a regular file.');
+  }
+  fs.writeFileSync(outputPath, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+  return evidence;
+}
+
 function evaluateCiEvidence({ artifactRoot, expected, run, jobs }) {
   const checks = [];
   const add = (id, passed, details) => checks.push({ id, status: passed ? 'PASS' : 'BLOCKED', details });
@@ -836,6 +985,55 @@ async function main() {
     report.ciStatus = 'BLOCKED';
     report.checks.unshift({ id: 'github-actions-api', status: 'BLOCKED', details: apiError });
   }
+  const postgresValidation = report.jobs.find(job => job.key === 'postgres-memgraph-integration');
+  const postgresApiJobs = jobs.filter(job => job?.name === 'PostgreSQL and Memgraph integration');
+  if (!apiError && postgresValidation?.status === 'PASS' && postgresApiJobs.length === 1) {
+    try {
+      const evidence = writePostgresMemgraphReleaseEvidence({
+        root,
+        directory: path.join(artifactRoot, postgresValidation.artifactName),
+        expected,
+        apiJob: postgresApiJobs[0],
+        validation: postgresValidation,
+      });
+      report.postgresMemgraphEvidence = {
+        status: 'PASS',
+        path: 'artifacts/evidence/postgres-memgraph-live.json',
+        sourceRevision: evidence.sourceRevision,
+        artifactCount: evidence.artifacts.length,
+        manifestSha256: evidence.ciEvidence.manifestSha256,
+      };
+      report.checks.push({
+        id: 'postgres-memgraph-release-evidence',
+        status: 'PASS',
+        details: 'Formal exact-source release evidence and its checksum-verified supporting artifacts were materialized.',
+      });
+    } catch {
+      report.ciStatus = 'BLOCKED';
+      report.postgresMemgraphEvidence = {
+        status: 'BLOCKED',
+        path: 'artifacts/evidence/postgres-memgraph-live.json',
+        sourceRevision: expected.mergeSha || null,
+      };
+      report.checks.push({
+        id: 'postgres-memgraph-release-evidence',
+        status: 'BLOCKED',
+        details: 'Validated live database evidence could not be materialized into the formal exact-source release-evidence contract.',
+      });
+    }
+  } else {
+    report.ciStatus = 'BLOCKED';
+    report.postgresMemgraphEvidence = {
+      status: 'BLOCKED',
+      path: 'artifacts/evidence/postgres-memgraph-live.json',
+      sourceRevision: expected.mergeSha || null,
+    };
+    report.checks.push({
+      id: 'postgres-memgraph-release-evidence',
+      status: 'BLOCKED',
+      details: 'A unique, successful, exact-attempt PostgreSQL/Memgraph producer job is required to generate formal release evidence.',
+    });
+  }
   const outputDirectory = path.join(root, 'artifacts');
   fs.mkdirSync(outputDirectory, { recursive: true });
   fs.writeFileSync(path.join(outputDirectory, 'release-readiness-ci.json'), JSON.stringify(report, null, 2) + '\n');
@@ -865,4 +1063,5 @@ module.exports = {
   stageEvidence,
   validateJobEvidence,
   validateManifestDirectory,
+  writePostgresMemgraphReleaseEvidence,
 };
