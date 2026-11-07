@@ -2,7 +2,7 @@
 
 VirgoScorpio Hub separates source-level checks from production evidence. A passing unit suite or a checked-in workflow is not proof that a release gate passed.
 
-## Mainline and application acceptance snapshot — 6 November 2026 (PRs #76–#80 merged)
+## Historical mainline and application acceptance snapshot
 
 Verified product-code mainline after PR #80: VirgoScorpio Hub 0.6.2 at 29a3e03997da429a1bb05964f46c22cf975a8c2e. Mainline push workflow [run #341](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42311936630) completed successfully with all six jobs green: Node.js 22.23.4, Node.js 24.22.1, PostgreSQL/Memgraph integration, browser/editor smoke, CodeQL, and consolidated evidence.
 

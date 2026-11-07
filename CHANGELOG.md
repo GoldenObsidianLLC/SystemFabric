@@ -12,6 +12,8 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ### Current mainline disposition - 7 November 2026
 
+- PR #83 merged as `109c05b001003e68dfaa5584353ab683a41d9075`; mainline push workflow [run #353](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42321203517) passed all six hosted jobs. The shared recursive Git-submodule preflight verifies pinned commits before bootstrap creates local files or installs dependencies; dev:doctor reports the same state. Missing, conflicted, mismatched, or unverifiable submodules fail closed with recovery guidance, without automatic update/reset/clean. Recursive-clone guidance is aligned across contributor docs. Seven focused tests passed; `npm run check` passed 530 tests (527 pass, 3 platform-conditional skips) in PR validation. No dependency, schema, or public API change; no SemVer increment or release authorization.
+
 - PR #82 merged as `89c87f9483f915d72a44695dd2a5054c08cdd9ed` after PR CI run #349 passed all six hosted jobs. Stripe Checkout expiration bounds now use one captured clock value; exact lower/upper boundary behavior is deterministic. No dependency, schema, or public API change; no version increment or release authorization.
 
 ### Current mainline disposition - 6 November 2026
