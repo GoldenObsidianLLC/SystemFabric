@@ -992,13 +992,72 @@ paths:
               type: object
               required: [slug, name, items]
               properties:
-                slug: { type: string, maxLength: 101 }
-                name: { type: string, maxLength: 180 }
+                slug: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,100}$' }
+                name: { type: string, minLength: 1, maxLength: 180 }
                 items: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
-                presentation: { type: object, additionalProperties: true }
+                presentation:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    megaMenu: { type: boolean }
+                    layout: { type: string, enum: [columns, tabs, flyout, grid] }
+                    width: { type: string, enum: [container, wide, full] }
+                    columns: { type: integer, minimum: 1, maximum: 6 }
+                    showDescriptions: { type: boolean }
+                    showImages: { type: boolean }
+                    showIcons: { type: boolean }
+                    featuredContentId: { type: [string, 'null'], format: uuid }
+                    mobileMode: { type: string, enum: [accordion, drilldown, collapse] }
+                    trigger: { type: string, enum: [hover, click, focus] }
       responses:
         '201': { description: Mega menu created }
+        '409': { description: Mega-menu slug already exists }
         '422': { description: Menu or presentation invalid }
+  /api/v1/sites/{siteId}/mega-menus/{slug}:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,100}$' }
+    put:
+      summary: Update a mega menu with optimistic version control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expectedVersion, name]
+              properties:
+                expectedVersion: { type: integer, minimum: 1 }
+                slug: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,100}$' }
+                name: { type: string, minLength: 1, maxLength: 180 }
+                items: { type: array, maxItems: 1000, items: { type: object, additionalProperties: true } }
+                presentation:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    megaMenu: { type: boolean }
+                    layout: { type: string, enum: [columns, tabs, flyout, grid] }
+                    width: { type: string, enum: [container, wide, full] }
+                    columns: { type: integer, minimum: 1, maximum: 6 }
+                    showDescriptions: { type: boolean }
+                    showImages: { type: boolean }
+                    showIcons: { type: boolean }
+                    featuredContentId: { type: [string, 'null'], format: uuid }
+                    mobileMode: { type: string, enum: [accordion, drilldown, collapse] }
+                    trigger: { type: string, enum: [hover, click, focus] }
+      responses:
+        '200': { description: Mega menu updated; version is incremented }
+        '404': { description: Mega menu not found }
+        '409': { description: Expected version is stale }
+        '422': { description: Menu or presentation invalid }
+    delete:
+      summary: Delete a mega menu
+      responses:
+        '200': { description: Mega menu deleted }
+        '404': { description: Mega menu not found }
   /api/v1/sites/{siteId}/security/firewall-rules:
     get:
       summary: List application-layer firewall rules

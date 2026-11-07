@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
 const { validateDesignTokens, cssVariables } = require('../packages/domain/src/design-system');
 const { validateMenuItems } = require('../packages/domain/src/navigation');
+const { presentationValid } = require('../apps/api/src/platform-routes');
 const { generateTotpSecret, totpAt, verifyTotp, encryptSecret, decryptSecret } = require('../packages/auth/src/totp');
 const { messageFor, sendEmail } = require('../packages/notifications/src/mailer');
 const { configFromEnv } = require('../packages/auth/src/oidc');
@@ -27,6 +28,19 @@ test('navigation menu validation rejects unsafe URLs, duplicate IDs, and excessi
   assert.equal(validateMenuItems(deeplyNested).valid, false);
 });
 
+test('mega-menu presentation accepts only the documented bounded configuration', () => {
+  assert.equal(presentationValid({}).valid, true);
+  assert.equal(presentationValid({ megaMenu: true, layout: 'grid', width: 'full', columns: 6, showDescriptions: true, showImages: false, showIcons: true, featuredContentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', mobileMode: 'drilldown', trigger: 'focus' }).valid, true);
+  for (const layout of ['columns', 'tabs', 'flyout', 'grid']) assert.equal(presentationValid({ layout }).valid, true, layout);
+  for (const width of ['container', 'wide', 'full']) assert.equal(presentationValid({ width }).valid, true, width);
+  for (const mobileMode of ['accordion', 'drilldown', 'collapse']) assert.equal(presentationValid({ mobileMode }).valid, true, mobileMode);
+  for (const trigger of ['hover', 'click', 'focus']) assert.equal(presentationValid({ trigger }).valid, true, trigger);
+  for (const invalid of [null, [], 'columns', { layout: 'absolute' }, { width: 'viewport' }, { columns: 0 }, { columns: 7 }, { columns: 2.5 }, { showImages: 'yes' }, { megaMenu: 1 }, { mobileMode: 'scroll' }, { trigger: 'automatic' }, { featuredContentId: 'not-a-uuid' }, { unexpected: true }, { nested: { unbounded: true } }]) {
+    assert.equal(presentationValid(invalid).valid, false, JSON.stringify(invalid));
+  }
+  assert.equal(presentationValid({ featuredContentId: null }).valid, true);
+  assert.equal(presentationValid({ note: 'x'.repeat(16_385) }).valid, false);
+});
 test('TOTP enrollment verifies a fresh time step and rejects step replay', () => {
   const secret = generateTotpSecret(); const now = 1_700_000_000_000; const step = Math.floor(now / 30_000); const code = totpAt(secret, step);
   assert.equal(verifyTotp(secret, code, { now, window: 0, lastUsedStep: step - 1 }), step);
