@@ -11,12 +11,13 @@ const USER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SESSION_A = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const TOKEN = 'site-a-only-session-token';
 
-function connectWebSocket(url, origin) {
+function connectWebSocket(url, origin, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url, {
       headers: {
         authorization: 'Bearer ' + TOKEN,
-        origin
+        origin,
+        ...extraHeaders
       }
     });
     socket._messages = [];
@@ -143,6 +144,28 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
     [[USER_A, 'active']]
   );
 
+  const presenceMismatchHeader = await fetch(origin + sitePath(SITE_A) + '/presence', {
+    headers: { ...headers, 'x-virgoscorpio-hub-site-id': SITE_B }
+  });
+  assert.equal(presenceMismatchHeader.status, 400);
+  assert.equal((await presenceMismatchHeader.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+
+  const presenceMismatchQuery = await fetch(origin + sitePath(SITE_A) + '/presence?siteId=' + SITE_B, { headers });
+  assert.equal(presenceMismatchQuery.status, 400);
+  assert.equal((await presenceMismatchQuery.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+
+  const heartbeatMismatchBody = await fetch(origin + sitePath(SITE_A) + '/presence/heartbeat', {
+    method: 'POST',
+    headers: { ...headers, 'content-type': 'application/json' },
+    body: JSON.stringify({ siteId: SITE_B, availability: 'active' })
+  });
+  assert.equal(heartbeatMismatchBody.status, 400);
+  assert.equal((await heartbeatMismatchBody.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+
+  const presenceAfterMismatch = await fetch(origin + sitePath(SITE_A) + '/presence', { headers });
+  assert.equal(presenceAfterMismatch.status, 200);
+  assert.deepEqual((await presenceAfterMismatch.json()).presence.map(entry => [entry.userId, entry.availability]), [[USER_A, 'active']]);
+
   const heartbeatB = await fetch(origin + sitePath(SITE_B) + '/presence/heartbeat', {
     method: 'POST',
     headers: { ...headers, 'content-type': 'application/json' },
@@ -161,6 +184,17 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
   });
   assert.equal(sseA.status, 200);
   assert.match(sseA.headers.get('content-type'), /text\/event-stream/);
+
+  const sseMismatch = await fetch(origin + sitePath(SITE_A) + '/realtime/events?topic=presence', {
+    headers: { ...headers, 'x-virgoscorpio-hub-site-id': SITE_B }
+  });
+  assert.equal(sseMismatch.status, 400);
+  assert.equal((await sseMismatch.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+  assert.doesNotMatch(sseMismatch.headers.get('content-type') || '', /text\/event-stream/);
+
+  const sseQueryMismatch = await fetch(origin + sitePath(SITE_A) + '/realtime/events?topic=presence&siteId=' + SITE_B, { headers });
+  assert.equal(sseQueryMismatch.status, 400);
+  assert.equal((await sseQueryMismatch.json()).code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
   const sseReader = sseA.body.getReader();
   const readyFrame = await sseReader.read();
   assert.match(new TextDecoder().decode(readyFrame.value), /connection\.ready/);
@@ -181,6 +215,16 @@ test('site-A membership cannot cross into site-B presence, SSE, or WebSocket', a
     connectWebSocket(wsPath(SITE_B), origin),
     error => error.statusCode === 403
   );
+
+  await assert.rejects(
+    connectWebSocket(wsPath(SITE_A), origin, { 'x-virgoscorpio-hub-site-id': SITE_B }),
+    error => error.statusCode === 400
+  );
+  await assert.rejects(
+    connectWebSocket(wsPath(SITE_A) + '?siteId=' + SITE_B, origin),
+    error => error.statusCode === 400
+  );
+  assert.equal(server.virgoScorpioHub.realtimeHub.subscriberCount, subscriptionsBeforeDeniedUpgrade, 'selector-mismatched upgrades must not create subscriptions');
   assert.equal(
     server.virgoScorpioHub.realtimeHub.subscriberCount,
     subscriptionsBeforeDeniedUpgrade,

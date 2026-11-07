@@ -1247,6 +1247,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_DISABLED', requestId });
         const siteId = presenceMatch[1];
         if (!ID_RE.test(siteId)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await reconcileRouteSiteContext(siteId);
         await requireRealtimeCapability(actor, siteId);
         const { principalId } = presencePrincipal();
         const members = await presence.list({ siteId, viewerId: principalId });
@@ -1257,6 +1258,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_DISABLED', requestId });
         const siteId = presenceHeartbeatMatch[1];
         if (!ID_RE.test(siteId)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await reconcileRouteSiteContext(siteId);
         await requireRealtimeCapability(actor, siteId);
         const { principalId, sessionId } = presencePrincipal();
         const limit = allowRequest('realtime-presence:' + siteId + ':' + principalId);
@@ -1265,6 +1267,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
           return sendJson(res, 429, { error: 'Presence heartbeat rate limit exceeded.', code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_RATE_LIMIT', requestId });
         }
         const body = await readJson(req, 8_192);
+        await reconcileRouteSiteContext(siteId, body);
         if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => key !== 'availability')) {
           throw fail(400, 'ERR_VIRGOSCORPIO_HUB_PRESENCE_BODY_INVALID', 'Only the availability field is accepted.');
         }
@@ -1277,6 +1280,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!presence) return sendJson(res, 503, { error: 'Real-time presence is not configured.', code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_DISABLED', requestId });
         const siteId = presenceHeartbeatMatch[1];
         if (!ID_RE.test(siteId)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await reconcileRouteSiteContext(siteId);
         await requireRealtimeCapability(actor, siteId);
         const { principalId, sessionId } = presencePrincipal();
         await presence.leave({ siteId, principalId, sessionId });
@@ -1288,6 +1292,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!realtimeGateway) return sendJson(res, 503, { error: 'Real-time event delivery is not configured.', code: 'ERR_VIRGOSCORPIO_HUB_REALTIME_DISABLED', requestId });
         const siteId = realtimeEventsMatch[1];
         if (!ID_RE.test(siteId)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID', 'siteId must be a valid UUID.');
+        await reconcileRouteSiteContext(siteId);
         await requireRealtimeCapability(actor, siteId);
         const requestedTopics = url.searchParams.getAll('topic');
         if (requestedTopics.length > 1 || (requestedTopics.length === 1 && requestedTopics[0] !== 'presence')) {
@@ -1977,6 +1982,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const auth = await authenticate(req);
       if (!auth) throw fail(401, 'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED', 'Authentication is required for WebSocket connections.');
       const actor = { ...auth, isDeveloper: auth.mode === 'development-token' };
+      await siteIdFor({ req, url, actor, routeSiteId: siteId, requireMembership: false });
       await requireRealtimeCapability(actor, siteId);
       const principalId = actor.user.id || (actor.isDeveloper ? 'local-developer' : null);
       const sessionId = actor.sessionId || (actor.isDeveloper ? 'local-developer-session' : null);

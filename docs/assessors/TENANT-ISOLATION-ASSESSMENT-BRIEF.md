@@ -251,8 +251,15 @@ The PR #88 candidate based on mainline 496db8a4a1416502b48a58120986eb665b197846 
 Unit tests verify the resolver runs before capability authorization. The live two-site integration case exercises path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares site A and site B membership, invitation, mail-outbox and audit snapshots to prove no tenant side effects occurred. This is targeted regression coverage only. PR #88 hosted CI is pending; no independent reviewer has accepted issue #14 evidence, no evidence file was created, and issues #14 and #25 remain open. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 
-## 11. Site configuration route selector-consistency follow-up - PR #89 candidate, 7 November 2026
+## 11. Site configuration route selector-consistency follow-up - PR #89 merged, 7 November 2026
 
 The PR #89 candidate based on mainline c5c31556acb052b9a257931867ef0166e866e822 adds a request-scoped helper that reconciles the path site ID with the x-virgoscorpio-hub-site-id header and siteId query selector before the existing route-specific capability guard for design-system, reusable-component, template, navigation-menu and AI-policy routes. Bounded JSON writes are checked for a body siteId after parsing and before domain validation or persistence. The helper disables its generic membership precheck and leaves each route capability authorization/error contract intact.
 
 The PostgreSQL tenant-isolation integration suite exercises conflicting header/query values for each family, body mismatches on write routes, and header mismatches for deletes. It compares site configuration table snapshots before and after rejected calls. This is regression coverage only and not proof of complete route inventory or tenant isolation. Independent reviewer acceptance remains required for issue #14; broader independent security assessment #25 remains open. No formal security evidence file is created. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+
+
+## 12. Realtime route selector-consistency follow-up - PR #90 candidate, 7 November 2026
+
+The PR #90 candidate based on mainline f38c3b0b65be1a20959295528b0ed5e1417eac40 applies the shared request-context resolver to presence list/heartbeat/leave, SSE and WebSocket upgrades. It reconciles path site IDs with the x-virgoscorpio-hub-site-id header and siteId query selector before realtime capability authorization. Heartbeat requests also reconcile an optional JSON-body siteId after bounded parsing and before the presence lease is mutated. The generic membership precheck is disabled so requireRealtimeCapability remains the authorization control.
+
+Targeted tests exercise header/query mismatch across presence/SSE/WebSocket and heartbeat body mismatch, assert rejected WebSocket upgrades create no subscriptions, and assert the existing presence lease is unchanged after a rejected heartbeat. This is regression coverage, not independent route/security assessment. Issues #14 and #25 remain open, no formal security evidence is created, and production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
