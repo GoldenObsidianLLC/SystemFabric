@@ -10,6 +10,10 @@ All notable project-level changes should be recorded here. This changelog does n
 - Updated renderer license attribution to GPL-2.0-or-later and enabled recursive submodule checkout in CI.
 - Updated release-readiness source-tree verification to validate the pinned EnginEx gitlink and its nested clean worktree separately from the superproject's own status.
 
+### Malware scanner process lifecycle
+
+- Keep the private temporary scan input until the `clamdscan` child emits `close` after a timeout or post-spawn error. This prevents cleanup from racing process teardown on Windows and other platforms. Add deterministic coverage for clean, detection, scanner-fault, unavailable-executable, and timeout/reap outcomes. These tests exercise the scanner boundary with a controlled process stub; live ClamAV corpus validation and the independent malware-scanning acceptance gate remain open.
+
 ### Current mainline disposition - 7 November 2026
 
 - PR #83 merged as `109c05b001003e68dfaa5584353ab683a41d9075`; mainline push workflow [run #353](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42321203517) passed all six hosted jobs. The shared recursive Git-submodule preflight verifies pinned commits before bootstrap creates local files or installs dependencies; dev:doctor reports the same state. Missing, conflicted, mismatched, or unverifiable submodules fail closed with recovery guidance, without automatic update/reset/clean. Recursive-clone guidance is aligned across contributor docs. Seven focused tests passed; `npm run check` passed 530 tests (527 pass, 3 platform-conditional skips) in PR validation. No dependency, schema, or public API change; no SemVer increment or release authorization.
