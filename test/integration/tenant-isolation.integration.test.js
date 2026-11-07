@@ -270,5 +270,44 @@ test(
       (await relationshipDuplicateQuery.json()).code,
       'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH'
     );
+
+    // Path-addressed site-configuration routes must reconcile selector context
+    // before capability checks and tenant-scoped database operations.
+    const configurationTables = ['site_design_systems','reusable_components','site_templates','navigation_menus','site_ai_policies'];
+    async function configurationSnapshot() {
+      const entries = await Promise.all(configurationTables.map(async table => {
+        const result = await pool.query('SELECT site_id,count(*)::integer AS count FROM ' + table + ' WHERE site_id=ANY($1::uuid[]) GROUP BY site_id ORDER BY site_id', [[siteA, siteB]]);
+        return [table, result.rows];
+      }));
+      return Object.fromEntries(entries);
+    }
+    const configurationBefore = await configurationSnapshot();
+    const selectorMismatchScenarios = [
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/design-system', headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/design-system?siteId=' + siteA },
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/reusable-components', headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/templates?siteId=' + siteA },
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/menus', headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+      { method: 'GET', path: '/api/v1/sites/' + siteB + '/ai-policy?siteId=' + siteA },
+      { method: 'PUT', path: '/api/v1/sites/' + siteB + '/design-system', body: { siteId: siteA, tokens: {} } },
+      { method: 'POST', path: '/api/v1/sites/' + siteB + '/reusable-components', body: { siteId: siteA } },
+      { method: 'POST', path: '/api/v1/sites/' + siteB + '/templates', body: { siteId: siteA } },
+      { method: 'POST', path: '/api/v1/sites/' + siteB + '/menus', body: { siteId: siteA } },
+      { method: 'PUT', path: '/api/v1/sites/' + siteB + '/ai-policy', body: { siteId: siteA } },
+      { method: 'DELETE', path: '/api/v1/sites/' + siteB + '/reusable-components/' + randomUUID(), headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+      { method: 'DELETE', path: '/api/v1/sites/' + siteB + '/templates/' + randomUUID(), headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+      { method: 'DELETE', path: '/api/v1/sites/' + siteB + '/menus/selector-probe', headers: { 'x-virgoscorpio-hub-site-id': siteA } },
+    ];
+    for (const scenario of selectorMismatchScenarios) {
+      const response = await fetch(base + scenario.path, {
+        method: scenario.method,
+        headers: { ...authHeaders, ...(scenario.headers || {}), ...(scenario.body === undefined ? {} : { 'content-type': 'application/json' }) },
+        ...(scenario.body === undefined ? {} : { body: JSON.stringify(scenario.body) }),
+      });
+      const payload = await response.json();
+      assert.equal(response.status, 400, scenario.method + ' ' + scenario.path + ' must reject conflicting site selectors');
+      assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+    }
+    assert.deepEqual(await configurationSnapshot(), configurationBefore, 'selector mismatches must not create or mutate tenant configuration records');
   }
 );

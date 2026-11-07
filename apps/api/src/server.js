@@ -1226,6 +1226,12 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       if (!auth) return sendJson(res, 401, { error: 'Authentication required.', code: 'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED', requestId });
       const actor = { ...auth, isDeveloper: auth.mode === 'development-token' };
 
+      // Validate path/header/query context without changing each route family's
+      // established capability authorization or forbidden-response contract.
+      async function reconcileRouteSiteContext(routeSiteId, body = {}) {
+        return siteIdFor({ req, url, body, actor, routeSiteId, requireMembership: false });
+      }
+
       const presenceMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/presence$/i);
       const presenceHeartbeatMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/presence\/heartbeat$/i);
       const realtimeEventsMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/realtime\/events$/i);
@@ -1325,12 +1331,12 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const designSystemMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/design-system$/i);
       if (designSystemMatch && ['GET','PUT'].includes(req.method)) {
         if (!localPool) return sendJson(res, 503, { error: 'Design systems require PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = designSystemMatch[1]; await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
+        const siteId = designSystemMatch[1]; await reconcileRouteSiteContext(siteId); await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
         if (req.method === 'GET') {
           const result = await localPool.query('SELECT version,tokens,updated_at FROM site_design_systems WHERE site_id=$1', [siteId]);
           return sendJson(res, 200, { designSystem: result.rows[0] || { version: 0, tokens: {} }, requestId });
         }
-        const body = await readJson(req, Math.min(maxBody, 64_000)); const validation = validateDesignTokens(body.tokens || {});
+        const body = await readJson(req, Math.min(maxBody, 64_000)); await reconcileRouteSiteContext(siteId, body); const validation = validateDesignTokens(body.tokens || {});
         if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_DESIGN_TOKENS_INVALID', 'Design tokens failed validation.', validation.errors);
         const client = await localPool.connect();
         try {
@@ -1349,7 +1355,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const reusableItemMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/reusable-components\/([0-9a-f-]{36})$/i);
       if ((reusableCollectionMatch && ['GET','POST'].includes(req.method)) || (reusableItemMatch && ['PUT','DELETE'].includes(req.method))) {
         if (!localPool) return sendJson(res, 503, { error: 'Reusable components require PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = reusableCollectionMatch?.[1] || reusableItemMatch[1]; await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'content:edit');
+        const siteId = reusableCollectionMatch?.[1] || reusableItemMatch[1]; await reconcileRouteSiteContext(siteId); await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'content:edit');
         if (req.method === 'GET') {
           const result = await localPool.query('SELECT id,slug,name,version,document,created_at,updated_at FROM reusable_components WHERE site_id=$1 ORDER BY name', [siteId]);
           return sendJson(res, 200, { components: result.rows, requestId });
@@ -1359,7 +1365,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
           if (!deleted.rows[0]) throw fail(404, 'ERR_VIRGOSCORPIO_HUB_COMPONENT_NOT_FOUND', 'Reusable component not found.');
           return sendJson(res, 200, { deleted: true, requestId });
         }
-        const body = await readJson(req, Math.min(maxBody, 1_000_000)); const validation = validatePageDocument(body.document);
+        const body = await readJson(req, Math.min(maxBody, 1_000_000)); await reconcileRouteSiteContext(siteId, body); const validation = validatePageDocument(body.document);
         if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT', 'Reusable component document failed validation.', validation.errors);
         if (!/^[a-z0-9][a-z0-9-]{0,100}$/.test(String(body.slug || '')) || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 180) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_COMPONENT_METADATA_INVALID', 'A safe slug and component name are required.');
         if (req.method === 'POST') {
@@ -1376,10 +1382,10 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const templateItemMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/templates\/([0-9a-f-]{36})$/i);
       if ((templateCollectionMatch && ['GET','POST'].includes(req.method)) || (templateItemMatch && ['PUT','DELETE'].includes(req.method))) {
         if (!localPool) return sendJson(res, 503, { error: 'Site templates require PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = templateCollectionMatch?.[1] || templateItemMatch[1]; await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
+        const siteId = templateCollectionMatch?.[1] || templateItemMatch[1]; await reconcileRouteSiteContext(siteId); await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
         if (req.method === 'GET') { const result = await localPool.query('SELECT id,slug,name,template_type,version,active,document,created_at,updated_at FROM site_templates WHERE site_id=$1 ORDER BY template_type,name', [siteId]); return sendJson(res, 200, { templates: result.rows, requestId }); }
         if (req.method === 'DELETE') { const deleted = await localPool.query('DELETE FROM site_templates WHERE site_id=$1 AND id=$2 AND active=false RETURNING id', [siteId, templateItemMatch[2]]); if (!deleted.rows[0]) throw fail(409, 'ERR_VIRGOSCORPIO_HUB_TEMPLATE_ACTIVE_OR_MISSING', 'Only an inactive template can be deleted.'); return sendJson(res, 200, { deleted: true, requestId }); }
-        const body = await readJson(req, Math.min(maxBody, 1_000_000)); const validation = validatePageDocument(body.document);
+        const body = await readJson(req, Math.min(maxBody, 1_000_000)); await reconcileRouteSiteContext(siteId, body); const validation = validatePageDocument(body.document);
         if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_INVALID_DOCUMENT', 'Template document failed validation.', validation.errors);
         if (!/^[a-z0-9][a-z0-9-]{0,100}$/.test(String(body.slug || '')) || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 180 || !['single','archive','header','footer','404','search','page'].includes(body.templateType)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_TEMPLATE_METADATA_INVALID', 'Template slug, name, or type is invalid.');
         const client = await localPool.connect();
@@ -1526,10 +1532,10 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const menuItemMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/menus\/([a-z0-9][a-z0-9-]{0,100})$/i);
       if ((menuCollectionMatch && ['GET','POST'].includes(req.method)) || (menuItemMatch && ['PUT','DELETE'].includes(req.method))) {
         if (!localPool) return sendJson(res, 503, { error: 'Navigation menus require PostgreSQL.', code: 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', requestId });
-        const siteId = menuCollectionMatch?.[1] || menuItemMatch[1]; await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
+        const siteId = menuCollectionMatch?.[1] || menuItemMatch[1]; await reconcileRouteSiteContext(siteId); await requireCapability(actor, siteId, req.method === 'GET' ? 'content:read' : 'site:manage');
         if (req.method === 'GET') { const result = await localPool.query('SELECT id,slug,name,version,items,presentation,created_at,updated_at FROM navigation_menus WHERE site_id=$1 ORDER BY name', [siteId]); return sendJson(res, 200, { menus: result.rows, requestId }); }
         if (req.method === 'DELETE') { const deleted = await localPool.query('DELETE FROM navigation_menus WHERE site_id=$1 AND slug=$2 RETURNING slug', [siteId, menuItemMatch[2]]); if (!deleted.rows[0]) throw fail(404, 'ERR_VIRGOSCORPIO_HUB_MENU_NOT_FOUND', 'Navigation menu not found.'); return sendJson(res, 200, { deleted: true, requestId }); }
-        const body = await readJson(req, Math.min(maxBody, 256_000)); const validation = validateMenuItems(body.items || []);
+        const body = await readJson(req, Math.min(maxBody, 256_000)); await reconcileRouteSiteContext(siteId, body); const validation = validateMenuItems(body.items || []);
         if (!validation.valid) throw fail(422, 'ERR_VIRGOSCORPIO_HUB_MENU_INVALID', 'Navigation menu failed validation.', validation.errors);
         if (!/^[a-z0-9][a-z0-9-]{0,100}$/.test(String(body.slug || '')) || typeof body.name !== 'string' || !body.name.trim() || body.name.length > 180) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_MENU_METADATA_INVALID', 'Menu slug and name are required.');
         const presentation = body.presentation === undefined ? {} : body.presentation;
@@ -1545,12 +1551,13 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
       const aiPolicyMatch = url.pathname.match(/^\/api\/v1\/sites\/([0-9a-f-]{36})\/ai-policy$/i);
       if (aiPolicyMatch && ['GET','PUT'].includes(req.method)) {
         if (!localPool) throw fail(503, 'ERR_VIRGOSCORPIO_HUB_DATABASE_DISABLED', 'AI governance configuration requires PostgreSQL.');
-        const siteId = aiPolicyMatch[1]; await requireCapability(actor, siteId, 'site:manage');
+        const siteId = aiPolicyMatch[1]; await reconcileRouteSiteContext(siteId); await requireCapability(actor, siteId, 'site:manage');
         if (req.method === 'GET') {
           const policy = await getSiteAIPolicy(siteId);
           return sendJson(res, 200, { policy, availableProviders: [...AI_PROVIDERS], classificationLevels: Object.keys(DATA_CLASSIFICATION_RANK), requestId });
         }
         const body = await readJson(req, Math.min(maxBody, 32_000));
+        await reconcileRouteSiteContext(siteId, body);
         const allowedProviders = body.allowedProviders;
         if (!Array.isArray(allowedProviders) || allowedProviders.length < 1 || allowedProviders.length > AI_PROVIDERS.size || allowedProviders.some(provider => typeof provider !== 'string' || !AI_PROVIDERS.has(provider)) || new Set(allowedProviders).size !== allowedProviders.length) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_AI_POLICY_INVALID', 'allowedProviders must contain unique supported provider names.');
         if (typeof body.enabled !== 'boolean' || typeof body.allowExternalContent !== 'boolean' || !Object.hasOwn(DATA_CLASSIFICATION_RANK, body.maxDataClassification)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_AI_POLICY_INVALID', 'enabled, allowExternalContent and maxDataClassification are required.');

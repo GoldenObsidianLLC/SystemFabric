@@ -8,8 +8,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
-- Implementation-source digest: 01faa2aae37f86937eb4bd85890b24978fb57e1ca304b343f963244bd4297e9e across 19 files.
-- Referenced-test digest: a92adf075c555d24c28b235c8259e21fe4b43c91766d03061cf0fdcf42362c41 across 37 files.
+- Implementation-source digest: 782b144cea68fe03835344eb1a93abb5d8c1ff8dfa1ed1add0d3037aae63d700 across 19 files.
+- Referenced-test digest: 36a341eddcd29102ef458cfaec4766b1bc1b551206a3bdc5b1955e43227c9893 across 37 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 37 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
@@ -55,7 +55,7 @@ Tests: test/tenant-route-capabilities.test.js
 
 Content read/edit scope and collaboration-document authorization include ownership, document type, site and active-session checks where applicable.
 
-Source: apps/api/src/server.js (lines 350, 438, 449, 1650, 1672, 1751)
+Source: apps/api/src/server.js (lines 350, 438, 449, 1657, 1679, 1758)
 
 Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/realtime-websocket.test.js
 
@@ -99,7 +99,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: Site membership/ownership policy, Developer-token restriction for site creation
 - Data-access boundary: sites; site_memberships; identity/audit records
 - Side effects: Site and owner-membership creation
-- Source: apps/api/src/server.js (lines 1313, 1317)
+- Source: apps/api/src/server.js (lines 1319, 1323)
 - Test references: test/api.test.js, test/auth-security.test.js
 - Coverage characterization: **targeted**. Identity unit and API coverage exists; owner handoff, concurrent ownership changes and creation abuse need independent assessment.
 
@@ -113,7 +113,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: site:manage
 - Data-access boundary: site_memberships; users; invitations; mail/outbox; audit events; authorization invalidation
 - Side effects: Add/remove membership; Create invitation; Mail delivery intent; Audit and session/realtime authorization invalidation
-- Source: apps/api/src/site-membership-routes.js (lines 33, 68, 89); apps/api/src/server.js (lines 1780)
+- Source: apps/api/src/site-membership-routes.js (lines 33, 68, 89); apps/api/src/server.js (lines 1787)
 - Test references: test/site-membership-routes.test.js, test/integration/tenant-membership-administration-isolation.integration.test.js
 - Coverage characterization: **targeted-selector-reconciliation-and-two-site-side-effects**. Unit tests assert resolver-before-capability ordering. The live A/B integration scenario rejects path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares membership, invitation, mail-outbox and audit snapshots for both sites. Foreign-user membership and invitation controls remain covered. Last-owner concurrency, broader role combinations and revocation of active streams remain independent-review work.
 
@@ -123,13 +123,13 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Methods (family-level union): GET, POST, PUT, PATCH, DELETE
 - Routes/flows: /api/v1/sites/{siteId}/design-system; /api/v1/sites/{siteId}/reusable-components/**; /api/v1/sites/{siteId}/templates/**; /api/v1/sites/{siteId}/terms/**; /api/v1/sites/{siteId}/relationships/**; /api/v1/sites/{siteId}/menus/**; /api/v1/sites/{siteId}/ai-policy
 - Authentication: Authenticated session.
-- Tenant/site context: Path-site route families; implementations use route/path site IDs and route-specific capability guards. Some handlers also reconcile other selectors through siteIdFor; verify each operation individually.
+- Tenant/site context: Path-addressed configuration operations reconcile the route site against x-virgoscorpio-hub-site-id and siteId query selectors before the route-specific capability check. Bounded JSON writes reconcile body siteId after parsing and before domain validation or persistence. The shared resolver validates selector shape and agreement with its generic membership precheck disabled so each route preserves its established capability/error contract.
 - Capabilities/controls: content:read, content:edit, site:manage
 - Data-access boundary: site_design_systems; reusable_components; site_templates; taxonomy_terms; content_relationships; navigation_menus; site_ai_policies; outbox; audit
 - Side effects: Versioned metadata/configuration writes; Relationship/taxonomy domain events; Graph projection work; Audit events
-- Source: apps/api/src/server.js (lines 1325, 1348, 1375, 1402, 1467, 1525, 1545)
+- Source: apps/api/src/server.js (lines 1231, 1331, 1354, 1381, 1408, 1473, 1531, 1551)
 - Test references: test/tenant-route-capabilities.test.js, test/integration/tenant-isolation.integration.test.js, test/integration/postgres.integration.test.js, test/outbox-contract.test.js
-- Coverage characterization: **selected-route-denial-and-targeted-integration**. The route capability suite checks deny-before-data-access for selected GET routes; it does not prove all operation methods, foreign object IDs, concurrency or outbox/graph effects for every family.
+- Coverage characterization: **path-header-query-and-write-body-selector-reconciliation**. Live PostgreSQL tenant-isolation integration tests exercise header/query conflicts for each configuration family, body conflicts for design-system/reusable-components/templates/menus/AI-policy writes, and header mismatches for path-addressed deletes. Snapshot comparisons cover tenant configuration tables. Independent route enumeration, authorization matrices and broader deployment review remain required.
 
 ### 6. Custom content-type registry and records
 
@@ -155,7 +155,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: content:read, content:read:own, content:edit, content:edit:own, content:submit, content:approve, content:publish, content:archive
 - Data-access boundary: content records; content revisions; published snapshots; workflow state; outbox/audit
 - Side effects: Content/revision writes; Restore and workflow transitions; Publication and outbox events
-- Source: apps/api/src/server.js (lines 1723, 1737, 1748, 1759)
+- Source: apps/api/src/server.js (lines 1730, 1744, 1755, 1766)
 - Test references: test/integration/tenant-content-object-isolation.integration.test.js, test/api.test.js, test/content-owner-store.test.js
 - Coverage characterization: **targeted-two-site**. The A/B suite reuses foreign page IDs against selected read/revision/collaboration/restore/publish paths and snapshots relevant state; all workflow actions, owner exceptions and concurrency still need independent coverage.
 
@@ -169,7 +169,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: content:edit, content:edit:own
 - Data-access boundary: content documents; collaboration operations/cursors; document publisher/realtime topics
 - Side effects: Durable operation append; Sequence and cursor updates; Site/document-scoped publication
-- Source: apps/api/src/server.js (lines 350, 438, 1657)
+- Source: apps/api/src/server.js (lines 350, 438, 1664)
 - Test references: test/collaboration-api.test.js, test/realtime-websocket.test.js, test/integration/tenant-content-object-isolation.integration.test.js
 - Coverage characterization: **targeted-two-site-and-unit**. Selected foreign document IDs and stale/invalid collaboration cases are covered; replay, reconnect, membership revocation during active collaboration and all cross-instance paths remain reviewer work.
 
@@ -183,7 +183,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: ai:use, site:manage (AI policy management)
 - Data-access boundary: site_ai_policies; AI task metadata and encrypted payloads; usage/quota reservations; provider adapters
 - Side effects: Task enqueue/claim/complete; Provider invocation; Usage/audit records; Cancellation and lease transitions
-- Source: apps/api/src/server.js (lines 455, 1571); apps/api/src/ai-task-routes.js (lines 8, 9, 104)
+- Source: apps/api/src/server.js (lines 455, 1578); apps/api/src/ai-task-routes.js (lines 8, 9, 104)
 - Test references: test/ai-task-routes.test.js, test/ai-task-queue.test.js, test/ai-queue-worker.test.js, test/api.test.js
 - Coverage characterization: **targeted**. Tenant-bound task cursors, payload AAD, policy and provider guards have focused tests; every selected-page/context/provider path and concurrent quota isolation require broader review.
 
@@ -197,7 +197,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: media:manage
 - Data-access boundary: media metadata; local/S3 object storage
 - Side effects: Object write followed by metadata write; Compensating object cleanup on metadata failure
-- Source: apps/api/src/server.js (lines 1620, 1625); packages/media/src/local-store.js (lines 51)
+- Source: apps/api/src/server.js (lines 1627, 1632); packages/media/src/local-store.js (lines 51)
 - Test references: test/api.test.js, test/security-boundaries.test.js, test/integration/tenant-library-media-isolation.integration.test.js
 - Coverage characterization: **targeted**. File signature and storage safety tests exist; remote provider IAM, object key collisions, deletion/reconciliation and media-specific two-site byte access require independent/provider testing.
 
@@ -309,7 +309,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: plugins:read, plugins:manage
 - Data-access boundary: plugin_installs; approval and security-review metadata; artifact/SBOM/provenance/signature metadata; plugin runner boundary
 - Side effects: Registration/update; Capability approval; Security review state; Activation/disable/invocation
-- Source: apps/api/src/server.js (lines 1796, 1802, 1831)
+- Source: apps/api/src/server.js (lines 1803, 1809, 1838)
 - Test references: test/security-boundaries.test.js, test/security-boundaries.test.js, test/integration/tenant-isolation.integration.test.js
 - Coverage characterization: **partial**. Manifest/signature/runner boundaries have unit coverage. Cross-site plugin ID, approval and invocation side-effect A/B tests and actual sandbox isolation remain open.
 
@@ -379,7 +379,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: Realtime capability policy, content:edit/content:edit:own for document collaboration
 - Data-access boundary: presence leases; SSE/WebSocket subscriptions; Redis channels/keys; connection quotas; document operations
 - Side effects: Presence lease create/renew/release; Stream fan-out; Authorization invalidation; Quota lease acquire/release
-- Source: apps/api/src/server.js (lines 1229, 1231, 1943); packages/realtime/src/redis-presence.js (lines 62, 63, 64, 66, 76, 79, 109, 111, 122, 126, 136, 139, 144, 178, 180, 196, 207, 211, 212)
+- Source: apps/api/src/server.js (lines 1235, 1237, 1950); packages/realtime/src/redis-presence.js (lines 62, 63, 64, 66, 76, 79, 109, 111, 122, 126, 136, 139, 144, 178, 180, 196, 207, 211, 212)
 - Test references: test/realtime-tenant-isolation.test.js, test/realtime-websocket.test.js, test/redis-realtime.test.js, test/integration/redis-presence.integration.test.js
 - Coverage characterization: **targeted-cross-instance**. Selected two-site stream isolation, session invalidation, per-command reauthorization and Redis relay cases are covered. Forged cross-site payloads, every reconnect/replay path and production distributed quota behavior need independent review.
 

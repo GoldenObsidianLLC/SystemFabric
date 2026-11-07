@@ -244,8 +244,15 @@ Mainline at inventory preparation: f601a8c124b9c2b266cb847dcb7b3b0daab30952. The
 **Current gate disposition remains OPEN / NOT PERFORMED.** No independent reviewer is assigned, no passing artifacts/evidence/tenant-isolation-review.json exists, and the broader independent security issue #25 remains open. This supplement does not change production status: NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 
-## 10. Membership route selector-consistency follow-up - 7 November 2026
+## 10. Membership route selector-consistency follow-up - PR #88 merged, 7 November 2026
 
 The PR #88 candidate based on mainline 496db8a4a1416502b48a58120986eb665b197846 aligns the site-membership module with the API shared siteIdFor resolver. Member listing, member addition, member removal and invitation creation now reconcile the path site with the optional x-virgoscorpio-hub-site-id header, siteId query selector and (for JSON writes) body siteId before the site:manage capability check. The resolver generic membership precheck is explicitly disabled for this route family so the existing site:manage check remains the authorization gate and preserves the established ERR_VIRGOSCORPIO_HUB_FORBIDDEN response contract. Conflicting or duplicated selectors still fail through the existing site-context 400 error contract before identity persistence.
 
 Unit tests verify the resolver runs before capability authorization. The live two-site integration case exercises path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares site A and site B membership, invitation, mail-outbox and audit snapshots to prove no tenant side effects occurred. This is targeted regression coverage only. PR #88 hosted CI is pending; no independent reviewer has accepted issue #14 evidence, no evidence file was created, and issues #14 and #25 remain open. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+
+
+## 11. Site configuration route selector-consistency follow-up - PR #89 candidate, 7 November 2026
+
+The PR #89 candidate based on mainline c5c31556acb052b9a257931867ef0166e866e822 adds a request-scoped helper that reconciles the path site ID with the x-virgoscorpio-hub-site-id header and siteId query selector before the existing route-specific capability guard for design-system, reusable-component, template, navigation-menu and AI-policy routes. Bounded JSON writes are checked for a body siteId after parsing and before domain validation or persistence. The helper disables its generic membership precheck and leaves each route capability authorization/error contract intact.
+
+The PostgreSQL tenant-isolation integration suite exercises conflicting header/query values for each family, body mismatches on write routes, and header mismatches for deletes. It compares site configuration table snapshots before and after rejected calls. This is regression coverage only and not proof of complete route inventory or tenant isolation. Independent reviewer acceptance remains required for issue #14; broader independent security assessment #25 remains open. No formal security evidence file is created. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.

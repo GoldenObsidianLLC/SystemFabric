@@ -1,6 +1,6 @@
-## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#87 merged)
+## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#88 merged)
 
-Current mainline: VirgoScorpio Hub 0.6.2 at 496db8a4a1416502b48a58120986eb665b197846 after PR #87. PR #87 added the generated 27-family/78-pattern tenant-isolation route/data-access inventory, source/test anchors and platform-normalized digests. Its PR workflow [run 42333235986](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42333235986) and post-merge mainline push workflow [run 42333446105](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42333446105) passed all six hosted jobs. PRs #84-#87 are merged. The inventory remains a maintainer-authored review aid, not independent evidence.
+Current mainline: VirgoScorpio Hub 0.6.2 at c5c31556acb052b9a257931867ef0166e866e822 after PR #88. PR #87 added the generated 27-family/78-pattern tenant-isolation route/data-access inventory, source/test anchors and platform-normalized digests. PR #88 aligned membership listing, add/remove and invitations with shared path/header/query/body selector reconciliation while preserving site:manage authorization errors. PR #88 PR workflow [run 42336173083](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42336173083) and post-merge mainline push workflow [run 42336343536](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42336343536) passed all six hosted jobs. PRs #84-#88 are merged. The inventory remains a maintainer-authored review aid, not independent evidence.
 
 The maintainer-generated [Tenant-Isolation Route and Data-Access Inventory](security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) catalogs 27 route/processing families and 78 declared route patterns, with 19 source files and 37 referenced test files. Its generator checks source anchors and test references, refreshes line numbers, records implementation/test tree digests, and is exercised by the unit suite. It is a navigation and drift-detection aid only: it does not prove route completeness or runtime security and is not an independent assessment.
 
@@ -8,13 +8,11 @@ Issue #14 remains OPEN / NOT PERFORMED. No independent reviewer is assigned and 
 
 ---
 
-## Pending code candidate - site selector reconciliation for membership administration (PR #88, not merged)
+## Pending code candidate - path-site selector reconciliation for configuration routes (PR #89, not merged)
 
-The next candidate is based on mainline 496db8a4a1416502b48a58120986eb665b197846. The member-list, member-add, member-remove and invitation handlers receive the shared siteIdFor resolver from API composition. The resolver reconciles the route path site with the header, query and JSON-body selectors and validates them before identity-store operations. Its generic membership precheck is explicitly disabled for this family, leaving the existing site:manage capability guard as the authorization step so the established ERR_VIRGOSCORPIO_HUB_FORBIDDEN response contract does not change. Duplicate query selectors and conflicting selectors still fail with the established 400 site-context error. Unit tests assert selector resolution precedes capability checking; the two-site PostgreSQL integration test compares membership, invitation, mail-outbox and audit state before/after header, query and body mismatch attempts and retains the existing cross-site forbidden response assertions.
+The next candidate is based on mainline c5c31556acb052b9a257931867ef0166e866e822. It introduces a shared request-scoped path-site reconciliation helper for design-system, reusable-component, template, navigation-menu and AI-policy routes. Route/header/query selectors are checked before the route capability guard; JSON body selectors are checked after bounded parsing and before validation or persistence. The helper disables only its generic membership precheck so existing route-specific capability authorization and forbidden-response contracts remain intact. PostgreSQL integration scenarios cover selector conflicts across reads, writes and deletes and compare configuration records before/after rejected requests.
 
-This is a targeted consistency hardening, not proof of complete tenant isolation. It does not close issue #14 or #25, does not produce formal security-review evidence, and does not change the product version or release disposition. PR CI and post-merge mainline CI have not yet been validated for this candidate.
-
----
+This targeted consistency work does not prove complete tenant isolation and does not replace independent issue #14 or #25 review. PR CI and post-merge CI have not yet been validated for this candidate; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 # Release Readiness and Certification Gates
 

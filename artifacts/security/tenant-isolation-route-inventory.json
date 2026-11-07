@@ -8,7 +8,7 @@
   "generatedBy": "scripts/generate-tenant-isolation-route-inventory.js",
   "sourceTree": {
     "fileCount": 19,
-    "sha256": "01faa2aae37f86937eb4bd85890b24978fb57e1ca304b343f963244bd4297e9e",
+    "sha256": "782b144cea68fe03835344eb1a93abb5d8c1ff8dfa1ed1add0d3037aae63d700",
     "files": [
       "apps/api/src/ai-task-routes.js",
       "apps/api/src/auth-routes.js",
@@ -33,7 +33,7 @@
   },
   "testTree": {
     "fileCount": 37,
-    "sha256": "a92adf075c555d24c28b235c8259e21fe4b43c91766d03061cf0fdcf42362c41",
+    "sha256": "36a341eddcd29102ef458cfaec4766b1bc1b551206a3bdc5b1955e43227c9893",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -181,9 +181,9 @@
               "anchor": "canEditContent",
               "lines": [
                 449,
-                1650,
-                1672,
-                1751
+                1657,
+                1679,
+                1758
               ]
             }
           ]
@@ -351,8 +351,8 @@
             {
               "anchor": "url.pathname === '/api/v1/sites'",
               "lines": [
-                1313,
-                1317
+                1319,
+                1323
               ]
             }
           ]
@@ -428,7 +428,7 @@
             {
               "anchor": "const siteMembershipHandled = await handleSiteMembershipRoute({",
               "lines": [
-                1780
+                1787
               ]
             }
           ]
@@ -461,7 +461,7 @@
         "/api/v1/sites/{siteId}/ai-policy"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Path-site route families; implementations use route/path site IDs and route-specific capability guards. Some handlers also reconcile other selectors through siteIdFor; verify each operation individually.",
+      "siteContext": "Path-addressed configuration operations reconcile the route site against x-virgoscorpio-hub-site-id and siteId query selectors before the route-specific capability check. Bounded JSON writes reconcile body siteId after parsing and before domain validation or persistence. The shared resolver validates selector shape and agreement with its generic membership precheck disabled so each route preserves its established capability/error contract.",
       "capabilities": [
         "content:read",
         "content:edit",
@@ -491,43 +491,49 @@
             {
               "anchor": "const designSystemMatch",
               "lines": [
-                1325
+                1331
               ]
             },
             {
               "anchor": "const reusableCollectionMatch",
               "lines": [
-                1348
+                1354
               ]
             },
             {
               "anchor": "const templateCollectionMatch",
               "lines": [
-                1375
+                1381
               ]
             },
             {
               "anchor": "const termsCollectionMatch",
               "lines": [
-                1402
+                1408
               ]
             },
             {
               "anchor": "const relationshipsCollectionMatch",
               "lines": [
-                1467
+                1473
               ]
             },
             {
               "anchor": "const menuCollectionMatch",
               "lines": [
-                1525
+                1531
               ]
             },
             {
               "anchor": "const aiPolicyMatch",
               "lines": [
-                1545
+                1551
+              ]
+            },
+            {
+              "anchor": "async function reconcileRouteSiteContext(routeSiteId, body = {})",
+              "lines": [
+                1231
               ]
             }
           ]
@@ -540,8 +546,8 @@
         "test/outbox-contract.test.js"
       ],
       "coverage": {
-        "level": "selected-route-denial-and-targeted-integration",
-        "limits": "The route capability suite checks deny-before-data-access for selected GET routes; it does not prove all operation methods, foreign object IDs, concurrency or outbox/graph effects for every family."
+        "level": "path-header-query-and-write-body-selector-reconciliation",
+        "limits": "Live PostgreSQL tenant-isolation integration tests exercise header/query conflicts for each configuration family, body conflicts for design-system/reusable-components/templates/menus/AI-policy writes, and header mismatches for path-addressed deletes. Snapshot comparisons cover tenant configuration tables. Independent route enumeration, authorization matrices and broader deployment review remain required."
       },
       "methods": [
         "GET",
@@ -663,25 +669,25 @@
             {
               "anchor": "const pageIdMatch",
               "lines": [
-                1723
+                1730
               ]
             },
             {
               "anchor": "const revisionsMatch",
               "lines": [
-                1737
+                1744
               ]
             },
             {
               "anchor": "const restoreMatch",
               "lines": [
-                1748
+                1755
               ]
             },
             {
               "anchor": "const workflowMatch",
               "lines": [
-                1759
+                1766
               ]
             }
           ]
@@ -734,7 +740,7 @@
             {
               "anchor": "const collaborationMatch",
               "lines": [
-                1657
+                1664
               ]
             },
             {
@@ -798,7 +804,7 @@
             {
               "anchor": "url.pathname === '/api/v1/ai/page-draft'",
               "lines": [
-                1571
+                1578
               ]
             }
           ]
@@ -860,13 +866,13 @@
             {
               "anchor": "url.pathname === '/api/v1/media'",
               "lines": [
-                1620
+                1627
               ]
             },
             {
               "anchor": "url.pathname === '/api/v1/media/uploads'",
               "lines": [
-                1625
+                1632
               ]
             }
           ]
@@ -1457,19 +1463,19 @@
             {
               "anchor": "url.pathname === '/api/v1/plugins'",
               "lines": [
-                1796
+                1803
               ]
             },
             {
               "anchor": "url.pathname === '/api/v1/plugins/register'",
               "lines": [
-                1802
+                1809
               ]
             },
             {
               "anchor": "const pluginActionMatch",
               "lines": [
-                1831
+                1838
               ]
             }
           ]
@@ -1725,19 +1731,19 @@
             {
               "anchor": "const presenceMatch",
               "lines": [
-                1229
+                1235
               ]
             },
             {
               "anchor": "const realtimeEventsMatch",
               "lines": [
-                1231
+                1237
               ]
             },
             {
               "anchor": "upgradePath = url.pathname",
               "lines": [
-                1943
+                1950
               ]
             }
           ]
