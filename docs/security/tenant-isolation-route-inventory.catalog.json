@@ -730,7 +730,7 @@
         "/library/public/{assetId}/variants/{variantKey}"
       ],
       "authentication": "Public/anonymous.",
-      "siteContext": "No caller-selected site. The asset ID resolves through store-level public/active/not-deleted predicates; bytes must match stored length/hash and media variants must match MIME signature and parent category.",
+      "siteContext": "No caller-selected site. Public byte routes resolve through store-level current visibility and lifecycle predicates; bytes are checked for stored length/hash and variants for MIME signature and parent category. S3 media URLs are API-mediated; direct public CDN URLs are disabled pending a verified invalidation contract.",
       "capabilities": [
         "Public asset publication flag and active/quarantine state"
       ],
@@ -740,7 +740,7 @@
         "media_variants"
       ],
       "sideEffects": [
-        "Read-only byte delivery with public cache headers; cache lifetime and revocation behavior are security-relevant."
+        "Read-only byte delivery; successful responses use private, no-store and recheck database visibility on each request. Shared-cache/CDN overrides remain deployment-review items."
       ],
       "sourceRefs": [
         {
@@ -765,8 +765,8 @@
         "test/security-boundaries.test.js"
       ],
       "coverage": {
-        "level": "targeted",
-        "limits": "Public/private and corrupted-variant checks exist. URL guessing, old caches after visibility change, object-provider policy and all media types require separate review."
+        "level": "targeted-two-site-revocation-and-no-store",
+        "limits": "The live two-site integration suite reads a public library asset and variant, revokes visibility through the authorized metadata route, and confirms the next origin request returns 404; it also verifies public media revocation and private, no-store success headers. S3 tests prove direct public CDN mode fails closed and objects are stored private/no-store. The tests do not validate reverse-proxy/CDN overrides, provider IAM/bucket policy, purging legacy direct-CDN URLs already issued before this change, or every asset/variant type; those remain deployment and independent-review work."
       },
       "methods": [
         "GET"

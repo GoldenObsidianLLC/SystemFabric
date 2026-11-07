@@ -12,6 +12,14 @@
 - Download responses use content-disposition, `nosniff`, private/no-store headers, and a restrictive CSP.
 - Public assets must be explicitly marked public. Public access must never be used for confidential documents.
 
+## Public asset delivery and revocation
+
+- Public media, library-asset, and variant byte routes are revocable reads. Every request rechecks the current database visibility and lifecycle state before returning bytes.
+- Successful public-byte responses use Cache-Control: private, no-store so compliant browsers and shared caches do not retain bytes after visibility is withdrawn. Denied responses are also non-cacheable.
+- S3 media URLs always resolve through the API (/media/{assetId}); S3 objects are stored with private, no-store metadata. MEDIA_CDN_PUBLIC=true fails startup because the provider adapter has no verified edge-purge/revocation contract.
+- Keep object-storage buckets private. Any reverse proxy or CDN in front of the API must bypass caching for /media/* and /library/public/* and must not override origin cache directives. Direct object URLs or edge caching require a separately implemented and tested invalidation contract before being enabled.
+- Migration caveat: this change cannot purge CDN objects or revoke direct URLs issued by an older deployment. Before rollout where MEDIA_CDN_PUBLIC was enabled, purge every previously exposed media key/prefix at the provider, block public access to the origin bucket, and verify denial from both the edge and origin. Until that evidence exists, previously issued URLs remain a separate deployment risk.
+
 ## API outline
 
 Authenticated routes use `Authorization: Bearer …` in development or an authenticated cookie/session with CSRF checks for browser write operations:

@@ -23,8 +23,10 @@ function createS3MediaStore({ pool, env = process.env, client: suppliedClient, c
   const bucket = String(env.S3_BUCKET || '');
   const region = String(env.S3_REGION || 'us-east-1');
   const endpoint = String(env.S3_ENDPOINT || '');
-  const cdnBase = String(env.CDN_BASE_URL || '').replace(/\/$/, '');
   if (!bucket || !/^[A-Za-z0-9._-]{3,63}$/.test(bucket)) throw new Error('S3_BUCKET must be configured with a valid bucket name.');
+  if (env.MEDIA_CDN_PUBLIC === 'true') {
+    throw new Error('MEDIA_CDN_PUBLIC is disabled until provider-backed CDN invalidation and revocation are implemented and verified.');
+  }
   if (env.NODE_ENV === 'production' && endpoint) {
     const url = new URL(endpoint);
     if (url.protocol !== 'https:') throw new Error('S3_ENDPOINT must use HTTPS in production.');
@@ -36,8 +38,6 @@ function createS3MediaStore({ pool, env = process.env, client: suppliedClient, c
     commands = commands || sdk;
     client = client || new sdk.S3Client({ region, endpoint: endpoint || undefined, forcePathStyle: env.S3_FORCE_PATH_STYLE === 'true', maxAttempts: 3 });
   }
-  const publicCdnEnabled = env.MEDIA_CDN_PUBLIC === 'true' && Boolean(cdnBase);
-
   async function upload({ siteId, actorId, dataBase64, mimeType, altText = '', isPublic = true }) {
     if (typeof dataBase64 !== 'string' || dataBase64.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 8 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(dataBase64)) throw mediaError('dataBase64 must be valid base64 image data up to 10 MiB.');
     const buffer = Buffer.from(dataBase64, 'base64');
@@ -46,7 +46,7 @@ function createS3MediaStore({ pool, env = process.env, client: suppliedClient, c
     if (!detected || detected !== mimeType || !MIME_TYPES[detected]) throw mediaError('Only signature-verified PNG, JPEG, WebP, and GIF images are supported. SVG and unknown formats are rejected.');
     if (typeof altText !== 'string' || altText.length > 1000) throw mediaError('altText must be at most 1000 characters.');
     const id = randomUUID(); const storageKey = `${siteId}/${id}.${MIME_TYPES[detected]}`;
-    await client.send(new commands.PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: buffer, ContentType: detected, ContentLength: buffer.length, CacheControl: isPublic === false ? 'private, no-store' : 'public, max-age=31536000, immutable', Metadata: { 'virgoscorpio-hub-site-id': String(siteId), 'virgoscorpio-hub-asset-id': id, verifiedImage: 'true' } }));
+    await client.send(new commands.PutObjectCommand({ Bucket: bucket, Key: storageKey, Body: buffer, ContentType: detected, ContentLength: buffer.length, CacheControl: 'private, no-store', Metadata: { 'virgoscorpio-hub-site-id': String(siteId), 'virgoscorpio-hub-asset-id': id, verifiedImage: 'true' } }));
     try {
       const result = await pool.query(`INSERT INTO media_assets(id,site_id,storage_key,mime_type,byte_size,alt_text,metadata,created_by,publicly_accessible) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING id,site_id,storage_key,mime_type,byte_size,alt_text,publicly_accessible,created_at`, [id, siteId, storageKey, detected, buffer.length, altText, JSON.stringify({ storage: 's3', bucket, region, verifiedImage: true }), actorId || null, isPublic !== false]);
       return result.rows[0];
@@ -63,8 +63,8 @@ function createS3MediaStore({ pool, env = process.env, client: suppliedClient, c
       return result.rows;
     },
     publicUrl(asset) {
-      if (!asset || !publicCdnEnabled || asset.publicly_accessible !== true || !asset.storage_key) return asset?.id ? `/media/${asset.id}` : null;
-      return `${cdnBase}/${String(asset.storage_key).split('/').map(segment => encodeURIComponent(segment)).join('/')}`;
+      // Public media must pass through readPublic so visibility revocation is checked per request.
+      return asset?.id ? '/media/' + asset.id : null;
     },
     async readPublic(id) {
       const result = await pool.query('SELECT id,storage_key,mime_type,byte_size FROM media_assets WHERE id=$1 AND publicly_accessible=true LIMIT 1', [id]);

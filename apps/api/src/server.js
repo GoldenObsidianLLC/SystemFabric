@@ -835,7 +835,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!mediaStore) return sendJson(res, 404, { error: 'Media not found.', requestId });
         const asset = await mediaStore.readPublic(mediaPublicMatch[1]);
         if (!asset) return sendJson(res, 404, { error: 'Media not found.', requestId });
-        res.writeHead(200, { 'content-type': asset.mime_type, 'content-length': asset.data.length, 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': 'inline' });
+        res.writeHead(200, { 'content-type': asset.mime_type, 'content-length': asset.data.length, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': 'inline' });
         return res.end(asset.data);
       }
       const publicSearchMatch = url.pathname.match(/^\/api\/v1\/public\/([a-z0-9][a-z0-9-]{0,62})\/search$/);
@@ -851,7 +851,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         if (!libraryStore) return sendJson(res, 404, { error: 'Asset variant not found.', code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', requestId });
         const variant = await libraryStore.readPublicVariant({ assetId: libraryVariantMatch[1], variantKey: libraryVariantMatch[2] });
         if (!variant) return sendJson(res, 404, { error: 'Asset variant not found.', code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', requestId });
-        res.writeHead(200, { 'content-type': variant.mime_type, 'content-length': variant.data.length, 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': 'inline' });
+        res.writeHead(200, { 'content-type': variant.mime_type, 'content-length': variant.data.length, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': 'inline' });
         return res.end(variant.data);
       }
       const libraryPublicMatch = url.pathname.match(/^\/library\/public\/([0-9a-f-]{36})$/i);
@@ -860,7 +860,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         const asset = await libraryStore.readPublic(libraryPublicMatch[1]);
         if (!asset) return sendJson(res, 404, { error: 'Asset not found.', code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', requestId });
         const disposition = /^(?:image|video|audio|font)\//.test(asset.mime_type) ? 'inline' : 'attachment';
-        res.writeHead(200, { 'content-type': asset.mime_type, 'content-length': asset.data.length, 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': disposition });
+        res.writeHead(200, { 'content-type': asset.mime_type, 'content-length': asset.data.length, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox", 'cross-origin-resource-policy': 'same-site', 'content-disposition': disposition });
         return res.end(asset.data);
       }
       const publicProductsMatch = url.pathname.match(/^\/api\/v1\/public\/([a-z0-9][a-z0-9-]{0,62})\/products$/);
