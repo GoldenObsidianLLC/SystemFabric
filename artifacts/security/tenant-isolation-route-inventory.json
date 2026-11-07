@@ -32,8 +32,8 @@
     ]
   },
   "testTree": {
-    "fileCount": 38,
-    "sha256": "8fd35987c8c20c42a624047557e6df3b87b6e5bbaff11bc4dc4fa78e1fb4537a",
+    "fileCount": 39,
+    "sha256": "97df2915d477d83022e976806e90cd4c293b873508f74f25e42d22a70f360ea9",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -62,6 +62,7 @@
       "test/integration/tenant-library-media-isolation.integration.test.js",
       "test/integration/tenant-mega-menu-isolation.integration.test.js",
       "test/integration/tenant-membership-administration-isolation.integration.test.js",
+      "test/integration/tenant-plugin-registry-isolation.integration.test.js",
       "test/library-routes.test.js",
       "test/memgraph-projector.test.js",
       "test/outbox-contract.test.js",
@@ -81,7 +82,7 @@
     "nonHttpFamilyCount": 4,
     "declaredRoutePatternCount": 78,
     "sourceFileCount": 19,
-    "testFileCount": 38
+    "testFileCount": 39
   },
   "commonControls": [
     {
@@ -1485,11 +1486,12 @@
       "tests": [
         "test/security-boundaries.test.js",
         "test/security-boundaries.test.js",
-        "test/integration/tenant-isolation.integration.test.js"
+        "test/integration/tenant-isolation.integration.test.js",
+        "test/integration/tenant-plugin-registry-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "partial",
-        "limits": "Manifest/signature/runner boundaries have unit coverage. Cross-site plugin ID, approval and invocation side-effect A/B tests and actual sandbox isolation remain open."
+        "level": "targeted-two-site-lifecycle",
+        "limits": "Live PostgreSQL A/B coverage verifies site-scoped plugin listing, non-disclosing foreign plugin IDs across approve/security-review/activate/disable/invoke, and no mutation or invocation records after denied cross-site actions. Conflicting registration site selectors are rejected before writes. The positive control approves a Site B plugin, requires a different Site B administrator for security review, and confirms activation/invocation remain fail-closed while execution is disabled. Actual isolated runner sandbox behavior and independent review remain external release gates."
       },
       "methods": [
         "GET",

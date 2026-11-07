@@ -9,8 +9,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
 - Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: 8fd35987c8c20c42a624047557e6df3b87b6e5bbaff11bc4dc4fa78e1fb4537a across 38 files.
-- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 38 test files.
+- Referenced-test digest: 97df2915d477d83022e976806e90cd4c293b873508f74f25e42d22a70f360ea9 across 39 files.
+- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 39 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
 The catalog is a curated route-family inventory. Source anchors are checked against the current files and line numbers are generated. Route patterns, capability descriptions, data-access notes, and test limitations remain maintainer-authored metadata; they are not inferred proofs of runtime behavior.
@@ -310,8 +310,8 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Data-access boundary: plugin_installs; approval and security-review metadata; artifact/SBOM/provenance/signature metadata; plugin runner boundary
 - Side effects: Registration/update; Capability approval; Security review state; Activation/disable/invocation
 - Source: apps/api/src/server.js (lines 1808, 1814, 1843)
-- Test references: test/security-boundaries.test.js, test/security-boundaries.test.js, test/integration/tenant-isolation.integration.test.js
-- Coverage characterization: **partial**. Manifest/signature/runner boundaries have unit coverage. Cross-site plugin ID, approval and invocation side-effect A/B tests and actual sandbox isolation remain open.
+- Test references: test/security-boundaries.test.js, test/security-boundaries.test.js, test/integration/tenant-isolation.integration.test.js, test/integration/tenant-plugin-registry-isolation.integration.test.js
+- Coverage characterization: **targeted-two-site-lifecycle**. Live PostgreSQL A/B coverage verifies site-scoped plugin listing, non-disclosing foreign plugin IDs across approve/security-review/activate/disable/invoke, and no mutation or invocation records after denied cross-site actions. Conflicting registration site selectors are rejected before writes. The positive control approves a Site B plugin, requires a different Site B administrator for security review, and confirms activation/invocation remain fail-closed while execution is disabled. Actual isolated runner sandbox behavior and independent review remain external release gates.
 
 ### 19. Site firewall rules and shared policy cache
 
