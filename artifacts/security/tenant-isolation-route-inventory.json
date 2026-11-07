@@ -32,8 +32,8 @@
     ]
   },
   "testTree": {
-    "fileCount": 40,
-    "sha256": "5bd381c1e1c4c3a09816497c34b149a8646cef6796e6adf619309ee029573099",
+    "fileCount": 41,
+    "sha256": "dcec09330a5a0962df19bc35b42a3a2f7a2e91ea518640f72f87a7ce60560b7c",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -64,6 +64,7 @@
       "test/integration/tenant-membership-administration-isolation.integration.test.js",
       "test/integration/tenant-plugin-registry-isolation.integration.test.js",
       "test/integration/tenant-public-catalog-isolation.integration.test.js",
+      "test/integration/tenant-public-query-loop-isolation.integration.test.js",
       "test/library-routes.test.js",
       "test/memgraph-projector.test.js",
       "test/outbox-contract.test.js",
@@ -83,7 +84,7 @@
     "nonHttpFamilyCount": 4,
     "declaredRoutePatternCount": 78,
     "sourceFileCount": 19,
-    "testFileCount": 40
+    "testFileCount": 41
   },
   "commonControls": [
     {
@@ -1054,11 +1055,12 @@
       "tests": [
         "test/api.test.js",
         "test/integration/tenant-commerce-isolation.integration.test.js",
-        "test/integration/tenant-public-catalog-isolation.integration.test.js"
+        "test/integration/tenant-public-catalog-isolation.integration.test.js",
+        "test/integration/tenant-public-query-loop-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted-two-site-public-catalog-search",
-        "limits": "Live PostgreSQL A/B coverage verifies public search returns only the selected site?s published, non-deleted snapshots; slug- and UUID-based product catalogs exclude foreign-site and draft products; product detail hides foreign-site slugs; and slug- and UUID-based membership catalogs exclude foreign-site and inactive plans. Published page rendering/query-loop expansion, shared-cache invalidation and revocation behavior, and independent adversarial review remain separate gates."
+        "level": "targeted-public-catalog-search-query-loop",
+        "limits": "Live PostgreSQL A/B coverage verifies public search, slug- and UUID-based product and membership catalogs, foreign-site product detail hiding, and rendered public-page query loops scoped to each site?s published posts. Query-loop output excludes foreign-site, draft, and soft-deleted posts. Shared-cache invalidation/revocation and independent adversarial review remain separate gates."
       },
       "methods": [
         "GET"
