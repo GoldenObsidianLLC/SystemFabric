@@ -8,7 +8,7 @@
   "generatedBy": "scripts/generate-tenant-isolation-route-inventory.js",
   "sourceTree": {
     "fileCount": 19,
-    "sha256": "782b144cea68fe03835344eb1a93abb5d8c1ff8dfa1ed1add0d3037aae63d700",
+    "sha256": "a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575",
     "files": [
       "apps/api/src/ai-task-routes.js",
       "apps/api/src/auth-routes.js",
@@ -33,7 +33,7 @@
   },
   "testTree": {
     "fileCount": 37,
-    "sha256": "36a341eddcd29102ef458cfaec4766b1bc1b551206a3bdc5b1955e43227c9893",
+    "sha256": "1f5639b477999e72086593cb5ce315066b60dbe0bfa1a12be4c9e0112c0ac104",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -181,9 +181,9 @@
               "anchor": "canEditContent",
               "lines": [
                 449,
-                1657,
-                1679,
-                1758
+                1662,
+                1684,
+                1763
               ]
             }
           ]
@@ -351,8 +351,8 @@
             {
               "anchor": "url.pathname === '/api/v1/sites'",
               "lines": [
-                1319,
-                1323
+                1324,
+                1328
               ]
             }
           ]
@@ -428,7 +428,7 @@
             {
               "anchor": "const siteMembershipHandled = await handleSiteMembershipRoute({",
               "lines": [
-                1787
+                1792
               ]
             }
           ]
@@ -491,43 +491,43 @@
             {
               "anchor": "const designSystemMatch",
               "lines": [
-                1331
+                1336
               ]
             },
             {
               "anchor": "const reusableCollectionMatch",
               "lines": [
-                1354
+                1359
               ]
             },
             {
               "anchor": "const templateCollectionMatch",
               "lines": [
-                1381
+                1386
               ]
             },
             {
               "anchor": "const termsCollectionMatch",
               "lines": [
-                1408
+                1413
               ]
             },
             {
               "anchor": "const relationshipsCollectionMatch",
               "lines": [
-                1473
+                1478
               ]
             },
             {
               "anchor": "const menuCollectionMatch",
               "lines": [
-                1531
+                1536
               ]
             },
             {
               "anchor": "const aiPolicyMatch",
               "lines": [
-                1551
+                1556
               ]
             },
             {
@@ -669,25 +669,25 @@
             {
               "anchor": "const pageIdMatch",
               "lines": [
-                1730
+                1735
               ]
             },
             {
               "anchor": "const revisionsMatch",
               "lines": [
-                1744
+                1749
               ]
             },
             {
               "anchor": "const restoreMatch",
               "lines": [
-                1755
+                1760
               ]
             },
             {
               "anchor": "const workflowMatch",
               "lines": [
-                1766
+                1771
               ]
             }
           ]
@@ -740,7 +740,7 @@
             {
               "anchor": "const collaborationMatch",
               "lines": [
-                1664
+                1669
               ]
             },
             {
@@ -804,7 +804,7 @@
             {
               "anchor": "url.pathname === '/api/v1/ai/page-draft'",
               "lines": [
-                1578
+                1583
               ]
             }
           ]
@@ -866,13 +866,13 @@
             {
               "anchor": "url.pathname === '/api/v1/media'",
               "lines": [
-                1627
+                1632
               ]
             },
             {
               "anchor": "url.pathname === '/api/v1/media/uploads'",
               "lines": [
-                1632
+                1637
               ]
             }
           ]
@@ -1463,19 +1463,19 @@
             {
               "anchor": "url.pathname === '/api/v1/plugins'",
               "lines": [
-                1803
+                1808
               ]
             },
             {
               "anchor": "url.pathname === '/api/v1/plugins/register'",
               "lines": [
-                1809
+                1814
               ]
             },
             {
               "anchor": "const pluginActionMatch",
               "lines": [
-                1838
+                1843
               ]
             }
           ]
@@ -1706,7 +1706,7 @@
         "/api/v1/sites/{siteId}/realtime/ws (upgrade)"
       ],
       "authentication": "Authenticated persistent session; WebSocket additionally enforces same-origin and reauthorizes commands.",
-      "siteContext": "Path site plus realtime capability, active-session and per-command/document authorization. Redis topics and quota keys must retain site/principal/session dimensions.",
+      "siteContext": "Presence HTTP, SSE and WebSocket upgrade routes reconcile the path site against x-virgoscorpio-hub-site-id and siteId query selectors before realtime capability authorization. Heartbeat JSON bodies also reconcile an optional siteId after bounded parsing and before presence operations. The generic membership precheck is disabled so the existing requireRealtimeCapability control remains the authorization gate. Per-command/document authorization, active-session and distributed Redis scope checks remain separate.",
       "capabilities": [
         "Realtime capability policy",
         "content:edit/content:edit:own for document collaboration"
@@ -1743,7 +1743,13 @@
             {
               "anchor": "upgradePath = url.pathname",
               "lines": [
-                1950
+                1955
+              ]
+            },
+            {
+              "anchor": "async function reconcileRouteSiteContext(routeSiteId, body = {})",
+              "lines": [
+                1231
               ]
             }
           ]
@@ -1785,8 +1791,8 @@
         "test/integration/redis-presence.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted-cross-instance",
-        "limits": "Selected two-site stream isolation, session invalidation, per-command reauthorization and Redis relay cases are covered. Forged cross-site payloads, every reconnect/replay path and production distributed quota behavior need independent review."
+        "level": "path-header-query-and-heartbeat-body-selector-reconciliation",
+        "limits": "Realtime tenant-isolation tests exercise conflicting header/query selectors for presence, SSE and WebSocket upgrades plus heartbeat body mismatch. Tests assert rejected upgrades create no subscriptions and rejected heartbeat mismatch leaves the existing presence lease unchanged. Existing session, capability, per-command/document, Redis and reconnect tests remain relevant; independent deployment review and production distributed quota assessment remain required."
       },
       "methods": [
         "GET",

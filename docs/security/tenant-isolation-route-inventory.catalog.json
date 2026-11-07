@@ -1230,7 +1230,7 @@
         "/api/v1/sites/{siteId}/realtime/ws (upgrade)"
       ],
       "authentication": "Authenticated persistent session; WebSocket additionally enforces same-origin and reauthorizes commands.",
-      "siteContext": "Path site plus realtime capability, active-session and per-command/document authorization. Redis topics and quota keys must retain site/principal/session dimensions.",
+      "siteContext": "Presence HTTP, SSE and WebSocket upgrade routes reconcile the path site against x-virgoscorpio-hub-site-id and siteId query selectors before realtime capability authorization. Heartbeat JSON bodies also reconcile an optional siteId after bounded parsing and before presence operations. The generic membership precheck is disabled so the existing requireRealtimeCapability control remains the authorization gate. Per-command/document authorization, active-session and distributed Redis scope checks remain separate.",
       "capabilities": [
         "Realtime capability policy",
         "content:edit/content:edit:own for document collaboration"
@@ -1254,7 +1254,8 @@
           "anchors": [
             "const presenceMatch",
             "const realtimeEventsMatch",
-            "upgradePath = url.pathname"
+            "upgradePath = url.pathname",
+            "async function reconcileRouteSiteContext(routeSiteId, body = {})"
           ]
         },
         {
@@ -1271,8 +1272,8 @@
         "test/integration/redis-presence.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted-cross-instance",
-        "limits": "Selected two-site stream isolation, session invalidation, per-command reauthorization and Redis relay cases are covered. Forged cross-site payloads, every reconnect/replay path and production distributed quota behavior need independent review."
+        "level": "path-header-query-and-heartbeat-body-selector-reconciliation",
+        "limits": "Realtime tenant-isolation tests exercise conflicting header/query selectors for presence, SSE and WebSocket upgrades plus heartbeat body mismatch. Tests assert rejected upgrades create no subscriptions and rejected heartbeat mismatch leaves the existing presence lease unchanged. Existing session, capability, per-command/document, Redis and reconnect tests remain relevant; independent deployment review and production distributed quota assessment remain required."
       },
       "methods": [
         "GET",

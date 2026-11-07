@@ -1,6 +1,6 @@
-## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#88 merged)
+## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#89 merged)
 
-Current mainline: VirgoScorpio Hub 0.6.2 at c5c31556acb052b9a257931867ef0166e866e822 after PR #88. PR #87 added the generated 27-family/78-pattern tenant-isolation route/data-access inventory, source/test anchors and platform-normalized digests. PR #88 aligned membership listing, add/remove and invitations with shared path/header/query/body selector reconciliation while preserving site:manage authorization errors. PR #88 PR workflow [run 42336173083](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42336173083) and post-merge mainline push workflow [run 42336343536](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42336343536) passed all six hosted jobs. PRs #84-#88 are merged. The inventory remains a maintainer-authored review aid, not independent evidence.
+Current mainline: VirgoScorpio Hub 0.6.2 at f38c3b0b65be1a20959295528b0ed5e1417eac40 after PR #89. PR #89 reconciles path/header/query and bounded JSON body selectors across design-system, reusable-component, template, navigation-menu and AI-policy routes while preserving each capability gate. PR #89 PR workflow [run 42338254603](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42338254603) and post-merge mainline workflow [run 42338545038](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42338545038) passed all six hosted jobs. The generated inventory remains a maintainer navigation aid only. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 The maintainer-generated [Tenant-Isolation Route and Data-Access Inventory](security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) catalogs 27 route/processing families and 78 declared route patterns, with 19 source files and 37 referenced test files. Its generator checks source anchors and test references, refreshes line numbers, records implementation/test tree digests, and is exercised by the unit suite. It is a navigation and drift-detection aid only: it does not prove route completeness or runtime security and is not an independent assessment.
 
@@ -8,11 +8,11 @@ Issue #14 remains OPEN / NOT PERFORMED. No independent reviewer is assigned and 
 
 ---
 
-## Pending code candidate - path-site selector reconciliation for configuration routes (PR #89, not merged)
+## Pending code candidate - realtime route selector reconciliation (PR #90, not merged)
 
-The next candidate is based on mainline c5c31556acb052b9a257931867ef0166e866e822. It introduces a shared request-scoped path-site reconciliation helper for design-system, reusable-component, template, navigation-menu and AI-policy routes. Route/header/query selectors are checked before the route capability guard; JSON body selectors are checked after bounded parsing and before validation or persistence. The helper disables only its generic membership precheck so existing route-specific capability authorization and forbidden-response contracts remain intact. PostgreSQL integration scenarios cover selector conflicts across reads, writes and deletes and compare configuration records before/after rejected requests.
+The next candidate is based on mainline f38c3b0b65be1a20959295528b0ed5e1417eac40. It applies the shared request-context resolver to presence list/heartbeat/leave, SSE and WebSocket upgrades. Header/query conflicts are rejected before realtime capability authorization; heartbeat body siteId conflicts are rejected after bounded parsing and before presence mutation. Existing session, per-command/document, Redis and realtime authorization boundaries remain unchanged.
 
-This targeted consistency work does not prove complete tenant isolation and does not replace independent issue #14 or #25 review. PR CI and post-merge CI have not yet been validated for this candidate; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+This is targeted selector consistency work, not independent tenant-isolation proof. PR CI and post-merge mainline CI have not yet been validated. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 # Release Readiness and Certification Gates
 
