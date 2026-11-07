@@ -9,8 +9,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
 - Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: 91886d8d56b452fc2fdae73d31a7dfa270347f26350853bbfed1e671ea62d91c across 39 files.
-- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 39 test files.
+- Referenced-test digest: 5bd381c1e1c4c3a09816497c34b149a8646cef6796e6adf619309ee029573099 across 40 files.
+- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 40 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
 The catalog is a curated route-family inventory. Source anchors are checked against the current files and line numbers are generated. Route patterns, capability descriptions, data-access notes, and test limitations remain maintainer-authored metadata; they are not inferred proofs of runtime behavior.
@@ -226,8 +226,8 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Data-access boundary: sites; published content snapshots; search index/query data; commerce_products; membership_plans
 - Side effects: Read-only responses; caches/public query paths must preserve site and visibility scope.
 - Source: apps/api/src/server.js (lines 841, 866, 874, 1202, 1217)
-- Test references: test/api.test.js, test/api.test.js, test/integration/tenant-commerce-isolation.integration.test.js
-- Coverage characterization: **partial**. Selected public catalog and publication behavior has tests. Slug collisions, cross-site query-loop joins, private/unpublished content, search counts and shared cache behavior require independent adversarial review.
+- Test references: test/api.test.js, test/integration/tenant-commerce-isolation.integration.test.js, test/integration/tenant-public-catalog-isolation.integration.test.js
+- Coverage characterization: **targeted-two-site-public-catalog-search**. Live PostgreSQL A/B coverage verifies public search returns only the selected site?s published, non-deleted snapshots; slug- and UUID-based product catalogs exclude foreign-site and draft products; product detail hides foreign-site slugs; and slug- and UUID-based membership catalogs exclude foreign-site and inactive plans. Published page rendering/query-loop expansion, shared-cache invalidation and revocation behavior, and independent adversarial review remain separate gates.
 
 ### 13. Public media, library assets and public variants
 

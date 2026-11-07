@@ -709,12 +709,12 @@
       ],
       "tests": [
         "test/api.test.js",
-        "test/api.test.js",
-        "test/integration/tenant-commerce-isolation.integration.test.js"
+        "test/integration/tenant-commerce-isolation.integration.test.js",
+        "test/integration/tenant-public-catalog-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "partial",
-        "limits": "Selected public catalog and publication behavior has tests. Slug collisions, cross-site query-loop joins, private/unpublished content, search counts and shared cache behavior require independent adversarial review."
+        "level": "targeted-two-site-public-catalog-search",
+        "limits": "Live PostgreSQL A/B coverage verifies public search returns only the selected site?s published, non-deleted snapshots; slug- and UUID-based product catalogs exclude foreign-site and draft products; product detail hides foreign-site slugs; and slug- and UUID-based membership catalogs exclude foreign-site and inactive plans. Published page rendering/query-loop expansion, shared-cache invalidation and revocation behavior, and independent adversarial review remain separate gates."
       },
       "methods": [
         "GET"

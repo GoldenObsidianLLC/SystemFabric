@@ -32,8 +32,8 @@
     ]
   },
   "testTree": {
-    "fileCount": 39,
-    "sha256": "91886d8d56b452fc2fdae73d31a7dfa270347f26350853bbfed1e671ea62d91c",
+    "fileCount": 40,
+    "sha256": "5bd381c1e1c4c3a09816497c34b149a8646cef6796e6adf619309ee029573099",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -63,6 +63,7 @@
       "test/integration/tenant-mega-menu-isolation.integration.test.js",
       "test/integration/tenant-membership-administration-isolation.integration.test.js",
       "test/integration/tenant-plugin-registry-isolation.integration.test.js",
+      "test/integration/tenant-public-catalog-isolation.integration.test.js",
       "test/library-routes.test.js",
       "test/memgraph-projector.test.js",
       "test/outbox-contract.test.js",
@@ -82,7 +83,7 @@
     "nonHttpFamilyCount": 4,
     "declaredRoutePatternCount": 78,
     "sourceFileCount": 19,
-    "testFileCount": 39
+    "testFileCount": 40
   },
   "commonControls": [
     {
@@ -1052,12 +1053,12 @@
       ],
       "tests": [
         "test/api.test.js",
-        "test/api.test.js",
-        "test/integration/tenant-commerce-isolation.integration.test.js"
+        "test/integration/tenant-commerce-isolation.integration.test.js",
+        "test/integration/tenant-public-catalog-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "partial",
-        "limits": "Selected public catalog and publication behavior has tests. Slug collisions, cross-site query-loop joins, private/unpublished content, search counts and shared cache behavior require independent adversarial review."
+        "level": "targeted-two-site-public-catalog-search",
+        "limits": "Live PostgreSQL A/B coverage verifies public search returns only the selected site?s published, non-deleted snapshots; slug- and UUID-based product catalogs exclude foreign-site and draft products; product detail hides foreign-site slugs; and slug- and UUID-based membership catalogs exclude foreign-site and inactive plans. Published page rendering/query-loop expansion, shared-cache invalidation and revocation behavior, and independent adversarial review remain separate gates."
       },
       "methods": [
         "GET"
