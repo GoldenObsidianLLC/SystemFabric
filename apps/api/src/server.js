@@ -1222,6 +1222,8 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
         return sendJson(res, 200, { plans: found.rows, requestId });
       }
 
+      const auth = await authenticate(req);
+      if (!auth) return sendJson(res, 401, { error: 'Authentication required.', code: 'ERR_VIRGOSCORPIO_HUB_UNAUTHORIZED', requestId });
       const actor = { ...auth, isDeveloper: auth.mode === 'development-token' };
 
       // Validate path/header/query context without changing each route family's
