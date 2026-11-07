@@ -1,8 +1,18 @@
+## Latest mainline and tenant-isolation preparation snapshot — 7 November 2026 (PRs #84–#86 merged)
+
+Current mainline: VirgoScorpio Hub 0.6.2 at f601a8c124b9c2b266cb847dcb7b3b0daab30952. PR #84 synchronized the pre-review documentation; PR #85 hardened ClamAV timeout/process-close cleanup; PR #86 validates media-variant signatures and parent asset categories before object storage writes and public reads. The PR #86 workflow and post-merge mainline workflow [run](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42329895761) passed all six configured jobs: Node.js 22.23.4, Node.js 24.22.1, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL and evidence consolidation.
+
+The maintainer-generated [Tenant-Isolation Route and Data-Access Inventory](security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) catalogs 27 route/processing families and 78 declared route patterns, with 19 source files and 37 referenced test files. Its generator checks source anchors and test references, refreshes line numbers, records implementation/test tree digests, and is exercised by the unit suite. It is a navigation and drift-detection aid only: it does not prove route completeness or runtime security and is not an independent assessment.
+
+Issue #14 remains OPEN / NOT PERFORMED. No independent reviewer is assigned and no passing artifacts/evidence/tenant-isolation-review.json exists. Issue #25 remains open. The external/provider/product/security/operations evidence gates remain open, human lockfile review remains outstanding, and the service-less integration subset remains PARTIAL. The formal PostgreSQL/Memgraph evidence contract remains anchored to its previously documented exact-source baseline; this newer green mainline workflow does not silently replace that retained evidence. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. No version change, tag, publication or deployment is authorized.
+
+---
+
 # Release Readiness and Certification Gates
 
 > **Current status: NOT_PRODUCTION_CERTIFIED.** The readiness report is an engineering evidence snapshot, not production approval.
 
-## Verified mainline snapshot — 7 November 2026 (PRs #76–#83 merged)
+## Historical verified mainline snapshot — 7 November 2026 (PRs #76–#83 merged)
 
 Current mainline source: VirgoScorpio Hub 0.6.2 at `109c05b001003e68dfaa5584353ab683a41d9075`. PRs #76–#83 are merged. PR #83 adds read-only recursive pinned-submodule verification to development bootstrap and dev:doctor, with actionable fail-closed diagnostics and no automatic worktree mutation. PR CI and post-merge mainline push [run #353](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42321203517) passed all six hosted jobs. Node.js 22.23.4 and 24.22.1, PostgreSQL/Memgraph integration, browser/accessibility, CodeQL and evidence consolidation are green. The focused development change adds no dependency, schema, or public HTTP contract change.
 

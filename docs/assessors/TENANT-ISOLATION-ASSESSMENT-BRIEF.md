@@ -233,3 +233,12 @@ Do not set `status` to `passed` while findings, retests, coverage, independence,
 - [ ] Evidence JSON accepted and gate re-evaluated on the exact clean candidate revision.
 
 **Current handoff state:** no independent reviewer is assigned and no independent review result exists. Issue #14 remains open. VirgoScorpio Hub 0.5.1 remains `NOT_PRODUCTION_CERTIFIED` / NO-GO.
+## 9. Current 0.6.2 maintainer inventory supplement - 7 November 2026
+
+The earlier 0.5.1 source map and historical review notes above are retained as historical records. For current 0.6.2 review preparation, use the generated [Tenant-Isolation Route and Data-Access Inventory](../security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) and machine-readable [inventory JSON](../../artifacts/security/tenant-isolation-route-inventory.json). The generator validates source anchors, refreshes line numbers, records implementation/test file digests, and fails CI when the generated files become stale.
+
+The current inventory is a curated maintainer navigation aid. It is not an independent route enumeration, runtime security proof, reviewer report, pass, or the formal evidence record. It deliberately identifies direct path-site capability routes separately from siteIdFor-based routes and records asynchronous, public, provider-callback, storage and realtime boundaries. The reviewer must independently enumerate the deployed routes and handlers, trace each data/side-effect path, execute the issue #14 adversarial matrix, and record the exact full commit SHA and environment.
+
+Mainline at inventory preparation: f601a8c124b9c2b266cb847dcb7b3b0daab30952. The application-source digest and test-source digest are in the generated JSON; the reviewer must still run git rev-parse HEAD on their own clean assessment checkout. The inventory's CI freshness test confirms only that the source anchors and referenced test files exist, not that all route behavior is safe or that the referenced tests passed.
+
+**Current gate disposition remains OPEN / NOT PERFORMED.** No independent reviewer is assigned, no passing artifacts/evidence/tenant-isolation-review.json exists, and the broader independent security issue #25 remains open. This supplement does not change production status: NO-GO / NOT_PRODUCTION_CERTIFIED.

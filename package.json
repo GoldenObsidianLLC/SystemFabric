@@ -42,7 +42,8 @@
     "test:integration:memgraph-outage": "node scripts/test-memgraph-outage.js",
     "test:e2e:install": "playwright install chromium",
     "test:graph:rebuild": "node scripts/test-graph-rebuild.js",
-    "test:migrations:fresh": "node scripts/test-fresh-migrations.js"
+    "test:migrations:fresh": "node scripts/test-fresh-migrations.js",
+    "security:tenant-inventory": "node scripts/generate-tenant-isolation-route-inventory.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1156.0",
