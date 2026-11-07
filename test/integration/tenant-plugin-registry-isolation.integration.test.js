@@ -93,7 +93,7 @@ test(
     );
 
     const pluginName = 'tenant-isolation-plugin';
-    const imageDigest = 'sha256:' + 'b'.repeat(64);
+    const imageDigest = 'registry.example/tenant/isolated-plugin@sha256:' + 'b'.repeat(64);
     const sbomDigest = 'c'.repeat(64);
     const manifest = JSON.stringify({
       name: pluginName,
