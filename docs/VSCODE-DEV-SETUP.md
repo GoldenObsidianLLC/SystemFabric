@@ -1,6 +1,6 @@
 # VirgoScorpio Hub — VS Code Development and Blocker-Resolution Setup
 
-**Scope:** local development and test infrastructure for VirgoScorpio Hub 0.6.0 and the current 0.5.x developer-preview lineage. This is not a production deployment guide. Never place production credentials in this workspace.
+**Scope:** local development and test infrastructure for the unreleased VirgoScorpio Hub 0.6.2 developer-preview candidate and its 0.5.x lineage. This is not a production deployment guide. Never place production credentials in this workspace.
 
 ## Preferred path: VS Code Dev Containers
 
@@ -10,11 +10,11 @@ Prerequisites on the host:
 - Docker Desktop or Docker Engine with the Compose plugin.
 - A network connection to the configured npm registry the first time dependencies are installed.
 
-1. Extract or clone this codebase into a dedicated folder.
+1. Clone the repository with `git clone --recurse-submodules https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git` into a dedicated folder. Archive downloads and ordinary clones without submodules are incomplete development checkouts.
 2. Open that folder in VS Code.
 3. Run **Dev Containers: Reopen in Container** from the Command Palette.
 4. The container uses Node.js 22.23.4 and starts PostgreSQL plus Memgraph. The first post-create step creates `.env` if absent, installs dependencies, generates `package-lock.json` when it is missing, materializes optional assets, and installs Playwright Chromium.
-5. Once the bootstrap terminal completes, run `npm run dev:doctor`.
+5. Once the bootstrap terminal completes, run `npm run dev:doctor`. Bootstrap checks recursive submodule state before creating local configuration or installing dependencies.
 
 The first dependency install intentionally uses `npm install` if no lockfile exists. Review the generated `package-lock.json`, commit it, and verify `npm ci` from a clean workspace before treating dependency resolution as reproducible. Subsequent dev-container bootstraps use `npm ci` when a lockfile exists.
 

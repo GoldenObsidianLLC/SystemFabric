@@ -6,6 +6,7 @@ const net = require('node:net');
 const { spawnSync } = require('node:child_process');
 const { loadEnvFile } = require('./load-env');
 const { checkPostgresConnection } = require('./dev-doctor-postgres');
+const { assertGitSubmodulesReady } = require('./git-submodules');
 
 const root = path.resolve(__dirname, '..');
 const minimumNode = [22, 23, 4];
@@ -47,6 +48,14 @@ function parseUrl(raw, label) {
 
 async function main() {
   loadEnvFile(path.join(root, '.env'));
+  try {
+    const submodules = assertGitSubmodulesReady({ cwd: root });
+    add('Git submodules', true, submodules.length
+      ? submodules.map(item => item.path + ' @ ' + item.commit).join('; ') + ' match the pinned commits.'
+      : 'No Git submodules are configured.');
+  } catch (error) {
+    add('Git submodules', false, error.message);
+  }
   add('Node.js runtime', versionAtLeast(process.versions.node, minimumNode), `Found ${process.version}; requires >=22.23.4.`);
   add('Dependency lockfile', fs.existsSync(path.join(root, 'package-lock.json')), fs.existsSync(path.join(root, 'package-lock.json'))
     ? 'package-lock.json exists; verify its provenance by running npm ci and reviewing the diff.'

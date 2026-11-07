@@ -10,12 +10,18 @@ All notable project-level changes should be recorded here. This changelog does n
 - Updated renderer license attribution to GPL-2.0-or-later and enabled recursive submodule checkout in CI.
 - Updated release-readiness source-tree verification to validate the pinned EnginEx gitlink and its nested clean worktree separately from the superproject's own status.
 
+### Current mainline disposition - 7 November 2026
+
+- PR #82 merged as `89c87f9483f915d72a44695dd2a5054c08cdd9ed` after PR CI run #349 passed all six hosted jobs. Stripe Checkout expiration bounds now use one captured clock value; exact lower/upper boundary behavior is deterministic. No dependency, schema, or public API change; no version increment or release authorization.
+
 ### Current mainline disposition - 6 November 2026
 - PRs #76–#80 are merged. The verified product-code mainline after PR #80 is 29a3e03997da429a1bb05964f46c22cf975a8c2e; mainline push workflow [run #341](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42311936630) passed all six hosted jobs. Formal exact-source PostgreSQL/Memgraph evidence is PASS: 67/67 live tests with zero skips/failures/TODOs, 18/18 fresh migrations and 18/18 idempotent second-pass skips, plus outage/replay and graph rebuild. The service-less Node matrix integrations remain PARTIAL (29 skips per runtime); human lockfile review and 14 independent/provider/product/security/supply-chain/operations gates remain open. Hub 0.6.2 remains unreleased and NOT_PRODUCTION_CERTIFIED; no tag, GitHub Release, package publication or production deployment is authorized.
 - Harden the formal CI evidence writer with exclusive same-directory staging, descriptor-based writes, fsync, atomic replacement, and regression coverage for pre-existing files and symlinks. The structured JSON attestation is emitted only after the run/job identity, source SHA, manifest checksums, schema, and zero-skip results pass; raw GitHub Actions REST response values are validated but never serialized. This is CI evidence plumbing only and does not warrant a product version increment.
 - Pre-merge candidate notes below preserve their original run/branch context; statements that PRs #76–#80 were open or hosted validation was pending are historical and superseded by this current disposition.
 
 ### Local development environment
+
+- Require recursive EnginEx submodule checkout for first-time setup. Development bootstrap and `dev:doctor` perform the same read-only pinned-submodule check and provide recovery guidance without resetting or updating developer worktrees.
 ### Outbox producer audit - 6 November 2026
 - Production outbox writers were audited at mainline d2f1564cbb570e8d4e55d33b64ca5f3993c9a01a: content writer, relationship store/API routes and taxonomy API writer all satisfy the registered site-private envelope contract. Remaining direct inserts are synthetic/internal test fixtures. No remaining production producer gap or migration requirement was found. See docs/reports/2026-11-06-OUTBOX-PRODUCER-AUDIT.md.
 

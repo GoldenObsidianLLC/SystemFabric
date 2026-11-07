@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { loadEnvFile } = require('./load-env');
+const { assertGitSubmodulesReady } = require('./git-submodules');
 
 const root = path.resolve(__dirname, '..');
 
@@ -49,6 +50,8 @@ function run(label, command, args, extraEnv = {}) {
 }
 
 try {
+  // Validate the full source checkout before setup creates local files or npm installs.
+  assertGitSubmodulesReady({ cwd: root });
   run('Create safe local development defaults', process.execPath, ['scripts/setup-dev.js']);
   loadEnvFile(path.join(root, '.env'));
 
