@@ -18,7 +18,13 @@ All notable project-level changes should be recorded here. This changelog does n
 
 - Validate media-variant bytes against their declared MIME signature and parent asset category before writing object storage. Revalidate bytes and parent category when serving public variants, so a matching database hash alone cannot authorize mislabeled or corrupted content. Add regression coverage for mismatched signatures, cross-category variants, valid WebP variants, and corrupted reads. This code-level hardening does not replace live provider, malware-corpus, or independent tenant-isolation acceptance.
 
+### Tenant-isolation inventory tooling
+
+- Add a checked, generated route-family inventory with curated authentication, tenant-context, capability, data-access, side-effect, source-anchor and regression-test references. The generator refreshes source line numbers, records implementation/test file digests, and is enforced by the unit-test suite and required-artifact verification. Its 27 families and 78 declared route patterns are a maintainer-authored navigation aid, not an automatically complete route discovery or an independent security assessment. Issue #14 and broader security issue #25 remain open.
+
 ### Current mainline disposition - 7 November 2026
+
+- PRs #84-#86 merged after PR #83. PR #84 synchronized release documentation; PR #85 fixed ClamAV timeout child-process cleanup; PR #86 validates media-variant MIME signatures and parent asset categories before storage and public delivery. PR #86 merged as f601a8c124b9c2b266cb847dcb7b3b0daab30952; post-merge workflow [run](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42329895761) passed all six hosted jobs. The generated tenant-isolation inventory is maintainer preparation only and does not close independent issue #14. No dependency, schema or public API change; no SemVer increment, release tag, publication or deployment.
 
 - PR #83 merged as `109c05b001003e68dfaa5584353ab683a41d9075`; mainline push workflow [run #353](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42321203517) passed all six hosted jobs. The shared recursive Git-submodule preflight verifies pinned commits before bootstrap creates local files or installs dependencies; dev:doctor reports the same state. Missing, conflicted, mismatched, or unverifiable submodules fail closed with recovery guidance, without automatic update/reset/clean. Recursive-clone guidance is aligned across contributor docs. Seven focused tests passed; `npm run check` passed 530 tests (527 pass, 3 platform-conditional skips) in PR validation. No dependency, schema, or public API change; no SemVer increment or release authorization.
 
