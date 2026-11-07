@@ -33,11 +33,19 @@ test('Stripe checkout permits the provider default when no expiration is request
   assert.equal(new URLSearchParams(checkoutArgs.lastBody).has('expires_at'), false);
 });
 
+test('Stripe checkout accepts exact supported expiration boundaries with a stable clock', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  for (const expiresAt of [now + 30 * 60, now + 24 * 60 * 60]) {
+    await createStripeCheckoutSession(checkoutArgs({ expiresAt, nowSeconds: now }));
+    assert.equal(new URLSearchParams(checkoutArgs.lastBody).get('expires_at'), String(expiresAt));
+  }
+});
+
 test('Stripe checkout rejects unsupported expiration bounds before external request', async () => {
   const now = Math.floor(Date.now() / 1000);
   for (const expiresAt of [now + 29 * 60, now + 24 * 60 * 60 + 1, now + 60.5, 'tomorrow']) {
     let called = false;
-    await assert.rejects(createStripeCheckoutSession(checkoutArgs({ expiresAt, fetchImpl: async () => { called = true; throw new Error('should not call provider'); } })), /Checkout expiration must be between 30 minutes and 24 hours/);
+    await assert.rejects(createStripeCheckoutSession(checkoutArgs({ expiresAt, nowSeconds: now, fetchImpl: async () => { called = true; throw new Error('should not call provider'); } })), /Checkout expiration must be between 30 minutes and 24 hours/);
     assert.equal(called, false);
   }
 });
