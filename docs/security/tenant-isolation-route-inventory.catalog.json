@@ -222,7 +222,7 @@
         "/api/v1/sites/{siteId}/invitations"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Path site ID is passed directly to requireCapability. This family does not invoke the shared siteIdFor selector reconciliation helper; assess path/header/query/body mismatch behavior explicitly.",
+      "siteContext": "Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. Conflicting or duplicated selectors fail with a site-context 400 before capability authorization or identity-store operations. The resolved path site is then checked for site:manage.",
       "capabilities": [
         "site:manage"
       ],
@@ -248,6 +248,12 @@
             "const memberMatch",
             "const inviteMatch"
           ]
+        },
+        {
+          "file": "apps/api/src/server.js",
+          "anchors": [
+            "const siteMembershipHandled = await handleSiteMembershipRoute({"
+          ]
         }
       ],
       "tests": [
@@ -255,8 +261,8 @@
         "test/integration/tenant-membership-administration-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted-two-site",
-        "limits": "A/B integration asserts membership, invitation, mail-outbox and audit state around denied attempts. Multi-role edge cases, last-owner concurrency and active-stream invalidation still require reviewer expansion."
+        "level": "targeted-selector-reconciliation-and-two-site-side-effects",
+        "limits": "Unit tests assert resolver-before-capability ordering. The live A/B integration scenario rejects path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares membership, invitation, mail-outbox and audit snapshots for both sites. Foreign-user membership and invitation controls remain covered. Last-owner concurrency, broader role combinations and revocation of active streams remain independent-review work."
       },
       "methods": [
         "GET",

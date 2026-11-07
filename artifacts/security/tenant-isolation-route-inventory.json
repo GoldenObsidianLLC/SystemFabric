@@ -8,7 +8,7 @@
   "generatedBy": "scripts/generate-tenant-isolation-route-inventory.js",
   "sourceTree": {
     "fileCount": 19,
-    "sha256": "59ca52f1032f72a3961a3b0336317faab8dffb8cbd51f0281e62130d4aa34e13",
+    "sha256": "56ae2f99483accf6f411b4202d026f19bc77005aaecf0382088a6a255a73ae7b",
     "files": [
       "apps/api/src/ai-task-routes.js",
       "apps/api/src/auth-routes.js",
@@ -33,7 +33,7 @@
   },
   "testTree": {
     "fileCount": 37,
-    "sha256": "5ad23777a59f472f1cc1397cdbc7ee025a869ee07fc7a0f9beff300ddb9cae15",
+    "sha256": "99bd13d8a6bb4f612a9a07f2b03ccb5433219e3947534c94d41e658142b3e5e6",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -380,7 +380,7 @@
         "/api/v1/sites/{siteId}/invitations"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Path site ID is passed directly to requireCapability. This family does not invoke the shared siteIdFor selector reconciliation helper; assess path/header/query/body mismatch behavior explicitly.",
+      "siteContext": "Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. Conflicting or duplicated selectors fail with a site-context 400 before capability authorization or identity-store operations. The resolved path site is then checked for site:manage.",
       "capabilities": [
         "site:manage"
       ],
@@ -405,19 +405,30 @@
             {
               "anchor": "const membersMatch",
               "lines": [
-                26
+                31
               ]
             },
             {
               "anchor": "const memberMatch",
               "lines": [
-                61
+                66
               ]
             },
             {
               "anchor": "const inviteMatch",
               "lines": [
-                81
+                87
+              ]
+            }
+          ]
+        },
+        {
+          "file": "apps/api/src/server.js",
+          "anchors": [
+            {
+              "anchor": "const siteMembershipHandled = await handleSiteMembershipRoute({",
+              "lines": [
+                1780
               ]
             }
           ]
@@ -428,8 +439,8 @@
         "test/integration/tenant-membership-administration-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted-two-site",
-        "limits": "A/B integration asserts membership, invitation, mail-outbox and audit state around denied attempts. Multi-role edge cases, last-owner concurrency and active-stream invalidation still require reviewer expansion."
+        "level": "targeted-selector-reconciliation-and-two-site-side-effects",
+        "limits": "Unit tests assert resolver-before-capability ordering. The live A/B integration scenario rejects path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares membership, invitation, mail-outbox and audit snapshots for both sites. Foreign-user membership and invitation controls remain covered. Last-owner concurrency, broader role combinations and revocation of active streams remain independent-review work."
       },
       "methods": [
         "GET",
@@ -1446,19 +1457,19 @@
             {
               "anchor": "url.pathname === '/api/v1/plugins'",
               "lines": [
-                1795
+                1796
               ]
             },
             {
               "anchor": "url.pathname === '/api/v1/plugins/register'",
               "lines": [
-                1801
+                1802
               ]
             },
             {
               "anchor": "const pluginActionMatch",
               "lines": [
-                1830
+                1831
               ]
             }
           ]
@@ -1726,7 +1737,7 @@
             {
               "anchor": "upgradePath = url.pathname",
               "lines": [
-                1942
+                1943
               ]
             }
           ]

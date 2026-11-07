@@ -17,6 +17,7 @@ function createContext({
   body = {},
   identityOverrides = {},
   requireCapability = async () => {},
+  siteIdFor = async ({ routeSiteId }) => routeSiteId,
 } = {}) {
   const events = [];
   const payload = {};
@@ -53,10 +54,14 @@ function createContext({
   };
 
   const ctx = {
-    req: { method },
+    req: { method, headers: {} },
     res,
     url: new URL(`http://localhost${path}`),
     actor: { user: { id: ACTOR_ID } },
+    siteIdFor: async input => {
+      events.push({ type: 'siteIdFor', routeSiteId: input.routeSiteId, body: input.body });
+      return siteIdFor(input);
+    },
     requireCapability: async (...args) => {
       events.push({ type: 'requireCapability', args });
       return requireCapability(...args);
@@ -97,6 +102,7 @@ test('member listing checks site management capability before identity access', 
 
   assert.equal(await handleSiteMembershipRoute(ctx), true);
   assert.deepEqual(ctx.events, [
+    { type: 'siteIdFor', routeSiteId: SITE_ID, body: undefined },
     {
       type: 'requireCapability',
       args: [ctx.actor, SITE_ID, 'site:manage'],
@@ -110,6 +116,26 @@ test('member listing checks site management capability before identity access', 
   });
 });
 
+test('site selector reconciliation rejects conflicting context before capability or identity access', async () => {
+  const ctx = createContext({
+    path: `/api/v1/sites/${SITE_ID}/members`,
+    method: 'POST',
+    body: { siteId: '22222222-2222-4222-8222-222222222222', email: 'member@example.test', role: 'editor' },
+    siteIdFor: async () => {
+      throw Object.assign(new Error('Site selectors do not match.'), {
+        statusCode: 400,
+        code: 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH',
+      });
+    },
+  });
+
+  await assert.rejects(
+    handleSiteMembershipRoute(ctx),
+    error => error.statusCode === 400 && error.code === 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH',
+  );
+  assert.deepEqual(ctx.events.map(event => event.type), ['readJson', 'siteIdFor']);
+});
+
 test('member addition uses the bounded body reader and audits the assigned role', async () => {
   const ctx = createContext({
     path: `/api/v1/sites/${SITE_ID}/members`,
@@ -120,18 +146,24 @@ test('member addition uses the bounded body reader and audits the assigned role'
   assert.equal(await handleSiteMembershipRoute(ctx), true);
   assert.deepEqual(ctx.events.map(event => event.type), [
     'readJson',
+    'siteIdFor',
     'requireCapability',
     'addMember',
     'audit',
     'sendJson',
   ]);
   assert.equal(ctx.events[0].maxBytes, 16_384);
-  assert.deepEqual(ctx.events[2].input, {
+  assert.deepEqual(ctx.events[1], {
+    type: 'siteIdFor',
+    routeSiteId: SITE_ID,
+    body: { email: 'member@example.test', role: 'editor' },
+  });
+  assert.deepEqual(ctx.events[3].input, {
     siteId: SITE_ID,
     email: 'member@example.test',
     roleSlug: 'editor',
   });
-  assert.deepEqual(ctx.events[3].input, {
+  assert.deepEqual(ctx.events[4].input, {
     siteId: SITE_ID,
     actorId: ACTOR_ID,
     action: 'site.member_added',
@@ -151,14 +183,15 @@ test('member removal is site-capability guarded and audited after persistence', 
 
   assert.equal(await handleSiteMembershipRoute(ctx), true);
   assert.deepEqual(ctx.events.map(event => event.type), [
+    'siteIdFor',
     'requireCapability',
     'removeMember',
     'audit',
     'sendJson',
   ]);
-  assert.deepEqual(ctx.events[1].input, { siteId: SITE_ID, userId: TARGET_ID });
-  assert.equal(ctx.events[2].input.action, 'site.member_removed');
-  assert.equal(ctx.events[2].input.targetId, TARGET_ID);
+  assert.deepEqual(ctx.events[2].input, { siteId: SITE_ID, userId: TARGET_ID });
+  assert.equal(ctx.events[3].input.action, 'site.member_removed');
+  assert.equal(ctx.events[3].input.targetId, TARGET_ID);
   assert.deepEqual(ctx.res.payload.body, { removed: true, requestId: REQUEST_ID });
 });
 
@@ -172,19 +205,21 @@ test('invitation creation scopes capability checks and never audits the one-time
   assert.equal(await handleSiteMembershipRoute(ctx), true);
   assert.deepEqual(ctx.events.map(event => event.type), [
     'readJson',
+    'siteIdFor',
     'requireCapability',
     'createInvitation',
     'audit',
     'sendJson',
   ]);
   assert.equal(ctx.events[0].maxBytes, 16_384);
-  assert.deepEqual(ctx.events[2].input, {
+  assert.deepEqual(ctx.events[1], { type: 'siteIdFor', routeSiteId: SITE_ID, body: { email: 'invitee@example.test', role: 'viewer' } });
+  assert.deepEqual(ctx.events[3].input, {
     siteId: SITE_ID,
     email: 'invitee@example.test',
     roleSlug: 'viewer',
     invitedBy: ACTOR_ID,
   });
-  assert.deepEqual(ctx.events[3].input, {
+  assert.deepEqual(ctx.events[4].input, {
     siteId: SITE_ID,
     actorId: ACTOR_ID,
     action: 'site.invitation_created',

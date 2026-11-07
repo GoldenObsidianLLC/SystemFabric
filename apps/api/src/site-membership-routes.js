@@ -3,11 +3,11 @@
 /**
  * Handle site-scoped membership administration and invitation creation.
  *
- * The API composition layer authenticates the actor and supplies the
- * capability guard. This module deliberately accepts the path's site ID only
- * as input to that guard; it does not infer site scope or authorize a caller.
- * Invitation secrets are returned to the trusted caller but never included in
- * audit metadata.
+ * The API composition layer authenticates the actor and supplies the shared
+ * site-selector resolver and capability guard. Every path site ID is reconciled
+ * with header, query, and (for JSON writes) body selectors before authorization
+ * or identity-store access. Invitation secrets are returned to the trusted
+ * caller but never included in audit metadata.
  */
 async function handleSiteMembershipRoute(ctx) {
   const {
@@ -15,6 +15,7 @@ async function handleSiteMembershipRoute(ctx) {
     res,
     url,
     actor,
+    siteIdFor,
     requireCapability,
     readJson,
     sendJson,
@@ -23,12 +24,16 @@ async function handleSiteMembershipRoute(ctx) {
     maxBody,
   } = ctx;
 
+  async function resolveRouteSite(siteId, body) {
+    return siteIdFor({ req, url, body, actor, routeSiteId: siteId });
+  }
+
   const membersMatch = url.pathname.match(
     /^\/api\/v1\/sites\/([0-9a-f-]{36})\/members$/i,
   );
 
   if (req.method === 'GET' && membersMatch) {
-    const siteId = membersMatch[1];
+    const siteId = await resolveRouteSite(membersMatch[1]);
     await requireCapability(actor, siteId, 'site:manage');
 
     const members = await identity.listMembers({ siteId });
@@ -37,7 +42,7 @@ async function handleSiteMembershipRoute(ctx) {
 
   if (req.method === 'POST' && membersMatch) {
     const body = await readJson(req, Math.min(maxBody, 16_384));
-    const siteId = membersMatch[1];
+    const siteId = await resolveRouteSite(membersMatch[1], body);
     await requireCapability(actor, siteId, 'site:manage');
 
     const member = await identity.addMember({
@@ -63,7 +68,8 @@ async function handleSiteMembershipRoute(ctx) {
   );
 
   if (req.method === 'DELETE' && memberMatch) {
-    const [, siteId, userId] = memberMatch;
+    const [, routeSiteId, userId] = memberMatch;
+    const siteId = await resolveRouteSite(routeSiteId);
     await requireCapability(actor, siteId, 'site:manage');
     await identity.removeMember({ siteId, userId });
     await identity.audit({
@@ -84,7 +90,7 @@ async function handleSiteMembershipRoute(ctx) {
 
   if (req.method === 'POST' && inviteMatch) {
     const body = await readJson(req, Math.min(maxBody, 16_384));
-    const siteId = inviteMatch[1];
+    const siteId = await resolveRouteSite(inviteMatch[1], body);
     await requireCapability(actor, siteId, 'site:manage');
 
     const invitation = await identity.createInvitation({

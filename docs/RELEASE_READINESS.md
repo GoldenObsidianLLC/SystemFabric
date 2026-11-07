@@ -1,10 +1,18 @@
-## Latest mainline and tenant-isolation preparation snapshot — 7 November 2026 (PRs #84–#86 merged)
+## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#87 merged)
 
-Current mainline: VirgoScorpio Hub 0.6.2 at f601a8c124b9c2b266cb847dcb7b3b0daab30952. PR #84 synchronized the pre-review documentation; PR #85 hardened ClamAV timeout/process-close cleanup; PR #86 validates media-variant signatures and parent asset categories before object storage writes and public reads. The PR #86 workflow and post-merge mainline workflow [run](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42329895761) passed all six configured jobs: Node.js 22.23.4, Node.js 24.22.1, PostgreSQL/Memgraph integration, browser/accessibility smoke, CodeQL and evidence consolidation.
+Current mainline: VirgoScorpio Hub 0.6.2 at 496db8a4a1416502b48a58120986eb665b197846 after PR #87. PR #87 added the generated 27-family/78-pattern tenant-isolation route/data-access inventory, source/test anchors and platform-normalized digests. Its PR workflow [run 42333235986](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42333235986) and post-merge mainline push workflow [run 42333446105](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42333446105) passed all six hosted jobs. PRs #84-#87 are merged. The inventory remains a maintainer-authored review aid, not independent evidence.
 
 The maintainer-generated [Tenant-Isolation Route and Data-Access Inventory](security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) catalogs 27 route/processing families and 78 declared route patterns, with 19 source files and 37 referenced test files. Its generator checks source anchors and test references, refreshes line numbers, records implementation/test tree digests, and is exercised by the unit suite. It is a navigation and drift-detection aid only: it does not prove route completeness or runtime security and is not an independent assessment.
 
 Issue #14 remains OPEN / NOT PERFORMED. No independent reviewer is assigned and no passing artifacts/evidence/tenant-isolation-review.json exists. Issue #25 remains open. The external/provider/product/security/operations evidence gates remain open, human lockfile review remains outstanding, and the service-less integration subset remains PARTIAL. The formal PostgreSQL/Memgraph evidence contract remains anchored to its previously documented exact-source baseline; this newer green mainline workflow does not silently replace that retained evidence. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. No version change, tag, publication or deployment is authorized.
+
+---
+
+## Pending code candidate - site selector reconciliation for membership administration (PR #88, not merged)
+
+The next candidate is based on mainline 496db8a4a1416502b48a58120986eb665b197846. The member-list, member-add, member-remove and invitation handlers now receive the shared siteIdFor resolver from API composition and reconcile the route path site with the header, query and JSON-body selectors before site:manage authorization. Duplicate query selectors and conflicting selectors use the established 400 site-context error path before identity-store reads or writes. Unit tests assert resolver-before-capability ordering; the two-site PostgreSQL integration test compares membership, invitation, mail-outbox and audit state before/after header, query and body mismatch attempts.
+
+This is a targeted consistency hardening, not proof of complete tenant isolation. It does not close issue #14 or #25, does not produce formal security-review evidence, and does not change the product version or release disposition. PR CI and post-merge mainline CI have not yet been validated for this candidate.
 
 ---
 
