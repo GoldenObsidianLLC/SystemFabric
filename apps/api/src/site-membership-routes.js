@@ -25,7 +25,9 @@ async function handleSiteMembershipRoute(ctx) {
   } = ctx;
 
   async function resolveRouteSite(siteId, body) {
-    return siteIdFor({ req, url, body, actor, routeSiteId: siteId });
+    // Reconcile selectors here, but preserve this route family's established
+    // site:manage authorization/error contract as the membership gate.
+    return siteIdFor({ req, url, body, actor, routeSiteId: siteId, requireMembership: false });
   }
 
   const membersMatch = url.pathname.match(

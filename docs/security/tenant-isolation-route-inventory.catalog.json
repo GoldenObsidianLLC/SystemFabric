@@ -222,7 +222,7 @@
         "/api/v1/sites/{siteId}/invitations"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. Conflicting or duplicated selectors fail with a site-context 400 before capability authorization or identity-store operations. The resolved path site is then checked for site:manage.",
+      "siteContext": "Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. The resolver validates UUID shape and selector consistency with its generic membership precheck explicitly disabled for this route family; the established site:manage capability check remains the authorization gate and preserves the existing forbidden response contract. Conflicting or duplicated selectors fail with a site-context 400 before identity-store operations.",
       "capabilities": [
         "site:manage"
       ],

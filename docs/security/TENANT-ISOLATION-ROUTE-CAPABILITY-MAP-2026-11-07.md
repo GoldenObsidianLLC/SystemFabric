@@ -8,8 +8,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
-- Implementation-source digest: 56ae2f99483accf6f411b4202d026f19bc77005aaecf0382088a6a255a73ae7b across 19 files.
-- Referenced-test digest: 99bd13d8a6bb4f612a9a07f2b03ccb5433219e3947534c94d41e658142b3e5e6 across 37 files.
+- Implementation-source digest: 01faa2aae37f86937eb4bd85890b24978fb57e1ca304b343f963244bd4297e9e across 19 files.
+- Referenced-test digest: a92adf075c555d24c28b235c8259e21fe4b43c91766d03061cf0fdcf42362c41 across 37 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 37 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
@@ -109,11 +109,11 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Methods (family-level union): GET, POST, DELETE
 - Routes/flows: /api/v1/sites/{siteId}/members; /api/v1/sites/{siteId}/members/{userId}; /api/v1/sites/{siteId}/invitations
 - Authentication: Authenticated session.
-- Tenant/site context: Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. Conflicting or duplicated selectors fail with a site-context 400 before capability authorization or identity-store operations. The resolved path site is then checked for site:manage.
+- Tenant/site context: Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. The resolver validates UUID shape and selector consistency with its generic membership precheck explicitly disabled for this route family; the established site:manage capability check remains the authorization gate and preserves the existing forbidden response contract. Conflicting or duplicated selectors fail with a site-context 400 before identity-store operations.
 - Capabilities/controls: site:manage
 - Data-access boundary: site_memberships; users; invitations; mail/outbox; audit events; authorization invalidation
 - Side effects: Add/remove membership; Create invitation; Mail delivery intent; Audit and session/realtime authorization invalidation
-- Source: apps/api/src/site-membership-routes.js (lines 31, 66, 87); apps/api/src/server.js (lines 1780)
+- Source: apps/api/src/site-membership-routes.js (lines 33, 68, 89); apps/api/src/server.js (lines 1780)
 - Test references: test/site-membership-routes.test.js, test/integration/tenant-membership-administration-isolation.integration.test.js
 - Coverage characterization: **targeted-selector-reconciliation-and-two-site-side-effects**. Unit tests assert resolver-before-capability ordering. The live A/B integration scenario rejects path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares membership, invitation, mail-outbox and audit snapshots for both sites. Foreign-user membership and invitation controls remain covered. Last-owner concurrency, broader role combinations and revocation of active streams remain independent-review work.
 

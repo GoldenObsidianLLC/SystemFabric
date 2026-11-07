@@ -59,7 +59,7 @@ function createContext({
     url: new URL(`http://localhost${path}`),
     actor: { user: { id: ACTOR_ID } },
     siteIdFor: async input => {
-      events.push({ type: 'siteIdFor', routeSiteId: input.routeSiteId, body: input.body });
+      events.push({ type: 'siteIdFor', routeSiteId: input.routeSiteId, body: input.body, requireMembership: input.requireMembership });
       return siteIdFor(input);
     },
     requireCapability: async (...args) => {
@@ -102,7 +102,7 @@ test('member listing checks site management capability before identity access', 
 
   assert.equal(await handleSiteMembershipRoute(ctx), true);
   assert.deepEqual(ctx.events, [
-    { type: 'siteIdFor', routeSiteId: SITE_ID, body: undefined },
+    { type: 'siteIdFor', routeSiteId: SITE_ID, body: undefined, requireMembership: false },
     {
       type: 'requireCapability',
       args: [ctx.actor, SITE_ID, 'site:manage'],
@@ -157,6 +157,7 @@ test('member addition uses the bounded body reader and audits the assigned role'
     type: 'siteIdFor',
     routeSiteId: SITE_ID,
     body: { email: 'member@example.test', role: 'editor' },
+    requireMembership: false,
   });
   assert.deepEqual(ctx.events[3].input, {
     siteId: SITE_ID,
@@ -212,7 +213,7 @@ test('invitation creation scopes capability checks and never audits the one-time
     'sendJson',
   ]);
   assert.equal(ctx.events[0].maxBytes, 16_384);
-  assert.deepEqual(ctx.events[1], { type: 'siteIdFor', routeSiteId: SITE_ID, body: { email: 'invitee@example.test', role: 'viewer' } });
+  assert.deepEqual(ctx.events[1], { type: 'siteIdFor', routeSiteId: SITE_ID, body: { email: 'invitee@example.test', role: 'viewer' }, requireMembership: false });
   assert.deepEqual(ctx.events[3].input, {
     siteId: SITE_ID,
     email: 'invitee@example.test',

@@ -24,7 +24,7 @@ All notable project-level changes should be recorded here. This changelog does n
 
 ### Membership administration site-context reconciliation - PR #88 candidate
 
-- Candidate hardening routes site-member listing, member addition/removal and invitation creation through the shared siteIdFor resolver before capability checks. Path, x-virgoscorpio-hub-site-id, query and JSON-body site selectors must agree; conflicts fail before identity-store access. Unit and two-site PostgreSQL integration coverage verifies that conflicting selectors leave membership, invitation, mail-outbox and audit state unchanged. This candidate does not constitute an independent tenant-isolation assessment; hosted CI is pending at this candidate snapshot.
+- Candidate hardening routes site-member listing, member addition/removal and invitation creation through the shared siteIdFor selector resolver before capability checks. Header, query and JSON-body site selectors must match the path site; conflicts fail before identity-store access. The resolver generic membership precheck is explicitly disabled for this route family so the existing site:manage capability remains the authorization gate and retains its established forbidden response code. Unit and two-site PostgreSQL integration coverage verifies selector mismatches leave membership, invitation, mail-outbox and audit state unchanged. Independent tenant-isolation assessment remains outstanding; hosted CI is pending.
 
 ### Current mainline disposition - 7 November 2026
 

@@ -388,7 +388,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     }
     return null;
   }
-  async function siteIdFor({ req, url, body, actor, required = true, routeSiteId }) {
+  async function siteIdFor({ req, url, body, actor, required = true, routeSiteId, requireMembership = true }) {
     const querySiteIds = url.searchParams.getAll('siteId');
     if (querySiteIds.length > 1) {
       throw fail(400, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH', 'Provide a siteId query parameter only once.');
@@ -415,7 +415,7 @@ function createApiServer({ env = process.env, aiService, aiTaskStore: injectedAI
     if (!siteId) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_SITE_REQUIRED', 'A siteId is required for this operation.');
     if (!ID_RE.test(siteId)) throw fail(400, 'ERR_VIRGOSCORPIO_HUB_INVALID_SITE_ID', 'siteId must be a valid UUID.');
 
-    if (!actor.isDeveloper && !(await identity.authorizeSite(actor.user.id, siteId, 'content:read'))) {
+    if (requireMembership && !actor.isDeveloper && !(await identity.authorizeSite(actor.user.id, siteId, 'content:read'))) {
       // Read membership directly; the requested capability is checked by route-specific authorization below.
       const hasMembership = actor.memberships.some(item => item.siteId === siteId);
       if (!hasMembership) throw fail(403, 'ERR_VIRGOSCORPIO_HUB_TENANT_FORBIDDEN', 'You are not a member of this site.');
