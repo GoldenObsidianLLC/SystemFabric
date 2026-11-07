@@ -16,7 +16,7 @@
 
 </div>
 
-> **Project status:** VirgoScorpio Hub 0.6.2 remains an unreleased developer-preview. The verified product-code mainline after PR #80 is 29a3e03997da429a1bb05964f46c22cf975a8c2e; mainline workflow [run #341](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42311936630) passed all six hosted jobs. Formal exact-SHA PostgreSQL/Memgraph evidence is PASS: 67/67 live tests, zero failures/skips/TODOs, 18/18 fresh migrations, 18/18 idempotent second-pass skips, and passing Memgraph outage/replay and graph rebuild. Node 22/24 service-less integration subsets remain PARTIAL (29 skips per runtime); human lockfile review and 14 independent/provider/product/security/supply-chain/operations gates remain open. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. PRs #76–#80 are merged; no release tag, GitHub Release, package publication or production deployment is authorized. See [release readiness](docs/RELEASE_READINESS.md), the [6 November mainline status report](docs/reports/2026-11-06-VirgoScorpio-Hub-0.6.2-Mainline-Status.md), tenant-isolation and taxonomy pre-reviews, the outbox-producer audit and CHANGELOG.md.
+> **Project status:** VirgoScorpio Hub 0.6.2 remains an unreleased developer-preview. Current mainline is `89c87f9483f915d72a44695dd2a5054c08cdd9ed` after PR #82 merged; the PR workflow run #349 passed all six hosted jobs. The preceding mainline SHA `4326b96fcce881950805d5007f5c6f1198b21d05` passed all six jobs in push run #347. Formal PostgreSQL/Memgraph evidence remains bound to the earlier product-code baseline `29a3e03997da429a1bb05964f46c22cf975a8c2e` (run #341): 67/67 live tests, zero failures/skips/TODOs, 18/18 fresh migrations, 18/18 idempotent second-pass skips, and passing Memgraph outage/replay and graph rebuild. Node 22/24 service-less integration subsets remain PARTIAL (29 skips per runtime); human lockfile review and 14 independent/provider/product/security/supply-chain/operations gates remain open. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED. PRs #76–#82 are merged; no release tag, GitHub Release, package publication or production deployment is authorized. See [release readiness](docs/RELEASE_READINESS.md), the [6 November mainline status report](docs/reports/2026-11-06-VirgoScorpio-Hub-0.6.2-Mainline-Status.md), tenant-isolation and taxonomy pre-reviews, the outbox-producer audit and CHANGELOG.md.
 
 ## Table of contents
 
@@ -105,7 +105,7 @@ The authoritative dependency declarations and exact scripts are `package.json`, 
 ### Install and run the baseline checks
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+git clone --recurse-submodules https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
 Set-Location VirgoScorpio-Hub
 npm ci
 
@@ -114,6 +114,10 @@ docker compose up -d postgres memgraph
 
 npm run check
 ```
+
+EnginEx is a pinned Git submodule at `vendor/enginex`. The recursive clone checks out the exact commit recorded by VirgoScorpio Hub.
+
+For an existing checkout, inspect `git submodule status --recursive` first. Initialize an uninitialized submodule with `git submodule update --init --recursive`. If a checkout differs from the pinned commit, inspect and preserve local submodule work before changing it; development bootstrap never resets or updates a submodule automatically.
 
 `npm run check` runs the repository's artifact/syntax verification and unit tests. It does not, by itself, validate migrations against a fresh database, external provider credentials, production security, load, backup/restore, or every deployment path.
 

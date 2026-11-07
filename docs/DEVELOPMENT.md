@@ -20,10 +20,14 @@ npm --version
 ## Checkout and dependency install
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+git clone --recurse-submodules https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
 Set-Location VirgoScorpio-Hub
 npm ci
 ```
+
+EnginEx is a pinned Git submodule at `vendor/enginex`. The recursive clone checks out the exact commit recorded by VirgoScorpio Hub.
+
+For an existing checkout, inspect `git submodule status --recursive` first. Initialize an uninitialized submodule with `git submodule update --init --recursive`. If a checkout differs from the pinned commit, inspect and preserve local submodule work before changing it; development bootstrap never resets or updates a submodule automatically.
 
 Use `npm ci` for a clean installation from the committed lockfile. If a script or package changes dependencies, review and commit the corresponding lockfile change deliberately.
 

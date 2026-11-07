@@ -11,7 +11,7 @@ Thank you for considering a contribution. Focused changes, reproducible tests, a
 ## Development workflow
 
 1. Fork the repository or create a working branch from the current maintained branch.
-2. Install the supported Node.js runtime and run `npm ci`.
+2. Install the supported Node.js runtime, initialize the pinned Git submodules with `git submodule update --init --recursive` if they were not fetched by a recursive clone, and run `npm ci`. Inspect existing submodule changes before updating.
 3. Make a focused change and add or update automated tests.
 4. Run the smallest relevant test first, then `npm run check`; run EnginEx, browser, or live integration suites when the change affects those areas.
 5. Run `git diff --check` and inspect `git diff` before committing.

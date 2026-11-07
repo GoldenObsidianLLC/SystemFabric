@@ -32,10 +32,14 @@ You do **not** need PostgreSQL, Memgraph, Docker, Chromium, or third-party provi
 Run these commands from the directory where you keep development projects:
 
 ```powershell
-git clone https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
+git clone --recurse-submodules https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub.git
 Set-Location VirgoScorpio-Hub
 npm ci
 ```
+
+EnginEx is a pinned Git submodule at `vendor/enginex`. The recursive clone checks out the exact commit recorded by VirgoScorpio Hub.
+
+For an existing checkout, inspect `git submodule status --recursive` first. Initialize an uninitialized submodule with `git submodule update --init --recursive`. If a checkout differs from the pinned commit, inspect and preserve local submodule work before changing it; development bootstrap never resets or updates a submodule automatically.
 
 `npm ci` installs the exact dependency graph from `package-lock.json`. It removes and recreates `node_modules`; do not use it in a directory where you have manually stored files inside `node_modules`.
 
@@ -130,7 +134,8 @@ Ordinary unit tests mock external providers where applicable. Credentials are ne
 |---|---|
 | `npm ci` reports an unsupported Node engine | Check `node --version`; select Node.js 22.23.4 or later, then rerun `npm ci`. |
 | `npm ci` reports a lockfile/package mismatch | Do not regenerate the lockfile just to silence the error. Fetch the maintained branch, inspect the dependency change, and ask in the relevant issue if the committed lockfile appears inconsistent. |
-| A required module cannot be resolved | Confirm `npm ci` completed successfully in the repository root. Run `npm run dev:doctor` for the preflight summary. |
+| A required module cannot be resolved | Confirm the pinned `vendor/enginex` submodule is initialized with `git submodule status --recursive`, then confirm `npm ci` completed successfully. Run `npm run dev:doctor` for the preflight summary. |
+| EnginEx submodule is missing or at a different commit | Use a recursive clone or inspect the submodule status before initializing it. The bootstrap reports missing/conflicted/mismatched submodules without resetting them. |
 | Docker commands cannot connect | Start Docker Desktop/Engine, then check `docker compose version` and `docker compose ps`. |
 | PostgreSQL or Memgraph is unreachable | Start the named Compose services; inspect `docker compose logs postgres memgraph`; confirm the endpoint and port in your local `.env`. |
 | Live integration refuses to start | Confirm `TEST_DATABASE_URL` is explicitly set, points to an isolated database ending in `test`, and that `MEMGRAPH_TEST_URL` or `MEMGRAPH_URL` is configured. The runner will not silently target `DATABASE_URL`. |
