@@ -258,8 +258,15 @@ The PR #89 candidate based on mainline c5c31556acb052b9a257931867ef0166e866e822 
 The PostgreSQL tenant-isolation integration suite exercises conflicting header/query values for each family, body mismatches on write routes, and header mismatches for deletes. It compares site configuration table snapshots before and after rejected calls. This is regression coverage only and not proof of complete route inventory or tenant isolation. Independent reviewer acceptance remains required for issue #14; broader independent security assessment #25 remains open. No formal security evidence file is created. Production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 
-## 12. Realtime route selector-consistency follow-up - PR #90 candidate, 7 November 2026
+## 12. Realtime route selector-consistency follow-up - PR #90 merged, 7 November 2026
 
-The PR #90 candidate based on mainline f38c3b0b65be1a20959295528b0ed5e1417eac40 applies the shared request-context resolver to presence list/heartbeat/leave, SSE and WebSocket upgrades. It reconciles path site IDs with the x-virgoscorpio-hub-site-id header and siteId query selector before realtime capability authorization. Heartbeat requests also reconcile an optional JSON-body siteId after bounded parsing and before the presence lease is mutated. The generic membership precheck is disabled so requireRealtimeCapability remains the authorization control.
+The merged PR #90 based on mainline f38c3b0b65be1a20959295528b0ed5e1417eac40 applies the shared request-context resolver to presence list/heartbeat/leave, SSE and WebSocket upgrades. It reconciles path site IDs with the x-virgoscorpio-hub-site-id header and siteId query selector before realtime capability authorization. Heartbeat requests also reconcile an optional JSON-body siteId after bounded parsing and before the presence lease is mutated. The generic membership precheck is disabled so requireRealtimeCapability remains the authorization control.
 
 Targeted tests exercise header/query mismatch across presence/SSE/WebSocket and heartbeat body mismatch, assert rejected WebSocket upgrades create no subscriptions, and assert the existing presence lease is unchanged after a rejected heartbeat. This is regression coverage, not independent route/security assessment. Issues #14 and #25 remain open, no formal security evidence is created, and production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+
+
+## 13. Mega-menu two-site isolation follow-up - PR #91 candidate, 7 November 2026
+
+The PR #91 candidate based on mainline 58b6b9707f9d63a08f55b15b0f0ee2489bdf3ef5 adds a live PostgreSQL A/B route test for mega-menu collection/item operations. It seeds the same slug in two sites, verifies a Site A owner cannot list/update/delete the Site B record, checks path/header/query/body selector mismatches, and compares navigation_menus snapshots before and after rejected calls. Positive Site A controls exercise create, optimistic version update and delete while proving the Site B row remains unchanged.
+
+This adds targeted route regression coverage only. Concurrent stale-update behavior, cache/consumer invalidation and other presentation variants remain separate review items. Issues #14 and #25 remain open, no formal security evidence is created, and production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
