@@ -1166,7 +1166,7 @@
       ],
       "coverage": {
         "level": "targeted-two-site-route-tests",
-        "limits": "Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; snapshots prove both tenants remain unchanged after denial. A pending PR #92 candidate races two updates with the same expected version and requires one success, one version conflict, one version increment and a final row matching the winner; this candidate is not part of the current mainline until merged. Consumer rendering/cache invalidation and every presentation variant remain separate review items."
+        "limits": "Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; snapshots prove both tenants remain unchanged after denial. The merged PR #92 regression races two updates with the same expected version and requires exactly one success, one version conflict, one version increment and a final row matching the winning request; the Site B same-slug row must remain unchanged. Consumer rendering/cache invalidation and every presentation variant remain separate review items."
       },
       "methods": [
         "GET",
