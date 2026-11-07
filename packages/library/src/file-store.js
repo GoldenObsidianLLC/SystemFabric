@@ -206,15 +206,36 @@ function createLibraryStore({ pool, root = path.resolve(process.env.LIBRARY_ROOT
         client.release();
       }
     },
-    async readPublicVariant({ assetId,variantKey }) {
-      if(!/^[a-z0-9][a-z0-9_-]{0,60}$/.test(String(variantKey))) return null;
-      const q=await pool.query("SELECT v.id,v.storage_key,v.mime_type,v.byte_size,v.sha256 FROM media_variants v JOIN library_assets a ON a.id=v.asset_id WHERE a.id=$1 AND a.is_public=true AND a.status='active' AND a.deleted_at IS NULL AND v.variant_key=$2",[assetId,variantKey]);const row=q.rows[0];if(!row)return null;const data=await get(row.storage_key);if(!data||data.length!==Number(row.byte_size)||createHash('sha256').update(data).digest('hex')!==row.sha256)return null;return {...row,data};
+    async readPublicVariant({ assetId, variantKey }) {
+      if (!/^[a-z0-9][a-z0-9_-]{0,60}$/.test(String(variantKey))) return null;
+      const result = await pool.query(
+        "SELECT v.id,v.storage_key,v.mime_type,v.byte_size,v.sha256,a.asset_kind FROM media_variants v JOIN library_assets a ON a.id=v.asset_id WHERE a.id=$1 AND a.is_public=true AND a.status='active' AND a.deleted_at IS NULL AND v.variant_key=$2",
+        [assetId, variantKey]
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      const data = await get(row.storage_key);
+      if (!data || data.length !== Number(row.byte_size) || createHash('sha256').update(data).digest('hex') !== row.sha256) return null;
+      // Do not serve legacy or corrupted variant rows solely because their stored hash matches.
+      if (sniffMime(data) !== row.mime_type || !KIND_MIMES[row.asset_kind]?.has(row.mime_type)) return null;
+      return { ...row, data };
     },
-    async createVariant({ siteId,id,variantKey,data,mimeType,width=null,height=null }) {
-      if (!/^[a-z0-9][a-z0-9_-]{0,60}$/.test(String(variantKey)) || !Buffer.isBuffer(data) || data.length < 1 || data.length > maxFileBytes || typeof mimeType !== 'string') throw libraryError('Variant metadata or bytes are invalid.');
-      const current = await pool.query("SELECT id,asset_kind,version FROM library_assets WHERE site_id=$1 AND id=$2 AND deleted_at IS NULL AND status='active'",[siteId,id]);
-      if (!current.rows[0]) throw libraryError('Library asset not found.','ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND',404);
-      const ext = EXTENSIONS[mimeType]; if (!ext) throw libraryError('Variant MIME type is not allowed.');
+    async createVariant({ siteId, id, variantKey, data, mimeType, width = null, height = null }) {
+      if (!/^[a-z0-9][a-z0-9_-]{0,60}$/.test(String(variantKey)) || !Buffer.isBuffer(data) || data.length < 1 || data.length > maxFileBytes || typeof mimeType !== 'string') {
+        throw libraryError('Variant metadata or bytes are invalid.');
+      }
+      const detected = sniffMime(data);
+      if (!detected || detected !== mimeType) {
+        throw libraryError('Variant file signature does not match its MIME type.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE');
+      }
+      const current = await pool.query("SELECT id,asset_kind,version FROM library_assets WHERE site_id=$1 AND id=$2 AND deleted_at IS NULL AND status='active'", [siteId, id]);
+      const asset = current.rows[0];
+      if (!asset) throw libraryError('Library asset not found.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_NOT_FOUND', 404);
+      if (!KIND_MIMES[asset.asset_kind]?.has(detected)) {
+        throw libraryError('Variant MIME type does not match the parent library category.', 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE');
+      }
+      const ext = EXTENSIONS[detected];
+      if (!ext) throw libraryError('Variant MIME type is not allowed.');
       const storageKey = `${siteId}/${id}/variants/${variantKey}-${randomUUID()}.${ext}`; const digest = createHash('sha256').update(data).digest('hex');
       await put(storageKey,data,mimeType);
       try {

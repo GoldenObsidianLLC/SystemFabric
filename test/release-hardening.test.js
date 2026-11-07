@@ -72,6 +72,43 @@ test('library uploads activate only after scanner confirms clean content', async
   assert.equal(asset.is_public, true);
 });
 
+test('library media variants validate file signatures and parent asset categories before storage', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-variants-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+  const webp = Buffer.alloc(12);
+  webp.write('RIFF', 0, 'ascii');
+  webp.write('WEBP', 8, 'ascii');
+  let variantRow = null;
+  let insertCount = 0;
+  const pool = {
+    async query(sql, args) {
+      if (/SELECT id,asset_kind,version FROM library_assets/.test(sql)) return { rows: [{ id: 'asset-one', asset_kind: 'image', version: 1 }] };
+      if (/INSERT INTO media_variants/.test(sql)) {
+        insertCount += 1;
+        variantRow = { id: 'variant-one', asset_id: args[0], variant_key: args[1], storage_key: args[2], mime_type: args[3], byte_size: args[4], sha256: args[7], asset_kind: 'image' };
+        return { rows: [{ ...variantRow }] };
+      }
+      if (/FROM media_variants v JOIN library_assets a/.test(sql)) return { rows: variantRow ? [{ ...variantRow }] : [] };
+      throw new Error('Unexpected library variant query.');
+    }
+  };
+  const store = createLibraryStore({ pool, root, requireMalwareScan: false });
+  await assert.rejects(() => store.createVariant({ siteId: 'site-one', id: 'asset-one', variantKey: 'webp-optimized', data: Buffer.from('not a WebP image'), mimeType: 'image/webp' }), { code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE' });
+  await assert.rejects(() => store.createVariant({ siteId: 'site-one', id: 'asset-one', variantKey: 'pdf-variant', data: Buffer.from('%PDF-1.7\\n'), mimeType: 'application/pdf' }), { code: 'ERR_VIRGOSCORPIO_HUB_LIBRARY_TYPE' });
+  assert.equal(insertCount, 0);
+  assert.deepEqual(await fs.promises.readdir(root), [], 'invalid variants must be rejected before writing object bytes');
+  const created = await store.createVariant({ siteId: 'site-one', id: 'asset-one', variantKey: 'webp-optimized', data: webp, mimeType: 'image/webp' });
+  assert.equal(created.mime_type, 'image/webp');
+  assert.equal(insertCount, 1);
+  const readable = await store.readPublicVariant({ assetId: 'asset-one', variantKey: 'webp-optimized' });
+  assert.deepEqual(readable.data, webp);
+  const corrupted = Buffer.from('not a WebP image');
+  await fs.promises.writeFile(path.join(root, variantRow.storage_key), corrupted);
+  variantRow.byte_size = corrupted.length;
+  variantRow.sha256 = require('node:crypto').createHash('sha256').update(corrupted).digest('hex');
+  assert.equal(await store.readPublicVariant({ assetId: 'asset-one', variantKey: 'webp-optimized' }), null, 'a matching stored hash must not override a MIME signature mismatch');
+});
+
 test('production library uploads fail closed when scanner is missing, detects malware, or times out', async t => {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-failclosed-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
