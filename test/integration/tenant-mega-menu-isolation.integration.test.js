@@ -195,6 +195,15 @@ test(
 
     assert.deepEqual(await menuSnapshot(), before, 'denied and conflicting requests must not change either site navigation');
 
+    const invalidCreate = await fetch(base + path(siteA), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ slug: 'site-a-invalid-presentation', name: 'Invalid presentation', items: [], presentation: { layout: 'absolute' } }),
+    });
+    assert.equal(invalidCreate.status, 422);
+    assert.equal((await invalidCreate.json()).code, 'ERR_VIRGOSCORPIO_HUB_MEGA_MENU_PRESENTATION');
+    assert.equal((await pool.query('SELECT id FROM navigation_menus WHERE site_id=$1 AND slug=$2', [siteA, 'site-a-invalid-presentation'])).rows.length, 0, 'invalid create must not persist a menu');
+
     const createdSlug = 'site-a-created-mega-menu';
     const created = await fetch(base + path(siteA), {
       method: 'POST',
@@ -214,6 +223,16 @@ test(
     assert.equal(createdRecord.rows[0].site_id, siteA);
     assert.equal(createdRecord.rows[0].version, 1);
     assert.equal(createdPayload.menu.presentation.megaMenu, true);
+
+    const beforeInvalidUpdate = await menuSnapshot();
+    const invalidUpdate = await fetch(base + path(siteA) + '/' + createdSlug, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({ expectedVersion: 1, name: 'Must not persist', items: [{ id: 'bad', label: 'Bad', type: 'url', url: '/' }], presentation: { unknownOption: true } }),
+    });
+    assert.equal(invalidUpdate.status, 422);
+    assert.equal((await invalidUpdate.json()).code, 'ERR_VIRGOSCORPIO_HUB_MEGA_MENU_PRESENTATION');
+    assert.deepEqual(await menuSnapshot(), beforeInvalidUpdate, 'invalid presentation update must not change either tenant or increment a version');
 
     const updatedCreated = await fetch(base + path(siteA) + '/' + createdSlug, {
       method: 'PUT',
