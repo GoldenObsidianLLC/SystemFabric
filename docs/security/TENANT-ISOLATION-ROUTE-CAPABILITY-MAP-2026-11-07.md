@@ -9,7 +9,7 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
 - Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: 0dd0f08f394bc9f789e00e99c05f1b6a8789e4ebc95e2090d6659817cb8e5329 across 38 files.
+- Referenced-test digest: 77f16cad0777393c12c2d100deb9e5cac9c4accab0ea4a908c93016e3f4b00df across 38 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 38 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
@@ -353,7 +353,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Side effects: Create/update/delete versioned navigation configuration
 - Source: apps/api/src/platform-routes.js (lines 81)
 - Test references: test/tenant-route-capabilities.test.js, test/api.test.js, test/integration/tenant-mega-menu-isolation.integration.test.js
-- Coverage characterization: **targeted-two-site-route-tests**. Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; before/after snapshots prove both tenants remain unchanged after denial. Concurrent stale updates, consumer rendering/cache invalidation and every presentation variant remain separate review items.
+- Coverage characterization: **targeted-two-site-route-tests**. Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; snapshots prove both tenants remain unchanged after denial. A pending PR #92 candidate races two updates with the same expected version and requires one success, one version conflict, one version increment and a final row matching the winner; this candidate is not part of the current mainline until merged. Consumer rendering/cache invalidation and every presentation variant remain separate review items.
 
 ### 22. Stripe billing webhook
 

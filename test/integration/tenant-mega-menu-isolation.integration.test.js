@@ -234,6 +234,34 @@ test(
     assert.equal(updatedRecord.rows[0].site_id, siteA);
     assert.equal(updatedRecord.rows[0].version, 2);
 
+    // Race two writes against the same version; PostgreSQL must admit exactly one winner.
+    const concurrentCandidates = [
+      { name: 'Site A concurrent update alpha', items: [{ id: 'race-alpha', label: 'Alpha', type: 'url', url: '/alpha' }], presentation: { layout: 'columns' } },
+      { name: 'Site A concurrent update beta', items: [{ id: 'race-beta', label: 'Beta', type: 'url', url: '/beta' }], presentation: { layout: 'tabs' } },
+    ];
+    const concurrentResults = await Promise.all(concurrentCandidates.map(async candidate => {
+      const response = await fetch(base + path(siteA) + '/' + createdSlug, { method: 'PUT', headers: authHeaders, body: JSON.stringify({ expectedVersion: 2, name: candidate.name, items: candidate.items, presentation: candidate.presentation }) });
+      return { candidate, status: response.status, payload: await response.json() };
+    }));
+    assert.deepEqual(concurrentResults.map(result => result.status).sort((a, b) => a - b), [200, 409]);
+    const winner = concurrentResults.find(result => result.status === 200);
+    const loser = concurrentResults.find(result => result.status === 409);
+    assert.equal(loser.payload.code, 'ERR_VIRGOSCORPIO_HUB_VERSION_CONFLICT');
+    assert.equal(winner.payload.menu.version, 3);
+    assert.equal(winner.payload.menu.name, winner.candidate.name);
+    assert.deepEqual(winner.payload.menu.items, winner.candidate.items);
+    assert.equal(winner.payload.menu.presentation.layout, winner.candidate.presentation.layout);
+    const finalRaceRow = await pool.query('SELECT site_id,name,version,items,presentation FROM navigation_menus WHERE site_id=$1 AND slug=$2', [siteA, createdSlug]);
+    assert.equal(finalRaceRow.rows.length, 1);
+    assert.equal(finalRaceRow.rows[0].site_id, siteA);
+    assert.equal(finalRaceRow.rows[0].version, 3);
+    assert.equal(finalRaceRow.rows[0].name, winner.candidate.name);
+    assert.deepEqual(finalRaceRow.rows[0].items, winner.candidate.items);
+    assert.equal(finalRaceRow.rows[0].presentation.layout, winner.candidate.presentation.layout);
+    const siteBAfterRace = await pool.query('SELECT id,site_id,slug,name,version,items,presentation,updated_by,created_at,updated_at FROM navigation_menus WHERE site_id=$1 AND slug=$2', [siteB, sharedSlug]);
+    assert.equal(siteBAfterRace.rows.length, 1);
+    assert.deepEqual(siteBAfterRace.rows[0], before.find(row => row.site_id === siteB));
+
     const deletedCreated = await fetch(base + path(siteA) + '/' + createdSlug, {
       method: 'DELETE',
       headers: readHeaders,
