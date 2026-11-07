@@ -8,8 +8,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
-- Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: dcec09330a5a0962df19bc35b42a3a2f7a2e91ea518640f72f87a7ce60560b7c across 41 files.
+- Implementation-source digest: b8a9254def824b6bb54c386072caa5bb2d52667803480beb42e90a58a5397533 across 19 files.
+- Referenced-test digest: 9c95aeaa9593fd50d9bbf9242af58ec4445599d367aa50d74cfe8f28da31a366 across 41 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 41 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
@@ -235,13 +235,13 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Methods (family-level union): GET
 - Routes/flows: /media/{assetId}; /library/public/{assetId}; /library/public/{assetId}/variants/{variantKey}
 - Authentication: Public/anonymous.
-- Tenant/site context: No caller-selected site. The asset ID resolves through store-level public/active/not-deleted predicates; bytes must match stored length/hash and media variants must match MIME signature and parent category.
+- Tenant/site context: No caller-selected site. Public byte routes resolve through store-level current visibility and lifecycle predicates; bytes are checked for stored length/hash and variants for MIME signature and parent category. S3 media URLs are API-mediated; direct public CDN URLs are disabled pending a verified invalidation contract.
 - Capabilities/controls: Public asset publication flag and active/quarantine state
 - Data-access boundary: media assets and object storage; library_assets; media_variants
-- Side effects: Read-only byte delivery with public cache headers; cache lifetime and revocation behavior are security-relevant.
+- Side effects: Read-only byte delivery; successful responses use private, no-store and recheck database visibility on each request. Shared-cache/CDN overrides remain deployment-review items.
 - Source: apps/api/src/server.js (lines 833, 849, 857); packages/library/src/file-store.js (lines 136, 209)
 - Test references: test/release-hardening.test.js, test/integration/tenant-library-media-isolation.integration.test.js, test/security-boundaries.test.js
-- Coverage characterization: **targeted**. Public/private and corrupted-variant checks exist. URL guessing, old caches after visibility change, object-provider policy and all media types require separate review.
+- Coverage characterization: **targeted-two-site-revocation-and-no-store**. The live two-site integration suite reads a public library asset and variant, revokes visibility through the authorized metadata route, and confirms the next origin request returns 404; it also verifies public media revocation and private, no-store success headers. S3 tests prove direct public CDN mode fails closed and objects are stored private/no-store. The tests do not validate reverse-proxy/CDN overrides, provider IAM/bucket policy, purging legacy direct-CDN URLs already issued before this change, or every asset/variant type; those remain deployment and independent-review work.
 
 ### 14. Commerce products, orders, checkout, idempotency and refunds
 

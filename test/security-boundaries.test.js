@@ -53,20 +53,22 @@ test('PostgreSQL SAML cache namespaces keys by IdP and atomically consumes one-t
   assert.equal(await cache.consumeAsync(''), null);
 });
 
-test('S3 media store validates image signatures and writes object metadata before SQL metadata', async () => {
+test('S3 media store keeps public objects private and requires API-gated revocable URLs', async () => {
   const sent = [];
   class Command { constructor(input) { this.input = input; } }
   const commands = { PutObjectCommand: Command, DeleteObjectCommand: Command, GetObjectCommand: Command };
   const client = { async send(command) { sent.push(command); if (command instanceof commands.GetObjectCommand) return { Body: Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]) }; return {}; } };
   const poolCalls = [];
   const pool = { async query(sql, args) { poolCalls.push({ sql, args }); return { rows: [{ id: args[0], site_id: args[1], storage_key: args[2], mime_type: args[3], byte_size: args[4], alt_text: args[5], publicly_accessible: args[8], created_at: new Date() }] }; } };
-  const store = createS3MediaStore({ pool, client, commands, env: { S3_BUCKET: 'virgoscorpio-hub-assets', S3_REGION: 'us-east-1', CDN_BASE_URL: 'https://cdn.example.test', MEDIA_CDN_PUBLIC: 'true' } });
+  assert.throws(() => createS3MediaStore({ pool, client, commands, env: { S3_BUCKET: 'virgoscorpio-hub-assets', MEDIA_CDN_PUBLIC: 'true', CDN_BASE_URL: 'https://cdn.example.test' } }), /MEDIA_CDN_PUBLIC is disabled/);
+  const store = createS3MediaStore({ pool, client, commands, env: { S3_BUCKET: 'virgoscorpio-hub-assets', S3_REGION: 'us-east-1', CDN_BASE_URL: 'https://cdn.example.test' } });
   const png = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
   await assert.rejects(() => store.upload({ siteId: 'site-a', dataBase64: Buffer.from('<svg/>').toString('base64'), mimeType: 'image/svg+xml' }), { code: 'ERR_VIRGOSCORPIO_HUB_MEDIA_INVALID' });
   assert.equal(sent.length, 0);
   const asset = await store.upload({ siteId: 'site-a', actorId: 'user-a', dataBase64: png.toString('base64'), mimeType: 'image/png', altText: 'Example' });
   assert.equal(sent.length, 1);
   assert.match(sent[0].input.Key, /^site-a\//);
-  assert.equal(store.publicUrl(asset).startsWith('https://cdn.example.test/site-a/'), true);
+  assert.equal(sent[0].input.CacheControl, 'private, no-store');
+  assert.equal(store.publicUrl(asset), '/media/' + asset.id);
   assert.equal(poolCalls.length, 1);
 });

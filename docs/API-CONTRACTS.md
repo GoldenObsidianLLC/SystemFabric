@@ -52,7 +52,7 @@ These routes preserve the existing HTTP paths and database schema. Definition va
 
 - `GET /api/v1/media?siteId=...` — list assets (requires `media:manage` in this version).
 - `POST /api/v1/media/uploads` — base64 PNG/JPEG/WebP/GIF upload, max 10 MiB decoded. Actual image signatures are verified; SVG and unknown formats are rejected. Files are stored locally or through the configured S3-compatible adapter.
-- `GET /media/{assetId}` — public assets only. Private media delivery and signed URL handling are not yet complete; storage metadata flags must not be treated as a full private-delivery security boundary. S3/CDN policies require integration tests.
+- `GET /media/{assetId}` — public assets only. Private media delivery and signed URL handling are not yet complete; storage metadata flags must not be treated as a full private-delivery security boundary. S3/CDN policies require integration tests. New public media URLs are API-mediated, use Cache-Control: private, no-store, and recheck current publication state on each request; MEDIA_CDN_PUBLIC=true fails closed. Reverse-proxy/CDN cache overrides, bucket policy, and purging previously issued direct-CDN URLs remain deployment-specific validation gates.
 
 ## AI and MCP
 

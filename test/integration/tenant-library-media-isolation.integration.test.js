@@ -55,6 +55,19 @@ async function seedLibraryAsset({ pool, libraryRoot, siteId, id, bytes, displayN
   return { id, siteId, storageKey, bytes, digest, displayName };
 }
 
+async function seedMediaAsset({ pool, mediaRoot, siteId, id, bytes, createdBy = null }) {
+  const storageKey = String(siteId) + '/' + String(id) + '.png';
+  const filePath = path.join(mediaRoot, ...storageKey.split('/'));
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, bytes, { flag: 'wx' });
+  await pool.query(
+    'INSERT INTO media_assets(id,site_id,storage_key,mime_type,byte_size,alt_text,metadata,created_by,publicly_accessible) ' +
+    "VALUES($1,$2,$3,'image/png',$4,'','{}'::jsonb,$5,true)",
+    [id, siteId, storageKey, bytes.length, createdBy]
+  );
+  return { id, siteId, storageKey, bytes };
+}
+
 async function librarySideEffects(pool, siteId, assetId) {
   const [asset, versions, variants] = await Promise.all([
     pool.query(
@@ -89,6 +102,7 @@ test(
     let roleId = null;
     let server = null;
     let libraryRoot = null;
+    let mediaRoot = null;
 
     const env = {
       ...process.env,
@@ -116,11 +130,14 @@ test(
       }
       if (roleId) await pool.query('DELETE FROM roles WHERE id=$1', [roleId]).catch(() => {});
       if (libraryRoot) await fs.rm(libraryRoot, { recursive: true, force: true }).catch(() => {});
+      if (mediaRoot) await fs.rm(mediaRoot, { recursive: true, force: true }).catch(() => {});
       await pool.end();
     });
 
     libraryRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-tenant-library-'));
     env.LIBRARY_ROOT = libraryRoot;
+    mediaRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'virgoscorpio_hub-tenant-media-'));
+    env.MEDIA_ROOT = mediaRoot;
 
     const siteAResult = await pool.query(
       'INSERT INTO sites(slug,name) VALUES($1,$2) RETURNING id',
@@ -189,6 +206,21 @@ test(
       `INSERT INTO media_variants(asset_id,variant_key,storage_key,mime_type,byte_size,sha256)
        VALUES($1,'private-preview',$2,'text/plain',$3,$4)`,
       [assetAId, variantKey, variantBytes.length, createHash('sha256').update(variantBytes).digest('hex')]
+    );
+
+    const mediaAssetId = randomUUID();
+    const mediaBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+    const mediaAsset = await seedMediaAsset({ pool, mediaRoot, siteId: siteB, id: mediaAssetId, bytes: mediaBytes, createdBy: actor.id });
+
+    const publicVariantBytes = Buffer.from('SITE_B_PUBLIC_VARIANT_PAYLOAD');
+    const publicVariantKey = siteB + '/' + assetBId + '/variants/public-preview.txt';
+    const publicVariantPath = path.join(libraryRoot, ...publicVariantKey.split('/'));
+    await fs.mkdir(path.dirname(publicVariantPath), { recursive: true });
+    await fs.writeFile(publicVariantPath, publicVariantBytes, { flag: 'wx' });
+    await pool.query(
+      'INSERT INTO media_variants(asset_id,variant_key,storage_key,mime_type,byte_size,sha256) ' +
+      "VALUES($1,'public-preview',$2,'text/plain',$3,$4)",
+      [assetBId, publicVariantKey, publicVariantBytes.length, createHash('sha256').update(publicVariantBytes).digest('hex')]
     );
 
     const session = await identity.login({
@@ -318,10 +350,42 @@ test(
       assert.deepEqual(Buffer.from(await download.arrayBuffer()), controlB);
     });
 
-    await t.test('site B public asset remains available through its public URL', async () => {
-      const response = await fetch(`${base}/library/public/${assetB.id}`);
-      assert.equal(response.status, 200);
-      assert.deepEqual(Buffer.from(await response.arrayBuffer()), controlB);
+    await t.test('site B public asset and variant are non-cacheable and become unavailable immediately after revocation', async () => {
+      const assetResponse = await fetch(base + '/library/public/' + assetB.id);
+      assert.equal(assetResponse.status, 200);
+      assert.equal(assetResponse.headers.get('cache-control'), 'private, no-store');
+      assert.deepEqual(Buffer.from(await assetResponse.arrayBuffer()), controlB);
+
+      const variantResponse = await fetch(base + '/library/public/' + assetB.id + '/variants/public-preview');
+      assert.equal(variantResponse.status, 200);
+      assert.equal(variantResponse.headers.get('cache-control'), 'private, no-store');
+      assert.deepEqual(Buffer.from(await variantResponse.arrayBuffer()), publicVariantBytes);
+
+      const revoke = await fetch(base + '/api/v1/sites/' + siteB + '/library/items/' + assetB.id, {
+        method: 'PATCH',
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ expectedVersion: 1, patch: { isPublic: false } }),
+      });
+      assert.equal(revoke.status, 200, await revoke.text());
+
+      const hiddenAsset = await fetch(base + '/library/public/' + assetB.id);
+      const hiddenVariant = await fetch(base + '/library/public/' + assetB.id + '/variants/public-preview');
+      assert.equal(hiddenAsset.status, 404);
+      assert.equal(hiddenVariant.status, 404);
+      assert.equal(hiddenAsset.headers.get('cache-control'), 'no-store');
+      assert.equal(hiddenVariant.headers.get('cache-control'), 'no-store');
+    });
+
+    await t.test('public media uses no-store and checks current visibility on every request', async () => {
+      const publicResponse = await fetch(base + '/media/' + mediaAsset.id);
+      assert.equal(publicResponse.status, 200);
+      assert.equal(publicResponse.headers.get('cache-control'), 'private, no-store');
+      assert.deepEqual(Buffer.from(await publicResponse.arrayBuffer()), mediaBytes);
+
+      await pool.query('UPDATE media_assets SET publicly_accessible=false WHERE site_id=$1 AND id=$2', [siteB, mediaAsset.id]);
+      const revokedResponse = await fetch(base + '/media/' + mediaAsset.id);
+      assert.equal(revokedResponse.status, 404);
+      assert.equal(revokedResponse.headers.get('cache-control'), 'no-store');
     });
   }
 );
