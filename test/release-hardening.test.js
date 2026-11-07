@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const { PassThrough } = require('node:stream');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -23,6 +25,25 @@ function poolForInsert(capture = {}) {
         release() {}
       };
     }
+  };
+}
+
+function completedScannerProcess(exitCode, output = '') {
+  return (_executable, args, options) => {
+    assert.deepEqual(args.slice(0, 3), ['--no-summary', '--infected', '--stdout']);
+    assert.equal(options.shell, false);
+    const child = new EventEmitter();
+    child.pid = 123;
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.kill = () => false;
+    setImmediate(() => {
+      if (output) child.stderr.write(output);
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', exitCode, null);
+    });
+    return child;
   };
 }
 
@@ -51,13 +72,23 @@ test('library uploads activate only after scanner confirms clean content', async
   assert.equal(asset.is_public, true);
 });
 
-test('production library uploads fail closed when scanner is missing or reports a detection', async t => {
+test('production library uploads fail closed when scanner is missing, detects malware, or times out', async t => {
   const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-library-failclosed-'));
   t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
   const noScanner = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: true });
   await assert.rejects(() => noScanner.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_SCANNER_REQUIRED' });
   const infected = createLibraryStore({ pool: poolForInsert(), root, requireMalwareScan: true, malwareScanner: { async scan() { return { clean: false, status: 'infected', signature: 'EICAR' }; } } });
   await assert.rejects(() => infected.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'bad.png' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_DETECTED' });
+
+  const timeoutCalls = {};
+  const timedOut = createLibraryStore({
+    pool: poolForInsert(timeoutCalls),
+    root,
+    requireMalwareScan: true,
+    malwareScanner: { async scan() { const error = new Error('scanner timeout'); error.code = 'ERR_VIRGOSCORPIO_HUB_MALWARE_TIMEOUT'; throw error; } }
+  });
+  await assert.rejects(() => timedOut.upload({ siteId: 'site-one', category: 'image', dataBase64: png.toString('base64'), mimeType: 'image/png', fileName: 'timeout.png' }), { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_TIMEOUT' });
+  assert.deepEqual(timeoutCalls.calls || [], [], 'a scanner failure must happen before storage metadata is written');
   assert.deepEqual(await fs.promises.readdir(root), []);
 });
 
@@ -112,6 +143,77 @@ test('ClamAV scanner fails closed when the executable is unavailable and cleans 
   assert.deepEqual(await fs.promises.readdir(root), []);
 });
 
+test('ClamAV scanner accepts only clean/detection exit codes and rejects scanner faults', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-clamav-exit-codes-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+
+  const cleanScanner = createClamDScanScanner({ tempRoot: root, spawnProcess: completedScannerProcess(0), maxBytes: 1024 });
+  assert.deepEqual(await cleanScanner.scan({ buffer: Buffer.from('clean content') }), {
+    clean: true,
+    status: 'clean',
+    engine: 'clamdscan'
+  });
+
+  const detectionScanner = createClamDScanScanner({ tempRoot: root, spawnProcess: completedScannerProcess(1, 'stream: Eicar-Test-Signature FOUND'), maxBytes: 1024 });
+  const detection = await detectionScanner.scan({ buffer: Buffer.from('test signature') });
+  assert.equal(detection.clean, false);
+  assert.equal(detection.status, 'infected');
+  assert.match(detection.signature, /Eicar-Test-Signature/);
+
+  const failedScanner = createClamDScanScanner({ tempRoot: root, spawnProcess: completedScannerProcess(2), maxBytes: 1024 });
+  await assert.rejects(() => failedScanner.scan({ buffer: Buffer.from('scanner failure') }), {
+    code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_SCAN_FAILED'
+  });
+  assert.deepEqual(await fs.promises.readdir(root), []);
+});
+
+test('ClamAV timeout retains the private scan file until the child process closes', async t => {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'vsh-clamav-timeout-'));
+  t.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+
+  let scanFile;
+  let child;
+  let releaseChildClose;
+  let notifyKilled;
+  const killed = new Promise(resolve => { notifyKilled = resolve; });
+  const spawnProcess = (_executable, args, options) => {
+    assert.equal(options.shell, false);
+    scanFile = args[3];
+    child = new EventEmitter();
+    child.pid = 456;
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.kill = signal => {
+      notifyKilled(signal);
+      return true;
+    };
+    releaseChildClose = () => {
+      child.stdout.end();
+      child.stderr.end();
+      child.emit('close', null, 'SIGKILL');
+    };
+    return child;
+  };
+
+  const scanner = createClamDScanScanner({ executable: 'clamdscan-test', tempRoot: root, timeoutMs: 100, maxBytes: 1024, spawnProcess });
+  const scanPromise = scanner.scan({ buffer: Buffer.from('timeout test'), fileName: 'timeout.txt' });
+  const rejection = assert.rejects(scanPromise, { code: 'ERR_VIRGOSCORPIO_HUB_MALWARE_TIMEOUT' });
+  const signal = await killed;
+  assert.equal(signal, 'SIGKILL');
+  assert.ok(scanFile);
+  assert.equal((await fs.promises.stat(scanFile)).isFile(), true, 'the scanner input remains available while the killed child is closing');
+
+  let settled = false;
+  scanPromise.then(() => { settled = true; }, () => { settled = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false, 'the timeout result waits for child close before cleanup');
+  assert.equal(fs.existsSync(path.dirname(scanFile)), true);
+
+  releaseChildClose();
+  await rejection;
+  assert.equal(fs.existsSync(path.dirname(scanFile)), false);
+  assert.deepEqual(await fs.promises.readdir(root), []);
+});
 
 test('cloud credential references fail closed unless the active SDK can resolve the intended identity', () => {
   assert.equal(resolveCloudCredentialReference({ provider: 'aws-s3', reference: 'vault://production/assets', env: {} }).ok, false);
