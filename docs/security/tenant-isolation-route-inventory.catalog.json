@@ -1033,11 +1033,12 @@
       "tests": [
         "test/security-boundaries.test.js",
         "test/security-boundaries.test.js",
-        "test/integration/tenant-isolation.integration.test.js"
+        "test/integration/tenant-isolation.integration.test.js",
+        "test/integration/tenant-plugin-registry-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "partial",
-        "limits": "Manifest/signature/runner boundaries have unit coverage. Cross-site plugin ID, approval and invocation side-effect A/B tests and actual sandbox isolation remain open."
+        "level": "targeted-two-site-lifecycle",
+        "limits": "Live PostgreSQL A/B coverage verifies site-scoped plugin listing, non-disclosing foreign plugin IDs across approve/security-review/activate/disable/invoke, and no mutation or invocation records after denied cross-site actions. Conflicting registration site selectors are rejected before writes. The positive control approves a Site B plugin, requires a different Site B administrator for security review, and confirms activation/invocation remain fail-closed while execution is disabled. Actual isolated runner sandbox behavior and independent review remain external release gates."
       },
       "methods": [
         "GET",
