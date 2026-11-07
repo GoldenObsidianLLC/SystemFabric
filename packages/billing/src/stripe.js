@@ -10,14 +10,16 @@ function verifyStripeSignature(rawBody, header, secret, { nowSeconds = Math.floo
   const expected = createHmac('sha256', secret).update(`${timestamp}.`).update(rawBody).digest();
   return (fields.v1 || []).some(value => { if (!/^[a-f0-9]{64}$/i.test(value)) return false; const got=Buffer.from(value,'hex'); return got.length===expected.length && timingSafeEqual(got,expected); });
 }
-async function createStripeCheckoutSession({ secretKey, mode = 'payment', lineItems, successUrl, cancelUrl, customerEmail, metadata = {}, idempotencyKey = randomUUID(), fetchImpl = fetch, subscriptionMetadata = null, expiresAt = null }) {
+async function createStripeCheckoutSession({ secretKey, mode = 'payment', lineItems, successUrl, cancelUrl, customerEmail, metadata = {}, idempotencyKey = randomUUID(), fetchImpl = fetch, subscriptionMetadata = null, expiresAt = null, nowSeconds = Math.floor(Date.now() / 1000) }) {
   if (typeof secretKey !== 'string' || !secretKey.startsWith('sk_')) throw billingError('STRIPE_SECRET_KEY is not configured.', 'ERR_VIRGOSCORPIO_HUB_BILLING_DISABLED', 503);
   if (!['payment','subscription'].includes(mode) || !Array.isArray(lineItems) || lineItems.length < 1 || lineItems.length > 100) throw billingError('Checkout mode or line items are invalid.');
   for (const item of lineItems) if (!item || !/^[A-Z]{3}$/.test(item.currency) || !Number.isSafeInteger(item.unitAmount) || item.unitAmount < 0 || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 1000 || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 250) throw billingError('A checkout line item is invalid.');
   for (const value of [successUrl,cancelUrl]) { let u; try { u=new URL(value); } catch { throw billingError('Success and cancellation URLs must be absolute URLs.'); } if (!['https:','http:'].includes(u.protocol) || u.username || u.password || (process.env.NODE_ENV === 'production' && u.protocol !== 'https:')) throw billingError('Checkout URLs must use HTTPS in production and cannot contain credentials.'); }
   if (expiresAt !== null) {
-    const now = Math.floor(Date.now() / 1000);
-    if (!Number.isSafeInteger(expiresAt) || expiresAt < now + 30 * 60 || expiresAt > now + 24 * 60 * 60) throw billingError('Checkout expiration must be between 30 minutes and 24 hours from now.');
+    if (!Number.isSafeInteger(nowSeconds) || nowSeconds < 0 ||
+        !Number.isSafeInteger(expiresAt) || expiresAt < nowSeconds + 30 * 60 || expiresAt > nowSeconds + 24 * 60 * 60) {
+      throw billingError('Checkout expiration must be between 30 minutes and 24 hours from now.');
+    }
   }
   const form = new URLSearchParams(); form.set('mode',mode); form.set('success_url',successUrl); form.set('cancel_url',cancelUrl);
   if (expiresAt !== null) form.set('expires_at', String(expiresAt));
