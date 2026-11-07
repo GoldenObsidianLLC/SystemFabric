@@ -9,8 +9,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
 - Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: 1f5639b477999e72086593cb5ce315066b60dbe0bfa1a12be4c9e0112c0ac104 across 37 files.
-- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 37 test files.
+- Referenced-test digest: 0dd0f08f394bc9f789e00e99c05f1b6a8789e4ebc95e2090d6659817cb8e5329 across 38 files.
+- Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 38 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
 The catalog is a curated route-family inventory. Source anchors are checked against the current files and line numbers are generated. Route patterns, capability descriptions, data-access notes, and test limitations remain maintainer-authored metadata; they are not inferred proofs of runtime behavior.
@@ -347,13 +347,13 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Methods (family-level union): GET, POST, PUT, DELETE
 - Routes/flows: /api/v1/sites/{siteId}/mega-menus; /api/v1/sites/{siteId}/mega-menus/{slug}
 - Authentication: Authenticated session.
-- Tenant/site context: Site passed through siteIdFor; GET checks content:read and writes check site:manage.
+- Tenant/site context: Path site is reconciled with optional header, query and JSON-body selectors through siteIdFor before route-specific authorization. GET requires content:read; create/update/delete require site:manage. Collection reads, versioned updates and deletes are scoped by site_id, with site/slug as the composite navigation key.
 - Capabilities/controls: content:read, site:manage
 - Data-access boundary: navigation_menus
 - Side effects: Create/update/delete versioned navigation configuration
 - Source: apps/api/src/platform-routes.js (lines 81)
-- Test references: test/tenant-route-capabilities.test.js, test/api.test.js
-- Coverage characterization: **targeted**. A route-level denied-capability case exists; foreign slug/ID updates and deletion with before/after tenant state require A/B database tests.
+- Test references: test/tenant-route-capabilities.test.js, test/api.test.js, test/integration/tenant-mega-menu-isolation.integration.test.js
+- Coverage characterization: **targeted-two-site-route-tests**. Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; before/after snapshots prove both tenants remain unchanged after denial. Concurrent stale updates, consumer rendering/cache invalidation and every presentation variant remain separate review items.
 
 ### 22. Stripe billing webhook
 

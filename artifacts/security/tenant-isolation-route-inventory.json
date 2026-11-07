@@ -32,8 +32,8 @@
     ]
   },
   "testTree": {
-    "fileCount": 37,
-    "sha256": "1f5639b477999e72086593cb5ce315066b60dbe0bfa1a12be4c9e0112c0ac104",
+    "fileCount": 38,
+    "sha256": "0dd0f08f394bc9f789e00e99c05f1b6a8789e4ebc95e2090d6659817cb8e5329",
     "files": [
       "test/ai-queue-worker.test.js",
       "test/ai-task-queue.test.js",
@@ -60,6 +60,7 @@
       "test/integration/tenant-content-object-isolation.integration.test.js",
       "test/integration/tenant-isolation.integration.test.js",
       "test/integration/tenant-library-media-isolation.integration.test.js",
+      "test/integration/tenant-mega-menu-isolation.integration.test.js",
       "test/integration/tenant-membership-administration-isolation.integration.test.js",
       "test/library-routes.test.js",
       "test/memgraph-projector.test.js",
@@ -80,7 +81,7 @@
     "nonHttpFamilyCount": 4,
     "declaredRoutePatternCount": 78,
     "sourceFileCount": 19,
-    "testFileCount": 37
+    "testFileCount": 38
   },
   "commonControls": [
     {
@@ -1601,7 +1602,7 @@
         "/api/v1/sites/{siteId}/mega-menus/{slug}"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Site passed through siteIdFor; GET checks content:read and writes check site:manage.",
+      "siteContext": "Path site is reconciled with optional header, query and JSON-body selectors through siteIdFor before route-specific authorization. GET requires content:read; create/update/delete require site:manage. Collection reads, versioned updates and deletes are scoped by site_id, with site/slug as the composite navigation key.",
       "capabilities": [
         "content:read",
         "site:manage"
@@ -1627,11 +1628,12 @@
       ],
       "tests": [
         "test/tenant-route-capabilities.test.js",
-        "test/api.test.js"
+        "test/api.test.js",
+        "test/integration/tenant-mega-menu-isolation.integration.test.js"
       ],
       "coverage": {
-        "level": "targeted",
-        "limits": "A route-level denied-capability case exists; foreign slug/ID updates and deletion with before/after tenant state require A/B database tests."
+        "level": "targeted-two-site-route-tests",
+        "limits": "Live PostgreSQL A/B route tests cover scoped listing, create, versioned update and delete with the same slug present in both sites. Foreign-site list/update/delete attempts and conflicting header/query/body selectors are rejected before mutation; before/after snapshots prove both tenants remain unchanged after denial. Concurrent stale updates, consumer rendering/cache invalidation and every presentation variant remain separate review items."
       },
       "methods": [
         "GET",

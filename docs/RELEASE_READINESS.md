@@ -1,6 +1,6 @@
-## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#89 merged)
+## Latest mainline and tenant-isolation preparation snapshot - 7 November 2026 (PRs #84-#90 merged)
 
-Current mainline: VirgoScorpio Hub 0.6.2 at f38c3b0b65be1a20959295528b0ed5e1417eac40 after PR #89. PR #89 reconciles path/header/query and bounded JSON body selectors across design-system, reusable-component, template, navigation-menu and AI-policy routes while preserving each capability gate. PR #89 PR workflow [run 42338254603](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42338254603) and post-merge mainline workflow [run 42338545038](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42338545038) passed all six hosted jobs. The generated inventory remains a maintainer navigation aid only. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+Current mainline: VirgoScorpio Hub 0.6.2 at 58b6b9707f9d63a08f55b15b0f0ee2489bdf3ef5 after PR #90. PR #90 applies shared path/header/query and optional heartbeat-body site selector reconciliation to presence, SSE and WebSocket routes while preserving realtime capability, session and per-command authorization. Its PR workflow [run 42339494738](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42339494738) and post-merge mainline workflow [run 42339681578](https://github.com/GoldenObsidianLLC/VirgoScorpio-Hub/actions/runs/42339681578) passed all six hosted jobs. The generated inventory remains a maintainer navigation aid only. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 The maintainer-generated [Tenant-Isolation Route and Data-Access Inventory](security/TENANT-ISOLATION-ROUTE-CAPABILITY-MAP-2026-11-07.md) catalogs 27 route/processing families and 78 declared route patterns, with 19 source files and 37 referenced test files. Its generator checks source anchors and test references, refreshes line numbers, records implementation/test tree digests, and is exercised by the unit suite. It is a navigation and drift-detection aid only: it does not prove route completeness or runtime security and is not an independent assessment.
 
@@ -8,11 +8,11 @@ Issue #14 remains OPEN / NOT PERFORMED. No independent reviewer is assigned and 
 
 ---
 
-## Pending code candidate - realtime route selector reconciliation (PR #90, not merged)
+## Pending code candidate - mega-menu two-site route isolation tests (PR #91, not merged)
 
-The next candidate is based on mainline f38c3b0b65be1a20959295528b0ed5e1417eac40. It applies the shared request-context resolver to presence list/heartbeat/leave, SSE and WebSocket upgrades. Header/query conflicts are rejected before realtime capability authorization; heartbeat body siteId conflicts are rejected after bounded parsing and before presence mutation. Existing session, per-command/document, Redis and realtime authorization boundaries remain unchanged.
+The next candidate is based on mainline 58b6b9707f9d63a08f55b15b0f0ee2489bdf3ef5. It adds a live PostgreSQL A/B endpoint suite for mega-menu listing, create, versioned update and delete with the same slug seeded in both sites. It asserts a Site A owner cannot list, update or delete the Site B record, conflicting header/query/body selectors fail before mutation, and before/after database snapshots remain unchanged after denied requests. Positive Site A controls verify creation, version increments and deletion without changing Site B.
 
-This is targeted selector consistency work, not independent tenant-isolation proof. PR CI and post-merge mainline CI have not yet been validated. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
+This is targeted regression coverage, not independent tenant-isolation proof. PR #91 hosted CI and post-merge CI have not yet been validated. Issues #14 and #25 remain open; production remains NO-GO / NOT_PRODUCTION_CERTIFIED.
 
 # Release Readiness and Certification Gates
 
