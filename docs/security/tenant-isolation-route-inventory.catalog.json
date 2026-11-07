@@ -283,7 +283,7 @@
         "/api/v1/sites/{siteId}/ai-policy"
       ],
       "authentication": "Authenticated session.",
-      "siteContext": "Path-site route families; implementations use route/path site IDs and route-specific capability guards. Some handlers also reconcile other selectors through siteIdFor; verify each operation individually.",
+      "siteContext": "Path-addressed configuration operations reconcile the route site against x-virgoscorpio-hub-site-id and siteId query selectors before the route-specific capability check. Bounded JSON writes reconcile body siteId after parsing and before domain validation or persistence. The shared resolver validates selector shape and agreement with its generic membership precheck disabled so each route preserves its established capability/error contract.",
       "capabilities": [
         "content:read",
         "content:edit",
@@ -316,7 +316,8 @@
             "const termsCollectionMatch",
             "const relationshipsCollectionMatch",
             "const menuCollectionMatch",
-            "const aiPolicyMatch"
+            "const aiPolicyMatch",
+            "async function reconcileRouteSiteContext(routeSiteId, body = {})"
           ]
         }
       ],
@@ -327,8 +328,8 @@
         "test/outbox-contract.test.js"
       ],
       "coverage": {
-        "level": "selected-route-denial-and-targeted-integration",
-        "limits": "The route capability suite checks deny-before-data-access for selected GET routes; it does not prove all operation methods, foreign object IDs, concurrency or outbox/graph effects for every family."
+        "level": "path-header-query-and-write-body-selector-reconciliation",
+        "limits": "Live PostgreSQL tenant-isolation integration tests exercise header/query conflicts for each configuration family, body conflicts for design-system/reusable-components/templates/menus/AI-policy writes, and header mismatches for path-addressed deletes. Snapshot comparisons cover tenant configuration tables. Independent route enumeration, authorization matrices and broader deployment review remain required."
       },
       "methods": [
         "GET",
