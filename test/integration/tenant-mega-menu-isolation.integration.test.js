@@ -208,8 +208,11 @@ test(
     });
     assert.equal(created.status, 201);
     const createdPayload = await created.json();
-    assert.equal(createdPayload.menu.site_id, siteA);
     assert.equal(createdPayload.menu.version, 1);
+    const createdRecord = await pool.query('SELECT site_id,version FROM navigation_menus WHERE site_id=$1 AND slug=$2', [siteA, createdSlug]);
+    assert.equal(createdRecord.rows.length, 1);
+    assert.equal(createdRecord.rows[0].site_id, siteA);
+    assert.equal(createdRecord.rows[0].version, 1);
     assert.equal(createdPayload.menu.presentation.megaMenu, true);
 
     const updatedCreated = await fetch(base + path(siteA) + '/' + createdSlug, {
@@ -224,9 +227,12 @@ test(
     });
     assert.equal(updatedCreated.status, 200);
     const updatedPayload = await updatedCreated.json();
-    assert.equal(updatedPayload.menu.site_id, siteA);
     assert.equal(updatedPayload.menu.version, 2);
     assert.equal(updatedPayload.menu.name, 'Site A updated mega menu');
+    const updatedRecord = await pool.query('SELECT site_id,version FROM navigation_menus WHERE site_id=$1 AND slug=$2', [siteA, createdSlug]);
+    assert.equal(updatedRecord.rows.length, 1);
+    assert.equal(updatedRecord.rows[0].site_id, siteA);
+    assert.equal(updatedRecord.rows[0].version, 2);
 
     const deletedCreated = await fetch(base + path(siteA) + '/' + createdSlug, {
       method: 'DELETE',

@@ -9,7 +9,7 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
 - Implementation-source digest: a900072ccaa5156ca70b150334d0c5d82baa573f0b3d5545485fdfe8490dc575 across 19 files.
-- Referenced-test digest: afbae9a8f19ca149d684dceb2879b18b37f1ce93f28a0e225fc5b26c0704033d across 38 files.
+- Referenced-test digest: 0dd0f08f394bc9f789e00e99c05f1b6a8789e4ebc95e2090d6659817cb8e5329 across 38 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 38 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
