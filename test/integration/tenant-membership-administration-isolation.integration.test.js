@@ -160,6 +160,7 @@ test(
     const attemptedInviteEmail = `cross-site-invite-${randomUUID()}@example.test`;
     mailRecipients.push(attemptedInviteEmail);
     const before = await membershipSideEffects(pool, siteB, attemptedInviteEmail);
+    const beforeSiteA = await membershipSideEffects(pool, siteA, attemptedInviteEmail);
 
     async function denyCrossSite(method, url, body) {
       const response = await fetch(base + url, {
@@ -172,6 +173,44 @@ test(
       assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_FORBIDDEN');
       assert.doesNotMatch(JSON.stringify(payload), /Site B Existing Member|cross-site-invite/);
     }
+
+    await t.test('path site selectors reject conflicting header, query, and JSON body context before tenant side effects', async () => {
+      const scenarios = [
+        {
+          method: 'GET',
+          url: `/api/v1/sites/${siteA}/members`,
+          headers: { 'x-virgoscorpio-hub-site-id': siteB },
+        },
+        {
+          method: 'GET',
+          url: `/api/v1/sites/${siteA}/members?siteId=${siteB}`,
+        },
+        {
+          method: 'POST',
+          url: `/api/v1/sites/${siteA}/members`,
+          body: { siteId: siteB, email: targetA.email, role: 'viewer' },
+        },
+        {
+          method: 'POST',
+          url: `/api/v1/sites/${siteA}/invitations`,
+          body: { siteId: siteB, email: attemptedInviteEmail, role: 'editor' },
+        },
+      ];
+
+      for (const scenario of scenarios) {
+        const response = await fetch(base + scenario.url, {
+          method: scenario.method,
+          headers: { ...headers, ...(scenario.headers || {}) },
+          ...(scenario.body === undefined ? {} : { body: JSON.stringify(scenario.body) }),
+        });
+        const payload = await response.json();
+        assert.equal(response.status, 400, `${scenario.method} ${scenario.url} must reject conflicting site selectors`);
+        assert.equal(payload.code, 'ERR_VIRGOSCORPIO_HUB_SITE_CONTEXT_MISMATCH');
+      }
+
+      assert.deepEqual(await membershipSideEffects(pool, siteA, attemptedInviteEmail), beforeSiteA);
+      assert.deepEqual(await membershipSideEffects(pool, siteB, attemptedInviteEmail), before);
+    });
 
     await t.test('site A owner can list and add members to site A', async () => {
       const listBefore = await fetch(`${base}/api/v1/sites/${siteA}/members`, {

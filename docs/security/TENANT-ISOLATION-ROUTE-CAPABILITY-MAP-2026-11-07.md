@@ -8,8 +8,8 @@ Maintainer-prepared route, capability, data-access, and regression-test navigati
 
 - Status: MAINTAINER_PREPARED_NOT_INDEPENDENTLY_REVIEWED.
 - Generated from the current working-tree implementation anchors and the catalog at docs/security/tenant-isolation-route-inventory.catalog.json.
-- Implementation-source digest: 59ca52f1032f72a3961a3b0336317faab8dffb8cbd51f0281e62130d4aa34e13 across 19 files.
-- Referenced-test digest: 5ad23777a59f472f1cc1397cdbc7ee025a869ee07fc7a0f9beff300ddb9cae15 across 37 files.
+- Implementation-source digest: 01faa2aae37f86937eb4bd85890b24978fb57e1ca304b343f963244bd4297e9e across 19 files.
+- Referenced-test digest: a92adf075c555d24c28b235c8259e21fe4b43c91766d03061cf0fdcf42362c41 across 37 files.
 - Inventory size: 27 route/flow families, 78 declared route patterns, 19 source files, and 37 test files.
 - Regenerate with npm run security:tenant-inventory; CI checks freshness with node scripts/generate-tenant-isolation-route-inventory.js --check.
 
@@ -109,13 +109,13 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Methods (family-level union): GET, POST, DELETE
 - Routes/flows: /api/v1/sites/{siteId}/members; /api/v1/sites/{siteId}/members/{userId}; /api/v1/sites/{siteId}/invitations
 - Authentication: Authenticated session.
-- Tenant/site context: Path site ID is passed directly to requireCapability. This family does not invoke the shared siteIdFor selector reconciliation helper; assess path/header/query/body mismatch behavior explicitly.
+- Tenant/site context: Each path site ID is reconciled through the shared siteIdFor helper against the x-virgoscorpio-hub-site-id header, siteId query values, and JSON body siteId on writes. The resolver validates UUID shape and selector consistency with its generic membership precheck explicitly disabled for this route family; the established site:manage capability check remains the authorization gate and preserves the existing forbidden response contract. Conflicting or duplicated selectors fail with a site-context 400 before identity-store operations.
 - Capabilities/controls: site:manage
 - Data-access boundary: site_memberships; users; invitations; mail/outbox; audit events; authorization invalidation
 - Side effects: Add/remove membership; Create invitation; Mail delivery intent; Audit and session/realtime authorization invalidation
-- Source: apps/api/src/site-membership-routes.js (lines 26, 61, 81)
+- Source: apps/api/src/site-membership-routes.js (lines 33, 68, 89); apps/api/src/server.js (lines 1780)
 - Test references: test/site-membership-routes.test.js, test/integration/tenant-membership-administration-isolation.integration.test.js
-- Coverage characterization: **targeted-two-site**. A/B integration asserts membership, invitation, mail-outbox and audit state around denied attempts. Multi-role edge cases, last-owner concurrency and active-stream invalidation still require reviewer expansion.
+- Coverage characterization: **targeted-selector-reconciliation-and-two-site-side-effects**. Unit tests assert resolver-before-capability ordering. The live A/B integration scenario rejects path/header, path/query and path/body conflicts for member listing, member creation and invitation creation, then compares membership, invitation, mail-outbox and audit snapshots for both sites. Foreign-user membership and invitation controls remain covered. Last-owner concurrency, broader role combinations and revocation of active streams remain independent-review work.
 
 ### 5. Design system, reusable components, templates, taxonomy, relationships, menus and AI policy
 
@@ -309,7 +309,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: plugins:read, plugins:manage
 - Data-access boundary: plugin_installs; approval and security-review metadata; artifact/SBOM/provenance/signature metadata; plugin runner boundary
 - Side effects: Registration/update; Capability approval; Security review state; Activation/disable/invocation
-- Source: apps/api/src/server.js (lines 1795, 1801, 1830)
+- Source: apps/api/src/server.js (lines 1796, 1802, 1831)
 - Test references: test/security-boundaries.test.js, test/security-boundaries.test.js, test/integration/tenant-isolation.integration.test.js
 - Coverage characterization: **partial**. Manifest/signature/runner boundaries have unit coverage. Cross-site plugin ID, approval and invocation side-effect A/B tests and actual sandbox isolation remain open.
 
@@ -379,7 +379,7 @@ Tests: test/content-type-routes.test.js, test/collaboration-api.test.js, test/re
 - Capabilities/controls: Realtime capability policy, content:edit/content:edit:own for document collaboration
 - Data-access boundary: presence leases; SSE/WebSocket subscriptions; Redis channels/keys; connection quotas; document operations
 - Side effects: Presence lease create/renew/release; Stream fan-out; Authorization invalidation; Quota lease acquire/release
-- Source: apps/api/src/server.js (lines 1229, 1231, 1942); packages/realtime/src/redis-presence.js (lines 62, 63, 64, 66, 76, 79, 109, 111, 122, 126, 136, 139, 144, 178, 180, 196, 207, 211, 212)
+- Source: apps/api/src/server.js (lines 1229, 1231, 1943); packages/realtime/src/redis-presence.js (lines 62, 63, 64, 66, 76, 79, 109, 111, 122, 126, 136, 139, 144, 178, 180, 196, 207, 211, 212)
 - Test references: test/realtime-tenant-isolation.test.js, test/realtime-websocket.test.js, test/redis-realtime.test.js, test/integration/redis-presence.integration.test.js
 - Coverage characterization: **targeted-cross-instance**. Selected two-site stream isolation, session invalidation, per-command reauthorization and Redis relay cases are covered. Forged cross-site payloads, every reconnect/replay path and production distributed quota behavior need independent review.
 
