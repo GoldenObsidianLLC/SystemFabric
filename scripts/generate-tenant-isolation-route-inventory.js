@@ -28,7 +28,10 @@ function digestFiles(files) {
   const hash = crypto.createHash('sha256');
   const unique = [...new Set(files)].sort();
   for (const relativePath of unique) {
-    const bytes = fs.readFileSync(repoFile(relativePath));
+    // Git checkouts may use LF or CRLF; digest canonical UTF-8/LF text so
+    // generated evidence remains identical across Windows, macOS and Linux.
+    const source = fs.readFileSync(repoFile(relativePath), 'utf8').replace(/\r\n?/g, '\n');
+    const bytes = Buffer.from(source, 'utf8');
     hash.update(relativePath, 'utf8');
     hash.update(Buffer.from([0]));
     hash.update(sha256(bytes), 'utf8');
